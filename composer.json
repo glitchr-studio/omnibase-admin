@@ -2,7 +2,13 @@
     "name": "glitchr/base-bundle-admin",
     "type": "symfony-bundle",
     "description": "Administration backoffice for base-bundle: dynamic CRUD, dashboard, menus and field-based form generation",
-    "keywords": ["symfony", "admin", "backoffice", "crud", "dashboard"],
+    "keywords": [
+        "symfony",
+        "admin",
+        "backoffice",
+        "crud",
+        "dashboard"
+    ],
     "homepage": "https://gitlab.glitchr.dev/public-repository/symfony/bundle/base/extension/admin",
     "license": "LGPL-3.0-or-later",
     "authors": [
@@ -18,7 +24,7 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Tests\\Base\\Admin\\": "./src/Tests"
+            "Tests\\Base\\Admin\\": "./tests"
         }
     },
     "require": {

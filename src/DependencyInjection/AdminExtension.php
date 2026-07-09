@@ -12,6 +12,11 @@ use Base\Bundle\AbstractBaseExtension;
 
 class AdminExtension extends AbstractBaseExtension
 {
+    public function getConfiguration(array $config, ContainerBuilder $container): AdminConfiguration
+    {
+        return new AdminConfiguration();
+    }
+
     public function load(array $configs, ContainerBuilder $container): void
     {
         //
