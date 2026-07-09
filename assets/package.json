@@ -1,0 +1,16 @@
+{
+  "name": "@glitchr/base-bundle-admin",
+  "version": "1.0.0",
+  "description": "Admin shell assets for glitchr/base-bundle-admin",
+  "license": "LGPL-3.0-or-later",
+  "author": "Marco Meyer <marco.meyer@glitchr.io>",
+  "repository": {
+    "url": "ssh://git@gitlab.glitchr.dev:public-repository/symfony/bundle/base/extension/admin.git",
+    "type": "git"
+  },
+  "main": "src/index.js",
+  "scripts": {
+    "watch": "echo \"No build configured yet.\"",
+    "prod": "echo \"No build configured yet.\""
+  }
+}

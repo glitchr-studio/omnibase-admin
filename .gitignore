@@ -1,0 +1,7 @@
+/vendor/
+/composer.lock
+/.phpunit.result.cache
+/assets/node_modules/
+/assets/build/
+/assets/package-lock.json
+/assets/yarn.lock
