@@ -70,13 +70,13 @@
             <ul class="admin-menu">
                 {% for item in admin_context.mainMenu %}
                     {% if item.section %}
-                        <li class="section">{{ item.label }}</li>
+                        <li class="section">{{ item.label|trans }}</li>
                     {% else %}
                         <li class="{{ item.selected ? 'selected' }}">
-                            <a href="{{ item.linkUrl ?? '#' }}"{% if item.linkTarget %} target="{{ item.linkTarget }}"{% endif %}>{{ item.label }}</a>
+                            <a href="{{ item.linkUrl ?? '#' }}"{% if item.linkTarget %} target="{{ item.linkTarget }}"{% endif %}>{{ item.label|trans }}</a>
                         </li>
                         {% for subItem in item.subItems %}
-                            <li class="{{ subItem.selected ? 'selected' }}"><a href="{{ subItem.linkUrl ?? '#' }}">&nbsp;&nbsp;{{ subItem.label }}</a></li>
+                            <li class="{{ subItem.selected ? 'selected' }}"><a href="{{ subItem.linkUrl ?? '#' }}">&nbsp;&nbsp;{{ subItem.label|trans }}</a></li>
                         {% endfor %}
                     {% endif %}
                 {% endfor %}

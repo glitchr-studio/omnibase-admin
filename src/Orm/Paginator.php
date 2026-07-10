@@ -25,7 +25,10 @@ class Paginator implements \IteratorAggregate, \Countable
             ->setFirstResult(($this->page - 1) * $this->pageSize)
             ->setMaxResults($this->pageSize);
 
-        $this->paginator = new DoctrinePaginator($queryBuilder->getQuery(), true);
+        // fetchJoinCollection=false: index queries select the root entity
+        // only, so the LimitSubqueryOutputWalker machinery is never needed
+        $this->paginator = new DoctrinePaginator($queryBuilder->getQuery(), false);
+        $this->paginator->setUseOutputWalkers(false);
     }
 
     public function getIterator(): \Traversable

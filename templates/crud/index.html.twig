@@ -8,7 +8,7 @@
     <div class="global-actions">
         {% for action in actions.globalActions('index') %}
             <a class="btn btn-primary {{ action.cssClass }}" href="{{ admin_url(controller_fqcn, action.crudActionName ?? 'new') }}">
-                {{ action.label }}
+                {{ action.label|trans }}
             </a>
         {% endfor %}
     </div>
@@ -54,11 +54,11 @@
                                 <form method="post" action="{{ admin_url(controller_fqcn, 'delete', row.entity.id) }}" style="display:inline"
                                       onsubmit="return confirm('{{ 'action.delete_confirm'|trans({}, 'admin') }}');">
                                     <input type="hidden" name="_token" value="{{ csrf_token('admin-delete-' ~ row.entity.id) }}">
-                                    <button class="btn text-danger" title="{{ action.label }}">✕</button>
+                                    <button class="btn text-danger" title="{{ action.label|trans }}">✕</button>
                                 </form>
                             {% else %}
-                                <a class="btn {{ action.cssClass }}" href="{{ action.linkUrl ?? admin_url(controller_fqcn, action.crudActionName ?? action.name, row.entity.id) }}" title="{{ action.label }}">
-                                    {{ action.name == 'edit' ? '✎' : (action.name == 'detail' ? '👁' : action.label) }}
+                                <a class="btn {{ action.cssClass }}" href="{{ action.linkUrl ?? admin_url(controller_fqcn, action.crudActionName ?? action.name, row.entity.id) }}" title="{{ action.label|trans }}">
+                                    {{ action.name == 'edit' ? '✎' : (action.name == 'detail' ? '👁' : action.label|trans) }}
                                 </a>
                             {% endif %}
                         {% endif %}

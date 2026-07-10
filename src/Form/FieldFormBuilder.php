@@ -29,7 +29,11 @@ class FieldFormBuilder
      */
     public function createFormBuilder(mixed $data, iterable $fields, string $page = FieldDescriptor::PAGE_NEW, array $formOptions = []): FormBuilderInterface
     {
-        $builder = $this->formFactory->createBuilder(FormType::class, $data, $formOptions + [
+        // createNamedBuilder on purpose: binding the entity itself is the
+        // whole point of a CRUD form, and the named variant is the sanctioned
+        // path for that (base-bundle's decorated factory guards createBuilder
+        // against accidental entity data in ad-hoc forms)
+        $builder = $this->formFactory->createNamedBuilder('crud_form', FormType::class, $data, $formOptions + [
             'data_class' => is_object($data) ? get_class($data) : null,
             'translation_domain' => 'forms',
         ]);
