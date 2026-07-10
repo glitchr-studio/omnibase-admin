@@ -16,7 +16,7 @@ trait FieldTrait
 {
     protected FieldDescriptor $dto;
 
-    private function __construct()
+    protected function __construct()
     {
         $this->dto = new FieldDescriptor();
         $this->dto->setFieldFqcn(static::class);
@@ -172,11 +172,6 @@ trait FieldTrait
     {
         $this->dto->setCssClass($cssClass);
         return $this;
-    }
-
-    public function setClass(string $cssClass): static
-    {
-        return $this->setCssClass($cssClass);
     }
 
     public function setTranslationParameters(array $parameters): static
