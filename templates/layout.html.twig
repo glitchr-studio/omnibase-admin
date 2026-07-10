@@ -62,8 +62,11 @@
     <aside class="admin-aside">
         <div class="brand">
             {% block brand %}<span>{% block brand_title %}Administration{% endblock %}</span>{% endblock %}
-            {# the "x" returns to the site; becomes Transparent.closeNest() once the overlay shell lands #}
-            <a class="close" href="/" title="Close administration">&times;</a>
+            {# the "x" closes the overlay instantly when the admin is nested
+               (transparentJS website-in-website); plain link back to the
+               site otherwise #}
+            <a class="close" href="/" title="Close administration"
+               onclick="if (window.Transparent && Transparent.isNested && Transparent.isNested()) { Transparent.closeNest(); return false; }">&times;</a>
         </div>
         {% block main_menu %}
             {% if admin_context is defined and admin_context.mainMenu is not empty %}

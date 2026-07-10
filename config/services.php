@@ -52,4 +52,7 @@ return function (ContainerConfigurator $configurator) {
     $services->set(\Base\Admin\Twig\AdminTwigExtension::class)
         ->args([service(AdminUrlGenerator::class)])
         ->tag('twig.extension');
+
+    $services->set(\Base\Admin\EventSubscriber\NestHeaderSubscriber::class)
+        ->tag('kernel.event_subscriber');
 };
