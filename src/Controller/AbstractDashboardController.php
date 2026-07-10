@@ -114,7 +114,7 @@ abstract class AbstractDashboardController extends AbstractController
             MenuItem::TYPE_CRUD => $this->generateCrudUrl($item),
             MenuItem::TYPE_ROUTE => $this->generateUrl($item->getRouteName(), $item->getRouteParameters()),
             MenuItem::TYPE_URL, MenuItem::TYPE_SUBMENU => $item->getUrl(),
-            MenuItem::TYPE_DASHBOARD => $this->generateUrl('admin_dashboard'),
+            MenuItem::TYPE_DASHBOARD => $this->generateUrl('admin'),
             MenuItem::TYPE_LOGOUT => $this->generateUrl('app_logout'),
             default => null,
         });
