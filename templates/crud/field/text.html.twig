@@ -1,0 +1,16 @@
+{%- set value = field.formattedValue -%}
+{%- if value is null -%}
+    <span style="color: var(--admin-muted)">—</span>
+{%- elseif value is same as(true) or value is same as(false) -%}
+    {{ value ? '✓' : '✕' }}
+{%- elseif value.timestamp is defined -%}
+    {{ value|date('Y-m-d H:i') }}
+{%- elseif value is iterable -%}
+    {{ value|length }} item{{ value|length != 1 ? 's' }}
+{%- elseif field.customOption('renderAsHtml') -%}
+    {{ value|raw }}
+{%- else -%}
+    {%- set value = '' ~ value -%}
+    {%- set max = field.customOption('maxLength') ?? 64 -%}
+    {{ value|length > max ? value|slice(0, max) ~ '…' : value }}
+{%- endif -%}

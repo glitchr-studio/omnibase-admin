@@ -30,6 +30,8 @@ class AdminExtension extends AbstractBaseExtension
         $config = $processor->processConfiguration($configuration, $configs);
         $this->setConfiguration($container, $config, $configuration->getTreeBuilder()->buildTree()->getName());
 
-        $this->setConfigurationAliases($container);
+        // NB: no setConfigurationAliases() here - Base\Admin IS the canonical
+        // namespace of this package; the swapped-segment service aliases the
+        // other extension bundles use would only duplicate every definition.
     }
 }

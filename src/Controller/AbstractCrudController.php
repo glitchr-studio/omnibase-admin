@@ -1,0 +1,378 @@
+<?php
+
+namespace Base\Admin\Controller;
+
+use Base\Admin\Config\Action;
+use Base\Admin\Config\Actions;
+use Base\Admin\Config\Crud;
+use Base\Admin\Context\AdminContext;
+use Base\Admin\Field\FieldDescriptor;
+use Base\Admin\Field\FieldInterface;
+use Base\Admin\Field\FieldValueResolver;
+use Base\Admin\Field\IdField;
+use Base\Admin\Form\FieldFormBuilder;
+use Base\Admin\Orm\Paginator;
+use Base\Admin\Router\AdminUrlGenerator;
+use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\QueryBuilder;
+use LogicException;
+use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Contracts\Service\Attribute\Required;
+
+/**
+ * Direct, linear CRUD pipeline: every page is an ordinary controller action
+ * calling overridable hooks - no event dispatch, no listener-side rendering.
+ *
+ * Hook names (configureFields/configureActions/configureCrud/
+ * createIndexQueryBuilder/...) intentionally match the historical API so
+ * existing controllers port without rewriting their bodies.
+ */
+abstract class AbstractCrudController extends AbstractController implements CrudControllerInterface
+{
+    protected EntityManagerInterface $entityManager;
+    protected FieldFormBuilder $fieldFormBuilder;
+    protected FieldValueResolver $fieldValueResolver;
+    protected AdminUrlGenerator $adminUrlGenerator;
+    protected AdminContext $adminContext;
+
+    #[Required]
+    public function setAdminServices(
+        EntityManagerInterface $entityManager,
+        FieldFormBuilder $fieldFormBuilder,
+        FieldValueResolver $fieldValueResolver,
+        AdminUrlGenerator $adminUrlGenerator,
+        AdminContext $adminContext,
+    ): void {
+        $this->entityManager = $entityManager;
+        $this->fieldFormBuilder = $fieldFormBuilder;
+        $this->fieldValueResolver = $fieldValueResolver;
+        $this->adminUrlGenerator = $adminUrlGenerator;
+        $this->adminContext = $adminContext;
+    }
+
+    /**
+     * Convention: App\Controller\Admin\Crud\Xxx\YyyCrudController maps to
+     * App\Entity\Xxx\Yyy. Override for non-conventional locations.
+     */
+    public static array $crudNamespaceCandidates = ['\\Controller\\Crud\\', '\\Controller\\Admin\\Crud\\'];
+
+    public static function getEntityFqcn(): string
+    {
+        $controllerFqcn = static::class;
+        $entityBase = preg_replace('/CrudController$/', '', $controllerFqcn);
+
+        foreach (static::$crudNamespaceCandidates as $namespace) {
+            $entityFqcn = str_replace($namespace, '\\Entity\\', $entityBase);
+            if ($entityFqcn !== $entityBase && class_exists($entityFqcn)) {
+                return $entityFqcn;
+            }
+        }
+
+        throw new LogicException(sprintf('Failed to guess the entity FQCN of "%s". Override getEntityFqcn().', $controllerFqcn));
+    }
+
+    public static function getPreferredIcon(): ?string
+    {
+        return null;
+    }
+
+    // -----------------------------------------------------------------
+    // configuration hooks
+    // -----------------------------------------------------------------
+
+    /**
+     * @return iterable<FieldInterface>
+     */
+    public function configureFields(string $pageName): iterable
+    {
+        yield IdField::new('id');
+    }
+
+    public function configureActions(Actions $actions): Actions
+    {
+        return $actions->addDefaults();
+    }
+
+    public function configureCrud(Crud $crud): Crud
+    {
+        return $crud
+            ->setDefaultSort(['id' => 'DESC'])
+            ->setPaginatorPageSize(20);
+    }
+
+    // -----------------------------------------------------------------
+    // page actions
+    // -----------------------------------------------------------------
+
+    public function index(Request $request): Response
+    {
+        $crud = $this->getCrudConfig(Crud::PAGE_INDEX, Action::INDEX);
+        $this->denyAccessUnlessGrantedToRun($crud);
+
+        $fields = $this->getFields(Crud::PAGE_INDEX);
+
+        $sort = $this->getSort($request, $crud);
+        $queryBuilder = $this->createIndexQueryBuilder($crud, $sort);
+
+        $paginator = new Paginator(
+            $queryBuilder,
+            max(1, $request->query->getInt('page', 1)),
+            $crud->getPaginatorPageSize()
+        );
+
+        $rows = [];
+        foreach ($paginator as $entity) {
+            $rows[] = [
+                'entity' => $entity,
+                'fields' => $this->fieldValueResolver->resolveAll($fields, $entity, FieldDescriptor::PAGE_INDEX),
+            ];
+        }
+
+        $actions = $this->getActionsConfig();
+
+        return $this->renderCrud('@Admin/crud/index.html.twig', [
+            'crud' => $crud,
+            'fields' => array_map(fn ($f) => $f instanceof FieldInterface ? $f->getAsDto() : $f, is_array($fields) ? $fields : iterator_to_array($fields, false)),
+            'rows' => $rows,
+            'paginator' => $paginator,
+            'actions' => $actions,
+            'sort' => $sort,
+        ]);
+    }
+
+    public function detail(Request $request, string $entityId): Response
+    {
+        $crud = $this->getCrudConfig(Crud::PAGE_DETAIL, Action::DETAIL);
+        $this->denyAccessUnlessGrantedToRun($crud);
+
+        $entity = $this->findEntity($entityId);
+        $this->adminContext->setEntity($entity);
+
+        return $this->renderCrud('@Admin/crud/detail.html.twig', [
+            'crud' => $crud,
+            'entity' => $entity,
+            'entityId' => $entityId,
+            'fields' => $this->fieldValueResolver->resolveAll($this->getFields(Crud::PAGE_DETAIL), $entity, FieldDescriptor::PAGE_DETAIL),
+            'actions' => $this->getActionsConfig(),
+        ]);
+    }
+
+    public function new(Request $request): Response
+    {
+        $crud = $this->getCrudConfig(Crud::PAGE_NEW, Action::NEW);
+        $this->denyAccessUnlessGrantedToRun($crud);
+
+        $entity = $this->createEntity(static::getEntityFqcn());
+        $this->adminContext->setEntity($entity);
+
+        $form = $this->fieldFormBuilder->createForm($entity, $this->getFields(Crud::PAGE_NEW), FieldDescriptor::PAGE_NEW, $crud->getNewFormOptions());
+        $form->handleRequest($request);
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            $this->persistEntity($this->entityManager, $entity);
+
+            return $this->redirectAfterSubmit($request, $entity);
+        }
+
+        return $this->renderCrud('@Admin/crud/new.html.twig', [
+            'crud' => $crud,
+            'entity' => $entity,
+            'form' => $form,
+            'actions' => $this->getActionsConfig(),
+        ]);
+    }
+
+    public function edit(Request $request, string $entityId): Response
+    {
+        $crud = $this->getCrudConfig(Crud::PAGE_EDIT, Action::EDIT);
+        $this->denyAccessUnlessGrantedToRun($crud);
+
+        $entity = $this->findEntity($entityId);
+        $this->adminContext->setEntity($entity);
+
+        $form = $this->fieldFormBuilder->createForm($entity, $this->getFields(Crud::PAGE_EDIT), FieldDescriptor::PAGE_EDIT, $crud->getEditFormOptions());
+        $form->handleRequest($request);
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            $this->updateEntity($this->entityManager, $entity);
+
+            return $this->redirectAfterSubmit($request, $entity);
+        }
+
+        return $this->renderCrud('@Admin/crud/edit.html.twig', [
+            'crud' => $crud,
+            'entity' => $entity,
+            'entityId' => $entityId,
+            'form' => $form,
+            'actions' => $this->getActionsConfig(),
+        ]);
+    }
+
+    public function delete(Request $request, string $entityId): Response
+    {
+        $crud = $this->getCrudConfig(Crud::PAGE_INDEX, Action::DELETE);
+        $this->denyAccessUnlessGrantedToRun($crud);
+
+        if (!$this->isCsrfTokenValid('admin-delete-' . $entityId, $request->request->getString('_token'))) {
+            throw $this->createAccessDeniedException('Invalid CSRF token.');
+        }
+
+        $entity = $this->findEntity($entityId);
+        $this->deleteEntity($this->entityManager, $entity);
+
+        return $this->redirect($this->adminUrlGenerator->setController(static::class)->setAction(Action::INDEX)->generateUrl());
+    }
+
+    public function batchDelete(Request $request): Response
+    {
+        $crud = $this->getCrudConfig(Crud::PAGE_INDEX, Action::BATCH_DELETE);
+        $this->denyAccessUnlessGrantedToRun($crud);
+
+        if (!$this->isCsrfTokenValid('admin-batch-' . static::getEntityFqcn(), $request->request->getString('_token'))) {
+            throw $this->createAccessDeniedException('Invalid CSRF token.');
+        }
+
+        foreach ($request->request->all('batchIds') as $entityId) {
+            $entity = $this->entityManager->find(static::getEntityFqcn(), $entityId);
+            if (null !== $entity) {
+                $this->deleteEntity($this->entityManager, $entity);
+            }
+        }
+
+        return $this->redirect($this->adminUrlGenerator->setController(static::class)->setAction(Action::INDEX)->generateUrl());
+    }
+
+    // -----------------------------------------------------------------
+    // overridable persistence + query hooks
+    // -----------------------------------------------------------------
+
+    public function createEntity(string $entityFqcn): object
+    {
+        return new $entityFqcn();
+    }
+
+    public function persistEntity(EntityManagerInterface $entityManager, object $entity): void
+    {
+        $entityManager->persist($entity);
+        $entityManager->flush();
+    }
+
+    public function updateEntity(EntityManagerInterface $entityManager, object $entity): void
+    {
+        $entityManager->flush();
+    }
+
+    public function deleteEntity(EntityManagerInterface $entityManager, object $entity): void
+    {
+        $entityManager->remove($entity);
+        $entityManager->flush();
+    }
+
+    public function createIndexQueryBuilder(Crud $crud, array $sort): QueryBuilder
+    {
+        $queryBuilder = $this->entityManager
+            ->getRepository(static::getEntityFqcn())
+            ->createQueryBuilder('entity');
+
+        foreach ($sort as $property => $direction) {
+            $queryBuilder->addOrderBy('entity.' . $property, $direction);
+        }
+
+        return $queryBuilder;
+    }
+
+    // -----------------------------------------------------------------
+    // plumbing
+    // -----------------------------------------------------------------
+
+    protected function getCrudConfig(string $pageName, string $actionName): Crud
+    {
+        $crud = $this->configureCrud(
+            Crud::new()
+                ->setEntityFqcn(static::getEntityFqcn())
+                ->setCurrentPage($pageName)
+                ->setCurrentAction($actionName)
+        );
+
+        $this->adminContext
+            ->setCrudControllerFqcn(static::class)
+            ->setCrud($crud);
+
+        return $crud;
+    }
+
+    protected function getActionsConfig(): Actions
+    {
+        $actions = $this->configureActions(Actions::new());
+        $this->adminContext->setActions($actions);
+
+        return $actions;
+    }
+
+    /**
+     * @return iterable<FieldInterface>
+     */
+    protected function getFields(string $pageName): iterable
+    {
+        $fields = $this->configureFields($pageName);
+
+        return is_array($fields) ? $fields : iterator_to_array($fields, false);
+    }
+
+    protected function getSort(Request $request, Crud $crud): array
+    {
+        $sort = $request->query->all('sort');
+        if ([] === $sort) {
+            return $crud->getDefaultSort();
+        }
+
+        $clean = [];
+        foreach ($sort as $property => $direction) {
+            if (preg_match('/^[a-zA-Z0-9_.]+$/', (string) $property)) {
+                $clean[$property] = 'DESC' === strtoupper((string) $direction) ? 'DESC' : 'ASC';
+            }
+        }
+
+        return $clean;
+    }
+
+    protected function findEntity(string $entityId): object
+    {
+        $entity = $this->entityManager->find(static::getEntityFqcn(), $entityId);
+        if (null === $entity) {
+            throw $this->createNotFoundException(sprintf('No "%s" found for id "%s".', static::getEntityFqcn(), $entityId));
+        }
+
+        return $entity;
+    }
+
+    protected function denyAccessUnlessGrantedToRun(Crud $crud): void
+    {
+        // per-action permissions are declared with Actions::setPermission();
+        // entity-level restriction hooks in here later (EA_ACCESS_ENTITY)
+    }
+
+    protected function redirectAfterSubmit(Request $request, object $entity): Response
+    {
+        $submitAction = $request->request->getString('submit_action', Action::SAVE_AND_RETURN);
+        $url = $this->adminUrlGenerator->setController(static::class);
+
+        $id = method_exists($entity, 'getId') ? $entity->getId() : null;
+
+        return $this->redirect(match ($submitAction) {
+            Action::SAVE_AND_CONTINUE => $url->setAction(Action::EDIT)->setEntityId($id)->generateUrl(),
+            Action::SAVE_AND_ADD_ANOTHER => $url->setAction(Action::NEW)->generateUrl(),
+            default => $url->setAction(Action::INDEX)->generateUrl(),
+        });
+    }
+
+    protected function renderCrud(string $template, array $parameters): Response
+    {
+        return $this->render($template, $parameters + [
+            'admin_context' => $this->adminContext,
+            'controller_fqcn' => static::class,
+        ]);
+    }
+}

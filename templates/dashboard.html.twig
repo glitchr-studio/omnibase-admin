@@ -1,0 +1,17 @@
+{% extends '@Admin/layout.html.twig' %}
+
+{% block page_title %}{{ 'dashboard.title'|trans({}, 'admin') }}{% endblock %}
+
+{% block content_header %}
+<div class="admin-header">
+    <h1>{{ 'dashboard.title'|trans({}, 'admin') }}</h1>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="empty-state">
+        {{ 'dashboard.welcome'|trans({}, 'admin') }}
+    </div>
+</div>
+{% endblock %}

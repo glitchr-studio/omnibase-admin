@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="{{ app.request.locale|default('en') }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block page_title %}Admin{% endblock %}</title>
+    {% block head_stylesheets %}
+    <style>
+        :root {
+            --admin-bg: #f6f7f9; --admin-surface: #fff; --admin-border: #e3e6ea;
+            --admin-text: #1f2429; --admin-muted: #6b7683; --admin-accent: #2563eb;
+            --admin-danger: #dc2626; --admin-radius: 8px;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; font: 15px/1.5 system-ui, -apple-system, sans-serif; background: var(--admin-bg); color: var(--admin-text); }
+        .admin-shell { display: flex; min-height: 100vh; }
+        .admin-aside { width: 230px; flex-shrink: 0; background: var(--admin-surface); border-right: 1px solid var(--admin-border); padding: 1rem 0; }
+        .admin-aside .brand { display: flex; align-items: center; gap: .5rem; padding: 0 1.25rem .75rem; font-weight: 700; border-bottom: 1px solid var(--admin-border); }
+        .admin-aside .close { margin-left: auto; text-decoration: none; color: var(--admin-muted); font-size: 1.3rem; line-height: 1; }
+        .admin-menu { list-style: none; margin: .75rem 0 0; padding: 0; }
+        .admin-menu .section { padding: .9rem 1.25rem .3rem; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--admin-muted); }
+        .admin-menu a { display: block; padding: .45rem 1.25rem; color: inherit; text-decoration: none; border-left: 3px solid transparent; }
+        .admin-menu a:hover { background: var(--admin-bg); }
+        .admin-menu .selected > a { border-left-color: var(--admin-accent); color: var(--admin-accent); font-weight: 600; }
+        .admin-main { flex: 1; padding: 1.5rem 2rem; min-width: 0; }
+        .admin-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.25rem; }
+        .admin-header h1 { margin: 0; font-size: 1.35rem; }
+        .admin-header .global-actions { margin-left: auto; display: flex; gap: .5rem; }
+        .card { background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: var(--admin-radius); }
+        .btn { display: inline-flex; align-items: center; gap: .4rem; padding: .45rem .9rem; border-radius: 6px; border: 1px solid var(--admin-border);
+               background: var(--admin-surface); color: inherit; text-decoration: none; font-size: .9rem; cursor: pointer; }
+        .btn:hover { border-color: var(--admin-accent); color: var(--admin-accent); }
+        .btn-primary { background: var(--admin-accent); border-color: var(--admin-accent); color: #fff; }
+        .btn-primary:hover { color: #fff; filter: brightness(1.08); }
+        .text-danger, .btn.text-danger { color: var(--admin-danger); }
+        table.datagrid { width: 100%; border-collapse: collapse; }
+        .datagrid th, .datagrid td { text-align: left; padding: .6rem .9rem; border-bottom: 1px solid var(--admin-border); }
+        .datagrid th a { color: inherit; text-decoration: none; }
+        .datagrid tr:hover td { background: var(--admin-bg); }
+        .datagrid td.actions, .datagrid th.actions { text-align: right; white-space: nowrap; }
+        .datagrid .actions a, .datagrid .actions button { margin-left: .35rem; }
+        .paginator { display: flex; align-items: center; gap: .75rem; padding: .75rem .9rem; color: var(--admin-muted); font-size: .9rem; }
+        .paginator .pages { margin-left: auto; display: flex; gap: .25rem; }
+        form.admin-form { padding: 1.25rem; }
+        form.admin-form .form-row { margin-bottom: 1rem; }
+        form.admin-form label { display: block; font-weight: 600; margin-bottom: .3rem; }
+        form.admin-form input[type=text], form.admin-form input[type=email], form.admin-form input[type=number],
+        form.admin-form input[type=password], form.admin-form select, form.admin-form textarea {
+            width: 100%; padding: .5rem .65rem; border: 1px solid var(--admin-border); border-radius: 6px; font: inherit; background: var(--admin-bg);
+        }
+        form.admin-form .form-errors { color: var(--admin-danger); font-size: .85rem; margin-top: .25rem; }
+        .form-footer { display: flex; gap: .5rem; padding: 1rem 1.25rem; border-top: 1px solid var(--admin-border); }
+        dl.detail { padding: 1.25rem; display: grid; grid-template-columns: 200px 1fr; gap: .5rem 1rem; margin: 0; }
+        dl.detail dt { font-weight: 600; color: var(--admin-muted); }
+        dl.detail dd { margin: 0; }
+        .empty-state { padding: 3rem; text-align: center; color: var(--admin-muted); }
+    </style>
+    {% endblock %}
+</head>
+<body>
+<div class="admin-shell">
+    <aside class="admin-aside">
+        <div class="brand">
+            {% block brand %}<span>{% block brand_title %}Administration{% endblock %}</span>{% endblock %}
+            {# the "x" returns to the site; becomes Transparent.closeNest() once the overlay shell lands #}
+            <a class="close" href="/" title="Close administration">&times;</a>
+        </div>
+        {% block main_menu %}
+            {% if admin_context is defined and admin_context.mainMenu is not empty %}
+            <ul class="admin-menu">
+                {% for item in admin_context.mainMenu %}
+                    {% if item.section %}
+                        <li class="section">{{ item.label }}</li>
+                    {% else %}
+                        <li class="{{ item.selected ? 'selected' }}">
+                            <a href="{{ item.linkUrl ?? '#' }}"{% if item.linkTarget %} target="{{ item.linkTarget }}"{% endif %}>{{ item.label }}</a>
+                        </li>
+                        {% for subItem in item.subItems %}
+                            <li class="{{ subItem.selected ? 'selected' }}"><a href="{{ subItem.linkUrl ?? '#' }}">&nbsp;&nbsp;{{ subItem.label }}</a></li>
+                        {% endfor %}
+                    {% endif %}
+                {% endfor %}
+            </ul>
+            {% endif %}
+        {% endblock %}
+    </aside>
+    <main class="admin-main">
+        {% block content_header %}{% endblock %}
+        {% block content %}{% endblock %}
+    </main>
+</div>
+{% block body_javascript %}{% endblock %}
+</body>
+</html>

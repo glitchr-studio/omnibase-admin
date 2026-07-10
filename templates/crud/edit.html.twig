@@ -1,0 +1,5 @@
+{% extends '@Admin/crud/_form.html.twig' %}
+
+{% block page_title %}{{ block('form_title') }}{% endblock %}
+
+{% block form_title %}{{ crud.pageTitle('edit') ?? 'page.edit'|trans({'%entity%': crud.entityLabelInSingular ?? crud.entityFqcn|split('\\')|last, '%id%': entityId}, 'admin') }}{% endblock %}

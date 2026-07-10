@@ -1,0 +1,24 @@
+{% extends '@Admin/layout.html.twig' %}
+
+{% block page_title %}{{ crud.entityLabelInSingular ?? crud.entityFqcn|split('\\')|last }} #{{ entityId }}{% endblock %}
+
+{% block content_header %}
+<div class="admin-header">
+    <h1>{{ crud.pageTitle('detail') ?? block('page_title') }}</h1>
+    <div class="global-actions">
+        <a class="btn" href="{{ admin_url(controller_fqcn, 'index') }}">{{ 'action.index'|trans({}, 'admin') }}</a>
+        <a class="btn btn-primary" href="{{ admin_url(controller_fqcn, 'edit', entityId) }}">{{ 'action.edit'|trans({}, 'admin') }}</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <dl class="detail">
+        {% for field in fields %}
+            <dt>{{ field.label ?? field.property|humanize }}</dt>
+            <dd>{{ include(['@Admin/' ~ field.templateName ~ '.html.twig', '@Admin/crud/field/text.html.twig'], {field: field, entity: entity}) }}</dd>
+        {% endfor %}
+    </dl>
+</div>
+{% endblock %}

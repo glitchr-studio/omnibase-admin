@@ -1,0 +1,35 @@
+{% extends '@Admin/layout.html.twig' %}
+
+{% block content_header %}
+<div class="admin-header">
+    <h1>{% block form_title %}{% endblock %}</h1>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    {{ form_start(form, {attr: {class: 'admin-form', novalidate: 'novalidate'}}) }}
+        {{ form_errors(form) }}
+        {% for child in form %}
+            <div class="form-row">
+                {{ form_label(child) }}
+                {{ form_widget(child) }}
+                <div class="form-errors">{{ form_errors(child) }}</div>
+                {{ form_help(child) }}
+            </div>
+        {% endfor %}
+        <div class="form-footer">
+            {% for action in actions.getAll(crud.currentPage) %}
+                {% if action.htmlElement == 'button' %}
+                    <button class="btn {{ 'action-save' in action.cssClass ? 'btn-primary' : '' }}" type="submit"
+                            name="{{ action.htmlAttributes.name|default('submit_action') }}" value="{{ action.htmlAttributes.value|default(action.name) }}">
+                        {{ action.label }}
+                    </button>
+                {% elseif action.crudActionName == 'index' %}
+                    <a class="btn" href="{{ admin_url(controller_fqcn, 'index') }}">{{ action.label }}</a>
+                {% endif %}
+            {% endfor %}
+        </div>
+    {{ form_end(form) }}
+</div>
+{% endblock %}

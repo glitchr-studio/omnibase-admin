@@ -1,0 +1,85 @@
+{% extends '@Admin/layout.html.twig' %}
+
+{% block page_title %}{{ crud.entityLabelInPlural ?? crud.entityFqcn|split('\\')|last }}{% endblock %}
+
+{% block content_header %}
+<div class="admin-header">
+    <h1>{{ crud.pageTitle('index') ?? crud.entityLabelInPlural ?? crud.entityFqcn|split('\\')|last }}</h1>
+    <div class="global-actions">
+        {% for action in actions.globalActions('index') %}
+            <a class="btn btn-primary {{ action.cssClass }}" href="{{ admin_url(controller_fqcn, action.crudActionName ?? 'new') }}">
+                {{ action.label }}
+            </a>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    {% if rows is empty %}
+        <div class="empty-state">{{ 'datagrid.empty'|trans({}, 'admin') }}</div>
+    {% else %}
+    <table class="datagrid">
+        <thead>
+        <tr>
+            {% for field in fields|filter(f => f.isDisplayedOn('index')) %}
+                {% set direction = sort[field.property]|default(null) %}
+                <th style="{{ field.textAlign ? 'text-align:' ~ field.textAlign }}">
+                    {% if field.isSortable is not defined or field.isSortable != false %}
+                        <a href="{{ admin_url(controller_fqcn, 'index', null, {'sort': {(field.property): direction == 'ASC' ? 'DESC' : 'ASC'}}) }}">
+                            {{ field.label ?? field.property|humanize }}
+                            {%- if direction %} {{ direction == 'ASC' ? '▲' : '▼' }}{% endif %}
+                        </a>
+                    {% else %}
+                        {{ field.label ?? field.property|humanize }}
+                    {% endif %}
+                </th>
+            {% endfor %}
+            <th class="actions"></th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for row in rows %}
+            <tr>
+                {% for field in row.fields %}
+                    <td class="{{ field.cssClass }}" style="{{ field.textAlign ? 'text-align:' ~ field.textAlign }}">
+                        {{ include(['@Admin/' ~ field.templateName ~ '.html.twig', '@Admin/crud/field/text.html.twig'], {field: field, entity: row.entity}) }}
+                    </td>
+                {% endfor %}
+                <td class="actions">
+                    {% for action in actions.entityActions('index') %}
+                        {% if action.isDisplayed(row.entity) %}
+                            {% if action.name == 'delete' %}
+                                <form method="post" action="{{ admin_url(controller_fqcn, 'delete', row.entity.id) }}" style="display:inline"
+                                      onsubmit="return confirm('{{ 'action.delete_confirm'|trans({}, 'admin') }}');">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('admin-delete-' ~ row.entity.id) }}">
+                                    <button class="btn text-danger" title="{{ action.label }}">✕</button>
+                                </form>
+                            {% else %}
+                                <a class="btn {{ action.cssClass }}" href="{{ action.linkUrl ?? admin_url(controller_fqcn, action.crudActionName ?? action.name, row.entity.id) }}" title="{{ action.label }}">
+                                    {{ action.name == 'edit' ? '✎' : (action.name == 'detail' ? '👁' : action.label) }}
+                                </a>
+                            {% endif %}
+                        {% endif %}
+                    {% endfor %}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    <div class="paginator">
+        <span>{{ paginator.total }} {{ 'datagrid.results'|trans({}, 'admin') }}</span>
+        <div class="pages">
+            {% if paginator.hasPreviousPage %}
+                <a class="btn" href="{{ admin_url(controller_fqcn, 'index', null, {'page': paginator.previousPage, 'sort': sort}) }}">‹</a>
+            {% endif %}
+            <span class="btn" style="cursor:default">{{ paginator.page }} / {{ paginator.pageCount }}</span>
+            {% if paginator.hasNextPage %}
+                <a class="btn" href="{{ admin_url(controller_fqcn, 'index', null, {'page': paginator.nextPage, 'sort': sort}) }}">›</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
