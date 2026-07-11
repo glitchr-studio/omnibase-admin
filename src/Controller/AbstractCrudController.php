@@ -511,6 +511,9 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         if ([] === $this->adminContext->getMainMenu()) {
             $this->adminContext->setMainMenu($this->menuBuilder->buildDefault());
         }
+        if ([] === $this->adminContext->getUserMenu()) {
+            $this->adminContext->setUserMenu($this->menuBuilder->buildUserMenuDefault($this->getUser()));
+        }
 
         return $this->render($template, $parameters + [
             'admin_context' => $this->adminContext,

@@ -44,6 +44,25 @@ class MenuBuilder
     }
 
     /**
+     * Profile link (if the user object exposes a getId()) + sign out -
+     * the historical "usually better to call the parent method" default.
+     *
+     * @return MenuItem[]
+     */
+    public function buildUserMenuDefault(mixed $user): array
+    {
+        $items = [];
+
+        if (\is_object($user) && method_exists($user, 'getId')) {
+            $items[] = MenuItemFactory::linkToRoute('user_profile', ['id' => $user->getId()], $this->translator->trans('menu.profile', [], 'admin'), 'fa-solid fa-id-badge');
+        }
+
+        $items[] = MenuItemFactory::linkToRoute('security_logout', [], $this->translator->trans('menu.logout', [], 'admin'), 'fa-solid fa-arrow-right-from-bracket');
+
+        return $this->resolve($items);
+    }
+
+    /**
      * @param iterable<MenuItem> $items
      * @return MenuItem[]
      */
@@ -69,7 +88,7 @@ class MenuBuilder
             MenuItem::TYPE_ROUTE => $this->urlGenerator->generate($item->getRouteName(), $item->getRouteParameters()),
             MenuItem::TYPE_URL, MenuItem::TYPE_SUBMENU => $item->getUrl(),
             MenuItem::TYPE_DASHBOARD => $this->urlGenerator->generate('admin'),
-            MenuItem::TYPE_LOGOUT => $this->urlGenerator->generate('app_logout'),
+            MenuItem::TYPE_LOGOUT => $this->urlGenerator->generate('security_logout'),
             default => null,
         });
     }

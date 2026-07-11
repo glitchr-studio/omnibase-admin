@@ -6,8 +6,17 @@
 <div class="admin-header">
     <h1>{{ crud.pageTitle('detail') ?? block('page_title') }}</h1>
     <div class="global-actions">
-        <a class="btn" href="{{ admin_url(controller_fqcn, 'index') }}">{{ 'action.index'|trans({}, 'admin') }}</a>
-        <a class="btn btn-primary" href="{{ admin_url(controller_fqcn, 'edit', entityId) }}">{{ 'action.edit'|trans({}, 'admin') }}</a>
+        {% for action in actions.getAll('detail') %}
+            {% if action.name == 'delete' %}
+                <form method="post" action="{{ admin_url(controller_fqcn, 'delete', entityId) }}" style="display:inline"
+                      onsubmit="return confirm('{{ 'action.delete_confirm'|trans({}, 'admin') }}');">
+                    <input type="hidden" name="_token" value="{{ csrf_token('admin-batch-' ~ crud.entityFqcn) }}">
+                    <button class="btn text-danger">{{ action.label|trans }}</button>
+                </form>
+            {% elseif action.name != 'separator' %}
+                <a class="btn {{ action.name == 'edit' ? 'btn-primary' }}" href="{{ action.linkUrl ?? admin_url(controller_fqcn, action.crudActionName ?? action.name, entityId) }}">{{ action.label|trans }}</a>
+            {% endif %}
+        {% endfor %}
     </div>
 </div>
 {% endblock %}

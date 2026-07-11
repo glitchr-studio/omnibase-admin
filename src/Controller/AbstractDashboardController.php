@@ -39,6 +39,7 @@ abstract class AbstractDashboardController extends AbstractController
     {
         $this->adminContext->setDashboardControllerFqcn(static::class);
         $this->adminContext->setMainMenu($this->resolveMenu());
+        $this->adminContext->setUserMenu($this->menuBuilder->resolve($this->toArray($this->configureUserMenu())));
 
         return $this->render('@Admin/dashboard.html.twig', [
             'admin_context' => $this->adminContext,
@@ -79,7 +80,7 @@ abstract class AbstractDashboardController extends AbstractController
      */
     public function configureUserMenu(): iterable
     {
-        return [];
+        return $this->menuBuilder->buildUserMenuDefault($this->getUser());
     }
 
     // -----------------------------------------------------------------

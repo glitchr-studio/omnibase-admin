@@ -29,6 +29,8 @@ page:
     edit: "Modifier %entity% #%id%"
 
 menu:
+    profile: Mon profil
+    logout: Déconnexion
     dashboard: Tableau de bord
 
 flash:

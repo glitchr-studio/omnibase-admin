@@ -29,6 +29,8 @@ page:
     edit: "Edit %entity% #%id%"
 
 menu:
+    profile: My profile
+    logout: Sign out
     dashboard: Dashboard
 
 flash:
