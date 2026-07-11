@@ -73,6 +73,14 @@
         .filter-bar .filter-range { display: flex; gap: .3rem; }
         .datagrid th.batch, .datagrid td.batch { width: 2rem; text-align: center; }
         .batch-toolbar { padding: .6rem .9rem; border-top: 1px solid var(--admin-border); }
+        .manual-menu-section { margin-top: .5rem; }
+        .manual-tree { list-style: none; margin: 0; padding-left: 1.1rem; }
+        .manual-tree a { display: block; padding: .3rem 1.25rem; color: inherit; text-decoration: none; font-size: .92rem; }
+        .manual-tree a:hover { color: var(--admin-accent); }
+        .manual-tree li.selected > a { color: var(--admin-accent); font-weight: 600; }
+        .manual-content { padding: 1.5rem; }
+        .manual-meta { text-align: right; color: var(--admin-muted); font-size: .82rem; margin-bottom: .5rem; }
+        .manual-excerpt { color: var(--admin-muted); }
     </style>
     {% endblock %}
     {% block form_assets %}

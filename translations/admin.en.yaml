@@ -49,3 +49,8 @@ page.settings:
 page.apikey:
     title: API keys
     empty: No API key to display.
+
+manual:
+    title: Documentation
+    empty: No page selected. Choose a topic from the sidebar.
+    last_update: Last updated

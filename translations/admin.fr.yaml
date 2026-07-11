@@ -49,3 +49,8 @@ page.settings:
 page.apikey:
     title: Clefs API
     empty: Aucune clef API à afficher.
+
+manual:
+    title: Documentation
+    empty: Aucune page sélectionnée. Choisissez un sujet dans le menu.
+    last_update: Dernière mise à jour
