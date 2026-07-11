@@ -36,9 +36,36 @@ class FieldValueResolver
         $resolved->setValue($value);
 
         $callable = $descriptor->getFormatValueCallable();
-        $resolved->setFormattedValue(null !== $callable ? $callable($value, $entity) : $value);
+        $resolved->setFormattedValue(null !== $callable ? $callable($value, $entity) : $this->formatValue($value));
 
         return $resolved;
+    }
+
+    /**
+     * Default display formatting, done here rather than in Twig: templates
+     * cannot reliably type-check values behind entity magic methods
+     * (BaseTrait's __get makes any attribute look "defined").
+     */
+    protected function formatValue(mixed $value): mixed
+    {
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('Y-m-d H:i');
+        }
+
+        if ($value instanceof \BackedEnum) {
+            return $value->value;
+        }
+        if ($value instanceof \UnitEnum) {
+            return $value->name;
+        }
+
+        if (\is_object($value) && !is_iterable($value)) {
+            return method_exists($value, '__toString')
+                ? (string) $value
+                : substr(strrchr('\\' . get_class($value), '\\'), 1) . (method_exists($value, 'getId') ? ' #' . $value->getId() : '');
+        }
+
+        return $value;
     }
 
     /**

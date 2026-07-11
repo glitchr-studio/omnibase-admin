@@ -309,7 +309,26 @@ abstract class AbstractCrudController extends AbstractController implements Crud
 
     public function createEntity(string $entityFqcn): object
     {
-        return new $entityFqcn();
+        $reflection = new \ReflectionClass($entityFqcn);
+        $constructor = $reflection->getConstructor();
+
+        if (null === $constructor || 0 === $constructor->getNumberOfRequiredParameters()) {
+            return new $entityFqcn();
+        }
+
+        // required constructor args (author entities, pathed settings, ...):
+        // pass null/'' defaults so the blank instance is form-fillable;
+        // override createEntity() when the entity needs a smarter default
+        $arguments = [];
+        foreach ($constructor->getParameters() as $parameter) {
+            if ($parameter->isOptional()) {
+                break;
+            }
+            $type = $parameter->getType();
+            $arguments[] = ($type instanceof \ReflectionNamedType && 'string' === $type->getName() && !$type->allowsNull()) ? '' : null;
+        }
+
+        return $reflection->newInstanceArgs($arguments);
     }
 
     public function persistEntity(EntityManagerInterface $entityManager, object $entity): void
