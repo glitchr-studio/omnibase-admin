@@ -40,3 +40,10 @@ flash:
 filters:
     apply: Filtrer
     reset: Réinitialiser
+
+page.settings:
+    title: Paramètres du site
+    empty: Aucun paramètre à afficher.
+page.apikey:
+    title: Clefs API
+    empty: Aucune clef API à afficher.

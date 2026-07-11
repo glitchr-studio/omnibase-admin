@@ -40,3 +40,10 @@ flash:
 filters:
     apply: Apply
     reset: Reset
+
+page.settings:
+    title: Site settings
+    empty: No setting to display.
+page.apikey:
+    title: API keys
+    empty: No API key to display.

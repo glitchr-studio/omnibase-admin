@@ -1,0 +1,26 @@
+{% extends '@Admin/layout.html.twig' %}
+
+{% form_theme form with ['@Admin/crud/form_theme.html.twig'] %}
+
+{% block page_title %}{{ ('page.' ~ page ~ '.title')|trans({}, 'admin') }}{% endblock %}
+
+{% block content_header %}
+<div class="admin-header">
+    <h1>{{ ('page.' ~ page ~ '.title')|trans({}, 'admin') }}</h1>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    {% if form.children|length > 1 %}
+        {{ form_start(form, {attr: {class: 'admin-form'}}) }}
+            {{ form_rest(form) }}
+            <div class="form-footer">
+                <button class="btn btn-primary" type="submit">{{ 'action.save'|trans({}, 'admin') }}</button>
+            </div>
+        {{ form_end(form) }}
+    {% else %}
+        <div class="empty-state">{{ ('page.' ~ page ~ '.empty')|trans({}, 'admin') }}</div>
+    {% endif %}
+</div>
+{% endblock %}
