@@ -59,7 +59,7 @@ abstract class AbstractCrudController extends AbstractController implements Crud
      * Convention: App\Controller\Admin\Crud\Xxx\YyyCrudController maps to
      * App\Entity\Xxx\Yyy. Override for non-conventional locations.
      */
-    public static array $crudNamespaceCandidates = ['\\Controller\\Crud\\', '\\Controller\\Admin\\Crud\\'];
+    public static array $crudNamespaceCandidates = ['\\Controller\\Crud\\', '\\Controller\\Backoffice\\Crud\\'];
 
     public static function getEntityFqcn(): string
     {
@@ -98,7 +98,7 @@ abstract class AbstractCrudController extends AbstractController implements Crud
             $entityFqcn = substr($entityFqcn, $pos + 8);
         }
 
-        foreach (array_merge(static::$crudNamespaceCandidates, ['\\Controller\\Backoffice\\Crud\\']) as $namespace) {
+        foreach (static::$crudNamespaceCandidates as $namespace) {
             $controllerFqcn = str_replace('\\Entity\\', $namespace, $entityFqcn) . 'CrudController';
 
             $appVariant = preg_replace('/^Base\\\\/', 'App\\', $controllerFqcn);

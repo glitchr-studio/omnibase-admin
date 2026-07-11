@@ -18,8 +18,21 @@ class AdminRouteRegistry
      */
     public function __construct(array $controllerFqcns = [], protected readonly string $urlPrefix = '/admin')
     {
+        // cross-bundle override: when an App\ controller and a bundle
+        // controller resolve to the same slug (same entity or same entity
+        // inheritance chain), the App\ one wins - the bundle controller is
+        // a default the application is free to replace
+        $bySlug = [];
         foreach ($controllerFqcns as $fqcn) {
-            $this->controllers[$fqcn] = static::slugify($fqcn);
+            $slug = static::slugify($fqcn);
+            $current = $bySlug[$slug] ?? null;
+            if (null === $current || (!str_starts_with($current, 'App\\') && str_starts_with($fqcn, 'App\\'))) {
+                $bySlug[$slug] = $fqcn;
+            }
+        }
+
+        foreach ($bySlug as $slug => $fqcn) {
+            $this->controllers[$fqcn] = $slug;
         }
     }
 
