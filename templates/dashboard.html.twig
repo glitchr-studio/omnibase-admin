@@ -10,8 +10,16 @@
 
 {% block content %}
 <div class="card">
-    <div class="empty-state">
-        {{ 'dashboard.welcome'|trans({}, 'admin') }}
-    </div>
+    {% if quick_access is defined and quick_access is not empty %}
+        <div class="quick-access">
+            {% for card in quick_access %}
+                <a href="{{ card.url }}">
+                    {% if card.icon %}<i class="{{ card.icon }}"></i> {% endif %}{{ card.label }}
+                </a>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">{{ 'dashboard.welcome'|trans({}, 'admin') }}</div>
+    {% endif %}
 </div>
 {% endblock %}

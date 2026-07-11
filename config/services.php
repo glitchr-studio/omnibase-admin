@@ -55,4 +55,13 @@ return function (ContainerConfigurator $configurator) {
 
     $services->set(\Base\Admin\EventSubscriber\NestHeaderSubscriber::class)
         ->tag('kernel.event_subscriber');
+
+    $services->set(\Base\Admin\Menu\MenuBuilder::class)
+        ->args([
+            service(AdminRouteRegistry::class),
+            service(AdminUrlGenerator::class),
+            service('router'),
+            service('request_stack'),
+            service('translator'),
+        ]);
 };

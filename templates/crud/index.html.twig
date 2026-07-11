@@ -6,6 +6,9 @@
 <div class="admin-header">
     <h1>{{ crud.pageTitle('index') ?? crud.entityLabelInPlural ?? crud.entityFqcn|split('\\')|last }}</h1>
     <div class="global-actions">
+        <form class="search-form" method="get" action="{{ admin_url(controller_fqcn, 'index') }}">
+            <input type="search" name="query" value="{{ query ?? '' }}" placeholder="{{ 'datagrid.search_placeholder'|trans({}, 'admin') }}">
+        </form>
         {% for action in actions.globalActions('index') %}
             <a class="btn btn-primary {{ action.cssClass }}" href="{{ admin_url(controller_fqcn, action.crudActionName ?? 'new') }}">
                 {{ action.label|trans }}

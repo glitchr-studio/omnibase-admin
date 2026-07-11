@@ -1,0 +1,38 @@
+dashboard:
+    title: Dashboard
+    welcome: Welcome to your administration. Pick a section in the menu to start managing your content.
+
+action:
+    index: Back to list
+    new: Create
+    edit: Edit
+    detail: Show
+    delete: Delete
+    delete_confirm: Are you sure you want to delete this item?
+    save: Save changes
+    create: Create
+    save_and_continue: Save and keep editing
+    create_and_continue: Create and keep editing
+    create_and_add_another: Create and add another
+    goto_prev: Previous
+    goto_next: Next
+    goto_see: See online
+    search: Search
+
+datagrid:
+    empty: Nothing here yet.
+    results: result(s)
+    search_placeholder: Search…
+
+page:
+    new: New %entity%
+    edit: "Edit %entity% #%id%"
+
+menu:
+    dashboard: Dashboard
+
+flash:
+    created: The item has been created.
+    updated: The changes have been saved.
+    deleted: The item has been deleted.
+    batch_deleted: The selected items have been deleted.

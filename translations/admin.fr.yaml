@@ -1,0 +1,38 @@
+dashboard:
+    title: Tableau de bord
+    welcome: Bienvenue dans votre administration. Choisissez une section dans le menu pour gérer vos contenus.
+
+action:
+    index: Retour à la liste
+    new: Créer
+    edit: Modifier
+    detail: Voir
+    delete: Supprimer
+    delete_confirm: Voulez-vous vraiment supprimer cet élément ?
+    save: Enregistrer
+    create: Créer
+    save_and_continue: Enregistrer et continuer
+    create_and_continue: Créer et continuer
+    create_and_add_another: Créer et ajouter un autre
+    goto_prev: Précédent
+    goto_next: Suivant
+    goto_see: Voir en ligne
+    search: Rechercher
+
+datagrid:
+    empty: Rien ici pour le moment.
+    results: résultat(s)
+    search_placeholder: Rechercher…
+
+page:
+    new: Nouveau %entity%
+    edit: "Modifier %entity% #%id%"
+
+menu:
+    dashboard: Tableau de bord
+
+flash:
+    created: L'élément a été créé.
+    updated: Les modifications ont été enregistrées.
+    deleted: L'élément a été supprimé.
+    batch_deleted: Les éléments sélectionnés ont été supprimés.

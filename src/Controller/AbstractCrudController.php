@@ -36,6 +36,7 @@ abstract class AbstractCrudController extends AbstractController implements Crud
     protected FieldValueResolver $fieldValueResolver;
     protected AdminUrlGenerator $adminUrlGenerator;
     protected AdminContext $adminContext;
+    protected \Base\Admin\Menu\MenuBuilder $menuBuilder;
 
     #[Required]
     public function setAdminServices(
@@ -44,12 +45,14 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         FieldValueResolver $fieldValueResolver,
         AdminUrlGenerator $adminUrlGenerator,
         AdminContext $adminContext,
+        \Base\Admin\Menu\MenuBuilder $menuBuilder,
     ): void {
         $this->entityManager = $entityManager;
         $this->fieldFormBuilder = $fieldFormBuilder;
         $this->fieldValueResolver = $fieldValueResolver;
         $this->adminUrlGenerator = $adminUrlGenerator;
         $this->adminContext = $adminContext;
+        $this->menuBuilder = $menuBuilder;
     }
 
     /**
@@ -116,6 +119,11 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         $sort = $this->getSort($request, $crud);
         $queryBuilder = $this->createIndexQueryBuilder($crud, $sort);
 
+        $query = trim($request->query->getString('query'));
+        if ('' !== $query) {
+            $this->applySearch($queryBuilder, $crud, $query);
+        }
+
         $paginator = new Paginator(
             $queryBuilder,
             max(1, $request->query->getInt('page', 1)),
@@ -139,6 +147,7 @@ abstract class AbstractCrudController extends AbstractController implements Crud
             'paginator' => $paginator,
             'actions' => $actions,
             'sort' => $sort,
+            'query' => $query,
         ]);
     }
 
@@ -172,6 +181,7 @@ abstract class AbstractCrudController extends AbstractController implements Crud
 
         if ($form->isSubmitted() && $form->isValid()) {
             $this->persistEntity($this->entityManager, $entity);
+            $this->addFlash('success', new \Symfony\Component\Translation\TranslatableMessage('flash.created', [], 'admin'));
 
             return $this->redirectAfterSubmit($request, $entity);
         }
@@ -197,6 +207,7 @@ abstract class AbstractCrudController extends AbstractController implements Crud
 
         if ($form->isSubmitted() && $form->isValid()) {
             $this->updateEntity($this->entityManager, $entity);
+            $this->addFlash('success', new \Symfony\Component\Translation\TranslatableMessage('flash.updated', [], 'admin'));
 
             return $this->redirectAfterSubmit($request, $entity);
         }
@@ -221,6 +232,7 @@ abstract class AbstractCrudController extends AbstractController implements Crud
 
         $entity = $this->findEntity($entityId);
         $this->deleteEntity($this->entityManager, $entity);
+        $this->addFlash('success', new \Symfony\Component\Translation\TranslatableMessage('flash.deleted', [], 'admin'));
 
         return $this->redirect($this->adminUrlGenerator->setController(static::class)->setAction(Action::INDEX)->generateUrl());
     }
@@ -281,6 +293,35 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         }
 
         return $queryBuilder;
+    }
+
+    /**
+     * Case-insensitive LIKE over the crud's searchFields; falls back to
+     * every string-ish field shown on the index when none are declared.
+     */
+    protected function applySearch(QueryBuilder $queryBuilder, Crud $crud, string $query): void
+    {
+        $searchFields = $crud->getSearchFields();
+        if ([] === $searchFields) {
+            $metadata = $this->entityManager->getClassMetadata(static::getEntityFqcn());
+            foreach ($this->getFields(Crud::PAGE_INDEX) as $field) {
+                $property = $field->getAsDto()->getProperty();
+                if ($metadata->hasField($property) && \in_array($metadata->getTypeOfField($property), ['string', 'text'], true)) {
+                    $searchFields[] = $property;
+                }
+            }
+        }
+
+        if ([] === $searchFields) {
+            return;
+        }
+
+        $or = $queryBuilder->expr()->orX();
+        foreach ($searchFields as $i => $property) {
+            $or->add($queryBuilder->expr()->like('LOWER(entity.' . $property . ')', ':admin_query'));
+        }
+
+        $queryBuilder->andWhere($or)->setParameter('admin_query', '%' . mb_strtolower($query) . '%');
     }
 
     // -----------------------------------------------------------------
@@ -370,6 +411,10 @@ abstract class AbstractCrudController extends AbstractController implements Crud
 
     protected function renderCrud(string $template, array $parameters): Response
     {
+        if ([] === $this->adminContext->getMainMenu()) {
+            $this->adminContext->setMainMenu($this->menuBuilder->buildDefault());
+        }
+
         return $this->render($template, $parameters + [
             'admin_context' => $this->adminContext,
             'controller_fqcn' => static::class,

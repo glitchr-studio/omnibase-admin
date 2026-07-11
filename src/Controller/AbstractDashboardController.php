@@ -3,8 +3,8 @@
 namespace Base\Admin\Controller;
 
 use Base\Admin\Config\Menu\MenuItem;
-use Base\Admin\Config\MenuItem as MenuItemFactory;
 use Base\Admin\Context\AdminContext;
+use Base\Admin\Menu\MenuBuilder;
 use Base\Admin\Router\AdminRouteRegistry;
 use Base\Admin\Router\AdminUrlGenerator;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -20,16 +20,19 @@ abstract class AbstractDashboardController extends AbstractController
     protected AdminContext $adminContext;
     protected AdminUrlGenerator $adminUrlGenerator;
     protected AdminRouteRegistry $routeRegistry;
+    protected MenuBuilder $menuBuilder;
 
     #[Required]
     public function setAdminServices(
         AdminContext $adminContext,
         AdminUrlGenerator $adminUrlGenerator,
         AdminRouteRegistry $routeRegistry,
+        MenuBuilder $menuBuilder,
     ): void {
         $this->adminContext = $adminContext;
         $this->adminUrlGenerator = $adminUrlGenerator;
         $this->routeRegistry = $routeRegistry;
+        $this->menuBuilder = $menuBuilder;
     }
 
     public function index(): Response
@@ -39,6 +42,7 @@ abstract class AbstractDashboardController extends AbstractController
 
         return $this->render('@Admin/dashboard.html.twig', [
             'admin_context' => $this->adminContext,
+            'quick_access' => $this->buildQuickAccess(),
         ]);
     }
 
@@ -59,11 +63,7 @@ abstract class AbstractDashboardController extends AbstractController
      */
     public function configureMenuItems(): iterable
     {
-        foreach ($this->routeRegistry->getControllers() as $fqcn => $slug) {
-            if (is_subclass_of($fqcn, CrudControllerInterface::class)) {
-                yield MenuItemFactory::linkToCrud($fqcn::getEntityFqcn(), ucfirst(str_replace('-', ' ', $slug)));
-            }
-        }
+        return $this->menuBuilder->buildDefault();
     }
 
     /**
@@ -83,7 +83,7 @@ abstract class AbstractDashboardController extends AbstractController
     }
 
     // -----------------------------------------------------------------
-    // menu resolution
+    // menu / dashboard resolution
     // -----------------------------------------------------------------
 
     /**
@@ -91,47 +91,34 @@ abstract class AbstractDashboardController extends AbstractController
      */
     protected function resolveMenu(): array
     {
-        $items = array_merge(
+        return $this->menuBuilder->resolve(array_merge(
             $this->toArray($this->configureMenuBeforeItems()),
             $this->toArray($this->configureMenuItems()),
             $this->toArray($this->configureMenuAfterItems()),
-        );
-
-        foreach ($items as $item) {
-            $this->resolveMenuItemUrl($item);
-        }
-
-        return $items;
+        ));
     }
 
-    protected function resolveMenuItemUrl(MenuItem $item): void
+    /**
+     * One card per registered CRUD: label, icon and index URL.
+     *
+     * @return array<int, array{label: string, icon: ?string, url: string}>
+     */
+    protected function buildQuickAccess(): array
     {
-        foreach ($item->getSubItems() as $subItem) {
-            $this->resolveMenuItemUrl($subItem);
-        }
-
-        $item->setLinkUrl(match ($item->getType()) {
-            MenuItem::TYPE_CRUD => $this->generateCrudUrl($item),
-            MenuItem::TYPE_ROUTE => $this->generateUrl($item->getRouteName(), $item->getRouteParameters()),
-            MenuItem::TYPE_URL, MenuItem::TYPE_SUBMENU => $item->getUrl(),
-            MenuItem::TYPE_DASHBOARD => $this->generateUrl('admin'),
-            MenuItem::TYPE_LOGOUT => $this->generateUrl('app_logout'),
-            default => null,
-        });
-    }
-
-    protected function generateCrudUrl(MenuItem $item): ?string
-    {
+        $cards = [];
         foreach ($this->routeRegistry->getControllers() as $fqcn => $slug) {
-            if (is_subclass_of($fqcn, CrudControllerInterface::class) && $fqcn::getEntityFqcn() === $item->getEntityFqcn()) {
-                return $this->adminUrlGenerator
-                    ->setController($fqcn)
-                    ->setAction($item->getCrudActionName() ?? 'index')
-                    ->generateUrl();
+            if (!is_subclass_of($fqcn, CrudControllerInterface::class)) {
+                continue;
             }
+
+            $cards[] = [
+                'label' => ucfirst(str_replace('-', ' ', $slug)),
+                'icon' => $fqcn::getPreferredIcon(),
+                'url' => $this->adminUrlGenerator->setController($fqcn)->setAction('index')->generateUrl(),
+            ];
         }
 
-        return null;
+        return $cards;
     }
 
     /**

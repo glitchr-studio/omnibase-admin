@@ -54,6 +54,16 @@
         dl.detail dt { font-weight: 600; color: var(--admin-muted); }
         dl.detail dd { margin: 0; }
         .empty-state { padding: 3rem; text-align: center; color: var(--admin-muted); }
+        .flashes { margin-bottom: 1rem; }
+        .flash { padding: .6rem .9rem; border-radius: 6px; margin-bottom: .4rem; border: 1px solid var(--admin-border); background: var(--admin-surface); }
+        .flash-success { border-color: #86efac; background: #f0fdf4; color: #166534; }
+        .flash-warning { border-color: #fde68a; background: #fffbeb; color: #92400e; }
+        .flash-danger, .flash-error { border-color: #fecaca; background: #fef2f2; color: #991b1b; }
+        .search-form { display: inline-flex; gap: .4rem; }
+        .search-form input { padding: .45rem .65rem; border: 1px solid var(--admin-border); border-radius: 6px; font: inherit; min-width: 220px; }
+        .quick-access { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: .75rem; padding: 1.25rem; }
+        .quick-access a { display: block; padding: 1rem; border: 1px solid var(--admin-border); border-radius: var(--admin-radius); text-decoration: none; color: inherit; background: var(--admin-surface); }
+        .quick-access a:hover { border-color: var(--admin-accent); color: var(--admin-accent); }
     </style>
     {% endblock %}
 </head>
@@ -88,6 +98,18 @@
         {% endblock %}
     </aside>
     <main class="admin-main">
+        {% block flashes %}
+            {% set flashes = app.flashes %}
+            {% if flashes is not empty %}
+            <div class="flashes">
+                {% for type, messages in flashes %}
+                    {% for message in messages %}
+                        <div class="flash flash-{{ type }}">{{ message|trans }}</div>
+                    {% endfor %}
+                {% endfor %}
+            </div>
+            {% endif %}
+        {% endblock %}
         {% block content_header %}{% endblock %}
         {% block content %}{% endblock %}
     </main>
