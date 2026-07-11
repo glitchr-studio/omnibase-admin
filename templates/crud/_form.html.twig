@@ -1,5 +1,9 @@
 {% extends '@Admin/layout.html.twig' %}
 
+{# base-bundle's widget blocks (select2 markup, editor textareas, pickers…)
+   render the DOM markers its form-defer JS bundles initialise from #}
+{% form_theme form with ['@Admin/crud/form_theme.html.twig'] %}
+
 {% block content_header %}
 <div class="admin-header">
     <h1>{% block form_title %}{% endblock %}</h1>

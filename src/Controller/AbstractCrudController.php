@@ -81,6 +81,41 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         return null;
     }
 
+    /**
+     * Convention-based reverse lookup: entity FQCN (or instance) to its CRUD
+     * controller FQCN. Mirrors getEntityFqcn(): each namespace candidate is
+     * substituted for "\Entity\", trying the App\ variant before Base\.
+     */
+    public static function getCrudControllerFqcn(object|string|null $entity): ?string
+    {
+        $entityFqcn = \is_object($entity) ? \get_class($entity) : $entity;
+        if (null === $entityFqcn || !class_exists($entityFqcn)) {
+            return null;
+        }
+
+        // strip doctrine proxy prefix
+        if (false !== ($pos = strrpos($entityFqcn, '\\__CG__\\'))) {
+            $entityFqcn = substr($entityFqcn, $pos + 8);
+        }
+
+        foreach (array_merge(static::$crudNamespaceCandidates, ['\\Controller\\Backoffice\\Crud\\']) as $namespace) {
+            $controllerFqcn = str_replace('\\Entity\\', $namespace, $entityFqcn) . 'CrudController';
+
+            $appVariant = preg_replace('/^Base\\\\/', 'App\\', $controllerFqcn);
+            $baseVariant = preg_replace('/^App\\\\/', 'Base\\', $controllerFqcn);
+
+            foreach (array_unique([$appVariant, $controllerFqcn, $baseVariant]) as $candidate) {
+                if (class_exists($candidate)) {
+                    return $candidate;
+                }
+            }
+        }
+
+        return null !== get_parent_class($entityFqcn) && false !== get_parent_class($entityFqcn)
+            ? static::getCrudControllerFqcn(get_parent_class($entityFqcn))
+            : null;
+    }
+
     // -----------------------------------------------------------------
     // configuration hooks
     // -----------------------------------------------------------------

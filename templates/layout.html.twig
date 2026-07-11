@@ -73,6 +73,14 @@
         .batch-toolbar { padding: .6rem .9rem; border-top: 1px solid var(--admin-border); }
     </style>
     {% endblock %}
+    {% block form_assets %}
+        {# base-bundle's prebuilt widget bundles (select2, editor, datetime,
+           color, dropzone, ...) - published under /bundles/base and resolved
+           through its WebpackTagRenderer; the widgets initialise themselves
+           from DOM markers rendered by @Base/form/form_div_layout.html.twig #}
+        {{ encore_entry_link_tags('form') }}
+        {{ encore_entry_script_tags('form') }}
+    {% endblock %}
 </head>
 <body>
 <div class="admin-shell">

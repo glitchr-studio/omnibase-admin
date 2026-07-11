@@ -1,0 +1,9 @@
+{# base-bundle's widget blocks (select2, editor, pickers…) minus its one
+   EA-context coupling: form_start pulled the referrer through ea(). #}
+{% use "@Base/form/form_div_layout.html.twig" %}
+
+{% block form_start %}
+    {%- set attr = attr|merge({'class': ('needs-validation ' ~ attr.class|default(''))|trim, 'novalidate': 'novalidate'}) -%}
+    {{ block('form_start', '@Twig/Form/form_div_layout.html.twig') }}
+    <input type="hidden" name="referrer" value="{{ app.request.query.get('referrer') ?? '' }}">
+{% endblock %}
