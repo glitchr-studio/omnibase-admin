@@ -1,0 +1,156 @@
+<?php
+
+namespace Base\Admin\Filter;
+
+use Doctrine\ORM\QueryBuilder;
+use Symfony\Contracts\Translation\TranslatableInterface;
+
+/**
+ * One filter definition: which property, which comparison widget, and how
+ * it constrains the index QueryBuilder. Single class - the type string
+ * drives both the rendering (inline bar) and the WHERE clause.
+ */
+class Filter
+{
+    public const TYPE_TEXT = 'text';
+    public const TYPE_BOOLEAN = 'boolean';
+    public const TYPE_CHOICE = 'choice';
+    public const TYPE_DATE = 'date';
+    public const TYPE_NUMERIC = 'numeric';
+
+    protected string $property;
+    protected TranslatableInterface|string|null $label = null;
+    protected string $type = self::TYPE_TEXT;
+    /** @var array<string, string> value => label */
+    protected array $choices = [];
+    /** @var callable|null custom applier: fn(QueryBuilder $qb, string $alias, mixed $value) */
+    protected mixed $applyCallable = null;
+
+    public static function new(string $property, TranslatableInterface|string|null $label = null): static
+    {
+        $filter = new static();
+        $filter->property = $property;
+        $filter->label = $label;
+
+        return $filter;
+    }
+
+    public function getProperty(): string
+    {
+        return $this->property;
+    }
+
+    public function getLabel(): TranslatableInterface|string|null
+    {
+        return $this->label;
+    }
+
+    public function setLabel(TranslatableInterface|string|null $label): static
+    {
+        $this->label = $label;
+        return $this;
+    }
+
+    public function getType(): string
+    {
+        return $this->type;
+    }
+
+    public function setType(string $type): static
+    {
+        $this->type = $type;
+        return $this;
+    }
+
+    public function asBoolean(): static
+    {
+        return $this->setType(self::TYPE_BOOLEAN);
+    }
+
+    public function asDate(): static
+    {
+        return $this->setType(self::TYPE_DATE);
+    }
+
+    public function asNumeric(): static
+    {
+        return $this->setType(self::TYPE_NUMERIC);
+    }
+
+    /**
+     * @param array<string, string> $choices value => label
+     */
+    public function asChoice(array $choices): static
+    {
+        $this->choices = $choices;
+        return $this->setType(self::TYPE_CHOICE);
+    }
+
+    public function getChoices(): array
+    {
+        return $this->choices;
+    }
+
+    public function applyWith(callable $applyCallable): static
+    {
+        $this->applyCallable = $applyCallable;
+        return $this;
+    }
+
+    /**
+     * @param mixed $value the raw request value (already checked non-empty)
+     */
+    public function apply(QueryBuilder $queryBuilder, string $alias, mixed $value): void
+    {
+        if (null !== $this->applyCallable) {
+            ($this->applyCallable)($queryBuilder, $alias, $value);
+            return;
+        }
+
+        $field = $alias . '.' . $this->property;
+        $param = 'filter_' . str_replace('.', '_', $this->property);
+
+        switch ($this->type) {
+            case self::TYPE_BOOLEAN:
+                $queryBuilder->andWhere(sprintf('%s = :%s', $field, $param))
+                    ->setParameter($param, '1' === $value || 'true' === $value || true === $value);
+                break;
+
+            case self::TYPE_DATE:
+                // value: ['from' => 'Y-m-d', 'to' => 'Y-m-d'], either side optional
+                $from = \is_array($value) ? ($value['from'] ?? null) : null;
+                $to = \is_array($value) ? ($value['to'] ?? null) : null;
+                if ($from) {
+                    $queryBuilder->andWhere(sprintf('%s >= :%s_from', $field, $param))
+                        ->setParameter($param . '_from', new \DateTimeImmutable($from . ' 00:00:00'));
+                }
+                if ($to) {
+                    $queryBuilder->andWhere(sprintf('%s <= :%s_to', $field, $param))
+                        ->setParameter($param . '_to', new \DateTimeImmutable($to . ' 23:59:59'));
+                }
+                break;
+
+            case self::TYPE_NUMERIC:
+            case self::TYPE_CHOICE:
+                $queryBuilder->andWhere(sprintf('%s = :%s', $field, $param))
+                    ->setParameter($param, $value);
+                break;
+
+            default:
+                $queryBuilder->andWhere(sprintf('LOWER(%s) LIKE :%s', $field, $param))
+                    ->setParameter($param, '%' . mb_strtolower((string) $value) . '%');
+        }
+    }
+
+    /**
+     * A filter value counts as "set" when it constrains anything.
+     */
+    public static function isActive(mixed $value): bool
+    {
+        if (\is_array($value)) {
+            return '' !== trim((string) ($value['from'] ?? '')) || '' !== trim((string) ($value['to'] ?? ''));
+        }
+
+        return null !== $value && '' !== trim((string) $value);
+    }
+}

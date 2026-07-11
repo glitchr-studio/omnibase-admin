@@ -64,6 +64,13 @@
         .quick-access { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: .75rem; padding: 1.25rem; }
         .quick-access a { display: block; padding: 1rem; border: 1px solid var(--admin-border); border-radius: var(--admin-radius); text-decoration: none; color: inherit; background: var(--admin-surface); }
         .quick-access a:hover { border-color: var(--admin-accent); color: var(--admin-accent); }
+        .filter-bar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .75rem; padding: .75rem .9rem; margin-bottom: 1rem;
+                      background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: var(--admin-radius); }
+        .filter-bar label { display: flex; flex-direction: column; gap: .2rem; font-size: .82rem; color: var(--admin-muted); }
+        .filter-bar input, .filter-bar select { padding: .4rem .55rem; border: 1px solid var(--admin-border); border-radius: 6px; font: inherit; background: var(--admin-bg); }
+        .filter-bar .filter-range { display: flex; gap: .3rem; }
+        .datagrid th.batch, .datagrid td.batch { width: 2rem; text-align: center; }
+        .batch-toolbar { padding: .6rem .9rem; border-top: 1px solid var(--admin-border); }
     </style>
     {% endblock %}
 </head>

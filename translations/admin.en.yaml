@@ -36,3 +36,7 @@ flash:
     updated: The changes have been saved.
     deleted: The item has been deleted.
     batch_deleted: The selected items have been deleted.
+
+filters:
+    apply: Apply
+    reset: Reset

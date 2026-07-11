@@ -19,13 +19,53 @@
 {% endblock %}
 
 {% block content %}
+{% if filters is defined and not filters.isEmpty %}
+<form class="filter-bar" method="get" action="{{ admin_url(controller_fqcn, 'index') }}">
+    {% if query %}<input type="hidden" name="query" value="{{ query }}">{% endif %}
+    {% for property, filter in filters.all %}
+        {% set value = filter_values[property]|default(null) %}
+        <label>
+            <span>{{ filter.label ?? property|humanize }}</span>
+            {% if filter.type == 'boolean' %}
+                <select name="filters[{{ property }}]">
+                    <option value=""></option>
+                    <option value="1" {{ value == '1' ? 'selected' }}>✓</option>
+                    <option value="0" {{ value == '0' ? 'selected' }}>✕</option>
+                </select>
+            {% elseif filter.type == 'choice' %}
+                <select name="filters[{{ property }}]">
+                    <option value=""></option>
+                    {% for choiceValue, choiceLabel in filter.choices %}
+                        <option value="{{ choiceValue }}" {{ value == choiceValue ? 'selected' }}>{{ choiceLabel|trans }}</option>
+                    {% endfor %}
+                </select>
+            {% elseif filter.type == 'date' %}
+                <span class="filter-range">
+                    <input type="date" name="filters[{{ property }}][from]" value="{{ value.from|default('') }}">
+                    <input type="date" name="filters[{{ property }}][to]" value="{{ value.to|default('') }}">
+                </span>
+            {% elseif filter.type == 'numeric' %}
+                <input type="number" step="any" name="filters[{{ property }}]" value="{{ value ?? '' }}">
+            {% else %}
+                <input type="text" name="filters[{{ property }}]" value="{{ value ?? '' }}">
+            {% endif %}
+        </label>
+    {% endfor %}
+    <button class="btn" type="submit">{{ 'filters.apply'|trans({}, 'admin') }}</button>
+    <a class="btn" href="{{ admin_url(controller_fqcn, 'index') }}">{{ 'filters.reset'|trans({}, 'admin') }}</a>
+</form>
+{% endif %}
 <div class="card">
     {% if rows is empty %}
         <div class="empty-state">{{ 'datagrid.empty'|trans({}, 'admin') }}</div>
     {% else %}
+    <form method="post" action="{{ admin_url(controller_fqcn, 'batchDelete') }}" class="batch-form"
+          onsubmit="return confirm('{{ 'action.delete_confirm'|trans({}, 'admin') }}');">
+    <input type="hidden" name="_token" value="{{ csrf_token('admin-batch-' ~ crud.entityFqcn) }}">
     <table class="datagrid">
         <thead>
         <tr>
+            <th class="batch"><input type="checkbox" onclick="this.closest('table').querySelectorAll('tbody input[type=checkbox]').forEach(c => c.checked = this.checked); this.closest('form').querySelector('.batch-toolbar').hidden = !this.checked;"></th>
             {% for field in fields|filter(f => f.isDisplayedOn('index')) %}
                 {% set direction = sort[field.property]|default(null) %}
                 <th style="{{ field.textAlign ? 'text-align:' ~ field.textAlign }}">
@@ -45,6 +85,8 @@
         <tbody>
         {% for row in rows %}
             <tr>
+                <td class="batch"><input type="checkbox" name="batchIds[]" value="{{ row.entity.id }}"
+                    onclick="this.closest('form').querySelector('.batch-toolbar').hidden = !this.closest('table').querySelector('tbody input:checked');"></td>
                 {% for field in row.fields %}
                     <td class="{{ field.cssClass }}" style="{{ field.textAlign ? 'text-align:' ~ field.textAlign }}">
                         {{ include(['@Admin/' ~ field.templateName ~ '.html.twig', '@Admin/crud/field/text.html.twig'], {field: field, entity: row.entity}) }}
@@ -54,11 +96,9 @@
                     {% for action in actions.entityActions('index') %}
                         {% if action.isDisplayed(row.entity) %}
                             {% if action.name == 'delete' %}
-                                <form method="post" action="{{ admin_url(controller_fqcn, 'delete', row.entity.id) }}" style="display:inline"
-                                      onsubmit="return confirm('{{ 'action.delete_confirm'|trans({}, 'admin') }}');">
-                                    <input type="hidden" name="_token" value="{{ csrf_token('admin-delete-' ~ row.entity.id) }}">
-                                    <button class="btn text-danger" title="{{ action.label|trans }}">✕</button>
-                                </form>
+                                {# submits the surrounding batch form to the row's delete URL (same CSRF token) #}
+                                <button class="btn text-danger" title="{{ action.label|trans }}"
+                                        formaction="{{ admin_url(controller_fqcn, 'delete', row.entity.id) }}">✕</button>
                             {% else %}
                                 <a class="btn {{ action.cssClass }}" href="{{ action.linkUrl ?? admin_url(controller_fqcn, action.crudActionName ?? action.name, row.entity.id) }}" title="{{ action.label|trans }}">
                                     {{ action.name == 'edit' ? '✎' : (action.name == 'detail' ? '👁' : action.label|trans) }}
@@ -71,6 +111,10 @@
         {% endfor %}
         </tbody>
     </table>
+    <div class="batch-toolbar" hidden>
+        <button class="btn text-danger" type="submit">{{ 'action.delete'|trans({}, 'admin') }}</button>
+    </div>
+    </form>
     <div class="paginator">
         <span>{{ paginator.total }} {{ 'datagrid.results'|trans({}, 'admin') }}</span>
         <div class="pages">

@@ -105,6 +105,11 @@ abstract class AbstractCrudController extends AbstractController implements Crud
             ->setPaginatorPageSize(20);
     }
 
+    public function configureFilters(\Base\Admin\Filter\Filters $filters): \Base\Admin\Filter\Filters
+    {
+        return $filters;
+    }
+
     // -----------------------------------------------------------------
     // page actions
     // -----------------------------------------------------------------
@@ -123,6 +128,10 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         if ('' !== $query) {
             $this->applySearch($queryBuilder, $crud, $query);
         }
+
+        $filters = $this->getFiltersConfig();
+        $filterValues = $request->query->all('filters');
+        $this->applyFilters($queryBuilder, $filters, $filterValues);
 
         $paginator = new Paginator(
             $queryBuilder,
@@ -148,6 +157,8 @@ abstract class AbstractCrudController extends AbstractController implements Crud
             'actions' => $actions,
             'sort' => $sort,
             'query' => $query,
+            'filters' => $filters,
+            'filter_values' => $filterValues,
         ]);
     }
 
@@ -226,7 +237,8 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         $crud = $this->getCrudConfig(Crud::PAGE_INDEX, Action::DELETE);
         $this->denyAccessUnlessGrantedToRun($crud);
 
-        if (!$this->isCsrfTokenValid('admin-delete-' . $entityId, $request->request->getString('_token'))) {
+        // same token as the batch form: the row delete button submits it
+        if (!$this->isCsrfTokenValid('admin-batch-' . static::getEntityFqcn(), $request->request->getString('_token'))) {
             throw $this->createAccessDeniedException('Invalid CSRF token.');
         }
 
@@ -293,6 +305,37 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         }
 
         return $queryBuilder;
+    }
+
+    protected function getFiltersConfig(): \Base\Admin\Filter\Filters
+    {
+        $filters = $this->configureFilters(\Base\Admin\Filter\Filters::new());
+
+        // guess widget types from Doctrine metadata for plain add('property')
+        $metadata = $this->entityManager->getClassMetadata(static::getEntityFqcn());
+        foreach ($filters->getAll() as $property => $filter) {
+            if (\Base\Admin\Filter\Filter::TYPE_TEXT !== $filter->getType() || !$metadata->hasField($property)) {
+                continue;
+            }
+            match ($metadata->getTypeOfField($property)) {
+                'boolean' => $filter->asBoolean(),
+                'integer', 'smallint', 'bigint', 'float', 'decimal' => $filter->asNumeric(),
+                'date', 'datetime', 'datetime_immutable', 'date_immutable' => $filter->asDate(),
+                default => null,
+            };
+        }
+
+        return $filters;
+    }
+
+    protected function applyFilters(QueryBuilder $queryBuilder, \Base\Admin\Filter\Filters $filters, array $filterValues): void
+    {
+        foreach ($filters->getAll() as $property => $filter) {
+            $value = $filterValues[$property] ?? null;
+            if (\Base\Admin\Filter\Filter::isActive($value)) {
+                $filter->apply($queryBuilder, 'entity', $value);
+            }
+        }
     }
 
     /**
