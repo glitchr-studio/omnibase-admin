@@ -1,10 +1,5 @@
 <!DOCTYPE html>
-{# data-turbo="true": the admin runs Turbo Drive for its OWN internal
-   navigation (see the easyadmin-async entry loaded below) - independent of
-   whatever nests it (transparentJS overlay, plain visit, ...). Turbo swaps
-   <body> only, so clicking around inside the admin is a fast AJAX
-   transition instead of a hard reload of the whole nested page. #}
-<html lang="{{ app.request.locale|default('en') }}" data-turbo="true">
+<html lang="{{ app.request.locale|default('en') }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -85,17 +80,32 @@
            from DOM markers rendered by @Base/form/form_div_layout.html.twig #}
         {{ encore_entry_link_tags('form') }}
         {{ encore_entry_script_tags('form') }}
-        {# base-bundle's prebuilt Turbo Drive bundle: swaps <body> only on
-           in-admin navigation (list -> edit -> save -> list...) instead of
-           a hard reload, and re-dispatches DOMContentLoaded after every
-           swap so the form-defer widgets above rebind against the fresh
-           markup. JS only - its CSS entry bundles the full legacy
-           EasyAdmin/Bootstrap stylesheet we're deliberately not using. #}
-        {{ encore_entry_script_tags('easyadmin-async') }}
+        {# One SPA engine for the whole product: transparentJS, vendored here
+           as plain UMD scripts (no Encore/webpack involvement - the package
+           has no build step of its own). Same library the public site and
+           the website-in-website overlay use; in-admin navigation now works
+           the same way everything else does: AJAX swap of #page, cached
+           pages, fade transitions - instead of a hard reload per click. #}
+        <link rel="stylesheet" href="{{ asset('bundles/admin/css/transparent.css') }}">
+        <script src="{{ asset('bundles/admin/js/jquery.min.js') }}"></script>
+        <script src="{{ asset('bundles/admin/js/transparent.js') }}"></script>
+        <script>
+            // Confine the SPA swap to /admin/* - a link out to the public
+            // site (e.g. a "view online" link on an article) should be a
+            // plain navigation, not an attempt to AJAX-swap the whole
+            // unrelated page into this frame.
+            if (window.Transparent) {
+                Transparent.settings.exceptions = [/^(?!\/admin(\/|$)).*/];
+            }
+        </script>
     {% endblock %}
 </head>
 <body>
-<div class="admin-shell">
+{# id="page": transparentJS only engages its SPA click/swap handling when
+   the current document contains this element (same convention the public
+   site's base.html.twig uses) - everything inside it is what gets swapped
+   and cached on navigation. #}
+<div id="page" class="admin-shell">
     <aside class="admin-aside">
         <div class="brand">
             {% block brand %}<span>{% block brand_title %}Administration{% endblock %}</span>{% endblock %}
