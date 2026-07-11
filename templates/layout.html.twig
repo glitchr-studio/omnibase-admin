@@ -90,8 +90,10 @@
             {# the "x" closes the overlay instantly when the admin is nested
                (transparentJS website-in-website); plain link back to the
                site otherwise #}
+            {# inside the transparentJS iframe overlay: close the parent's
+               overlay; standalone: plain link back to the site #}
             <a class="close" href="/" title="Close administration"
-               onclick="if (window.Transparent && Transparent.isNested && Transparent.isNested()) { Transparent.closeNest(); return false; }">&times;</a>
+               onclick="try { if (window.parent !== window && parent.Transparent && parent.Transparent.closeNest) { parent.Transparent.closeNest(); return false; } } catch (e) {} return true;">&times;</a>
         </div>
         {% block main_menu %}
             {% if admin_context is defined and admin_context.mainMenu is not empty %}
