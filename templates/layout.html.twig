@@ -1,5 +1,10 @@
 <!DOCTYPE html>
-<html lang="{{ app.request.locale|default('en') }}">
+{# data-turbo="true": the admin runs Turbo Drive for its OWN internal
+   navigation (see the easyadmin-async entry loaded below) - independent of
+   whatever nests it (transparentJS overlay, plain visit, ...). Turbo swaps
+   <body> only, so clicking around inside the admin is a fast AJAX
+   transition instead of a hard reload of the whole nested page. #}
+<html lang="{{ app.request.locale|default('en') }}" data-turbo="true">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -80,6 +85,13 @@
            from DOM markers rendered by @Base/form/form_div_layout.html.twig #}
         {{ encore_entry_link_tags('form') }}
         {{ encore_entry_script_tags('form') }}
+        {# base-bundle's prebuilt Turbo Drive bundle: swaps <body> only on
+           in-admin navigation (list -> edit -> save -> list...) instead of
+           a hard reload, and re-dispatches DOMContentLoaded after every
+           swap so the form-defer widgets above rebind against the fresh
+           markup. JS only - its CSS entry bundles the full legacy
+           EasyAdmin/Bootstrap stylesheet we're deliberately not using. #}
+        {{ encore_entry_script_tags('easyadmin-async') }}
     {% endblock %}
 </head>
 <body>
