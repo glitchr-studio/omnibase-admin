@@ -12,4 +12,4 @@ To update after a `@glitchr/transparent` release:
     cp <transparent-repo>/src/css/index.scss     public/css/transparent.css
     # jquery.min.js: cp node_modules/jquery/dist/jquery.min.js public/js/jquery.min.js
 
-Currently vendored at transparent 1.3.1 / jquery 3.7.1.
+Currently vendored at transparent 1.3.2 / jquery 3.7.1.
