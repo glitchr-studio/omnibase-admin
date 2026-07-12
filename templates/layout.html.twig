@@ -17,6 +17,16 @@
         .admin-aside { width: 230px; flex-shrink: 0; display: flex; flex-direction: column; background: var(--admin-surface); border-right: 1px solid var(--admin-border); padding: 1rem 0; }
         .admin-aside .brand { display: flex; align-items: center; gap: .5rem; padding: 0 1.25rem .75rem; font-weight: 700; border-bottom: 1px solid var(--admin-border); }
         .admin-aside .close { margin-left: auto; text-decoration: none; color: var(--admin-muted); font-size: 1.3rem; line-height: 1; }
+        /* hidden by default; html.loading spans the full duration of any
+           transparentJS-driven transition (real nav, in-page AJAX swap, or
+           a nested overlay open/navigate) - see transparent's own
+           index.scss for the matching top-bar rule this mirrors */
+        .admin-nav-spinner { display: none; width: 14px; height: 14px; margin-left: auto;
+            border-radius: 50%; border: 2px solid var(--admin-border); border-top-color: var(--admin-accent);
+            animation: admin-nav-spin .7s linear infinite; }
+        html.loading .admin-nav-spinner { display: inline-block; }
+        html.loading .admin-nav-spinner + .close { margin-left: .5rem; }
+        @keyframes admin-nav-spin { to { transform: rotate(360deg); } }
         .admin-menu { list-style: none; margin: .75rem 0 0; padding: 0; }
         .admin-menu .section { padding: .9rem 1.25rem .3rem; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--admin-muted); }
         .admin-menu a { display: block; padding: .45rem 1.25rem; color: inherit; text-decoration: none; border-left: 3px solid transparent; }
@@ -148,6 +158,12 @@
                stopping propagation it independently resolves this element's
                href="/" fallback and starts its own in-iframe navigation to
                "/" at the same time the parent is closing the overlay. #}
+            {# Visible for the full duration of any in-admin page transition -
+               html.loading is the same state class transparentJS already
+               manages for every swap (see Settings.progress_bar's top bar),
+               just a second, more localized loading cue right where you're
+               looking while navigating the admin. #}
+            <span class="admin-nav-spinner" aria-hidden="true"></span>
             <a class="close" href="/" title="Close administration"
                onclick="try { if (window.parent !== window && parent.Transparent && parent.Transparent.closeNest) { event.stopPropagation(); parent.Transparent.closeNest(); return false; } } catch (e) {} return true;">&times;</a>
         </div>
