@@ -100,13 +100,31 @@
         <script src="{{ asset('bundles/admin/js/jquery.min.js') }}"></script>
         <script src="{{ asset('bundles/admin/js/transparent.js') }}"></script>
         <script>
-            // Confine the SPA swap to /admin/* - a link out to the public
-            // site (e.g. a "view online" link on an article) should be a
-            // plain navigation, not an attempt to AJAX-swap the whole
-            // unrelated page into this frame.
-            if (window.Transparent) {
-                Transparent.settings.exceptions = [/^(?!\/admin(\/|$)).*/];
-            }
+            // Transparent.ready() was NEVER being called here - meaning
+            // `isReady` stayed false forever, and __main__'s early-return
+            // for that case does NOT call e.preventDefault() first. Every
+            // click on every admin link was silently falling through to a
+            // real, hard browser navigation of this iframe (not the AJAX
+            // swap the rest of this layout's comments and markup assume) -
+            // confirmed live: a genuine multi-hundred-ms blank-white gap
+            // (a real page load, not a styled transition) on every single
+            // in-admin navigation. {once:true} matters here exactly like it
+            // does on the public site's equivalent call (see
+            // assets/app-defer.js): transparent.js re-dispatches a
+            // synthetic 'load' event on every SPA nav, so a non-once
+            // listener would re-run ready() (and its side effects) on every
+            // click inside the admin too.
+            window.addEventListener('load', function () {
+                if (!window.Transparent) return;
+                Transparent.ready({
+                    // Confine the SPA swap to /admin/* - a link out to the
+                    // public site (e.g. a "view online" link on an
+                    // article) should be a plain navigation, not an
+                    // attempt to AJAX-swap the whole unrelated page into
+                    // this frame.
+                    exceptions: [/^(?!\/admin(\/|$)).*/]
+                });
+            }, { once: true });
         </script>
     {% endblock %}
 </head>
