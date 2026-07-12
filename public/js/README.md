@@ -12,4 +12,13 @@ To update after a `@glitchr/transparent` release:
     cp <transparent-repo>/src/css/index.scss     public/css/transparent.css
     # jquery.min.js: cp node_modules/jquery/dist/jquery.min.js public/js/jquery.min.js
 
-Currently vendored at transparent 1.3.3 / jquery 3.7.1.
+Currently vendored at transparent 1.3.4 / jquery 3.7.1.
+
+IMPORTANT: this is not the only copy in this app. The public site (host
+page) consumes `@glitchr/transparent` via `assets/app-defer.js` from
+`node_modules/@glitchr/transparent`, which is a hand-copy too (the package
+has never actually been `npm publish`ed). Both copies must be updated
+together or the host and the admin overlay run different versions of the
+SAME library at the same time - this caused real, hard-to-diagnose bugs
+(missing loading spinner, no close fade, iframe background bleed-through)
+because the half that runs on the host page silently lagged behind.
