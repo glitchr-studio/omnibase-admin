@@ -123,9 +123,15 @@
                (transparentJS website-in-website); plain link back to the
                site otherwise #}
             {# inside the transparentJS iframe overlay: close the parent's
-               overlay; standalone: plain link back to the site #}
+               overlay; standalone: plain link back to the site.
+               stopPropagation() is required, not just preventDefault(): this
+               page's OWN transparentJS instance (running inside the iframe)
+               also listens for clicks on document via __main__, and without
+               stopping propagation it independently resolves this element's
+               href="/" fallback and starts its own in-iframe navigation to
+               "/" at the same time the parent is closing the overlay. #}
             <a class="close" href="/" title="Close administration"
-               onclick="try { if (window.parent !== window && parent.Transparent && parent.Transparent.closeNest) { parent.Transparent.closeNest(); return false; } } catch (e) {} return true;">&times;</a>
+               onclick="try { if (window.parent !== window && parent.Transparent && parent.Transparent.closeNest) { event.stopPropagation(); parent.Transparent.closeNest(); return false; } } catch (e) {} return true;">&times;</a>
         </div>
         {% block main_menu %}
             {% if admin_context is defined and admin_context.mainMenu is not empty %}
