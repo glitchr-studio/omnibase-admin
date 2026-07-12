@@ -179,18 +179,21 @@
     </main>
 </div>
 {% block body_javascript %}{% endblock %}
-{# Tells the parent overlay this page is visually ready, the moment the
-   browser has actually finished parsing+executing everything up to this
-   point (including form-defer's widget bundle, loaded above via a real
-   <script> tag, and anything body_javascript added) - the parent's own
-   'load'-event heuristic can't know that as precisely as this page does
-   about itself. Safe no-op outside the nested-overlay context. #}
-<script>
-    try {
-        if (window.parent !== window && parent.Transparent && parent.Transparent.notifyNestReady) {
-            parent.Transparent.notifyNestReady();
-        }
-    } catch (e) {}
-</script>
-</body>
+{# NOT calling parent.Transparent.notifyNestReady() here (tried it,
+   reverted - see git history / transparent.js's mount()). A plain
+   inline <script> this close to </body> still runs during HTML
+   PARSING, roughly DOMContentLoaded timing, well before images/
+   stylesheets/deferred scripts have actually finished loading and
+   applied. Measured directly against the real admin dashboard: firing
+   it unconditionally here revealed the overlay while this document's
+   readyState was still "interactive", 668ms before it reached
+   "complete" - the exact "page goes white, nested site hasn't finished
+   loading" bug. Gating it on this document's OWN 'load' event instead
+   just re-races the parent's identical 'load'-driven reveal with no
+   guaranteed ordering between the two, for no proven benefit - this
+   app's actual asset loading (form-defer included, all real <script>
+   tags) is already fully covered by the parent's load+settle fallback
+   in Transparent.nest's mount(). Reconsider notifyNestReady() only if a
+   future page here has real async work that genuinely continues after
+   its own 'load' event. #}
 </html>
