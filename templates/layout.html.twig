@@ -179,5 +179,18 @@
     </main>
 </div>
 {% block body_javascript %}{% endblock %}
+{# Tells the parent overlay this page is visually ready, the moment the
+   browser has actually finished parsing+executing everything up to this
+   point (including form-defer's widget bundle, loaded above via a real
+   <script> tag, and anything body_javascript added) - the parent's own
+   'load'-event heuristic can't know that as precisely as this page does
+   about itself. Safe no-op outside the nested-overlay context. #}
+<script>
+    try {
+        if (window.parent !== window && parent.Transparent && parent.Transparent.notifyNestReady) {
+            parent.Transparent.notifyNestReady();
+        }
+    } catch (e) {}
+</script>
 </body>
 </html>
