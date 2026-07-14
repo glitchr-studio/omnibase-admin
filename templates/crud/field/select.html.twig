@@ -1,8 +1,16 @@
 {%- set choices = field.customOption('choices') ?? {} -%}
-{%- macro badge(raw, choices) -%}
+{%- set enumClass = field.customOption('enumClass') -%}
+{%- macro badge(raw, choices, enumClass) -%}
     {%- set label = choices[raw] ?? null -%}
+    {%- set enumLabel = enumClass ? raw|trans_enum(enumClass) : null -%}
     <span class="badge badge-accent">
-        {{- label is not null ? label|trans : raw|lower|replace({'_': ' '})|capitalize -}}
+        {%- if label is not null -%}
+            {{- label|trans -}}
+        {%- elseif enumLabel is not null -%}
+            {{- enumLabel -}}
+        {%- else -%}
+            {{- raw|lower|replace({'_': ' '})|capitalize -}}
+        {%- endif -%}
     </span>
 {%- endmacro -%}
 {%- set raw = field.value -%}
@@ -11,9 +19,9 @@
 {%- elseif raw is iterable -%}
     <span class="badge-list">
         {%- for item in raw -%}
-            {{ _self.badge(item, choices) }}
+            {{ _self.badge(item, choices, enumClass) }}
         {%- endfor -%}
     </span>
 {%- else -%}
-    {{ _self.badge(field.formattedValue, choices) }}
+    {{ _self.badge(field.formattedValue, choices, enumClass) }}
 {%- endif -%}

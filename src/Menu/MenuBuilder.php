@@ -18,20 +18,36 @@ use Symfony\Contracts\Translation\TranslatorInterface;
  */
 class MenuBuilder
 {
+    /**
+     * @param iterable<\Base\Admin\Controller\AbstractDashboardController> $dashboardControllers
+     */
     public function __construct(
         protected readonly AdminRouteRegistry $registry,
         protected readonly AdminUrlGenerator $adminUrlGenerator,
         protected readonly UrlGeneratorInterface $urlGenerator,
         protected readonly RequestStack $requestStack,
         protected readonly TranslatorInterface $translator,
+        protected readonly iterable $dashboardControllers = [],
     ) {
     }
 
     /**
+     * The app's own curated menu (dashboard link + configureMenuItems()'s
+     * sections/entries) when a DashboardController is registered - the same
+     * menu the dashboard itself shows - falling back to a generic
+     * unsectioned "one entry per registered CRUD" listing only when no app
+     * DashboardController exists yet (e.g. mid-migration).
+     *
      * @return MenuItem[]
      */
     public function buildDefault(): array
     {
+        foreach ($this->dashboardControllers as $dashboardController) {
+            // already resolved (URLs + selected state) by the dashboard
+            // controller's own resolveMenu() - no need to redo it here
+            return $dashboardController->getMenuItems();
+        }
+
         $items = [MenuItemFactory::linkToDashboard($this->translator->trans('menu.dashboard', [], 'admin'), 'fa-solid fa-home')];
 
         foreach ($this->registry->getControllers() as $fqcn => $slug) {

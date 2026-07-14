@@ -63,5 +63,6 @@ return function (ContainerConfigurator $configurator) {
             service('router'),
             service('request_stack'),
             service('translator'),
+            tagged_iterator('base.admin.dashboard_controller'),
         ]);
 };

@@ -20,6 +20,7 @@ class SelectField implements FieldInterface
     public const OPTION_CLASS = 'class';
 
     public const OPTION_CHOICES = 'choices';
+    public const OPTION_ENUM_CLASS = 'enumClass';
     public const OPTION_ICONS = 'icons';
     public const OPTION_FILTER = 'choice_filter';
 
@@ -195,6 +196,23 @@ class SelectField implements FieldInterface
         }
 
         $this->setFormTypeOption(self::OPTION_CHOICES, $choiceGenerator);
+
+        return $this;
+    }
+
+    /**
+     * Names the `Base\Database\Type\EnumType` subclass (e.g. ThreadState)
+     * backing this field's raw string values, so the index/detail badge
+     * template can resolve a real translated label (via the `trans_enum`
+     * filter, which already exists and is used elsewhere in the app) instead
+     * of guessing one by humanizing the raw constant name
+     * ("STATE_PUBLISH" -> "State publish" rather than "Publié").
+     *
+     * @return $this
+     */
+    public function setEnumClass(string $class)
+    {
+        $this->setCustomOption(self::OPTION_ENUM_CLASS, $class);
 
         return $this;
     }

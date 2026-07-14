@@ -57,7 +57,11 @@
         body { margin: 0; font: 15px/1.5 system-ui, -apple-system, sans-serif; background: var(--admin-bg); color: var(--admin-text); }
         .admin-shell { display: flex; min-height: 100vh; }
         .admin-aside { width: 230px; flex-shrink: 0; display: flex; flex-direction: column; background: var(--admin-surface); border-right: 1px solid var(--admin-border); padding: 1rem 0; }
-        .admin-aside .brand { display: flex; align-items: center; gap: .5rem; padding: 0 1.25rem .75rem; font-weight: 700; border-bottom: 1px solid var(--admin-border); }
+        .admin-aside .brand { display: flex; align-items: center; gap: .6rem; padding: 0 1.25rem .9rem; border-bottom: 1px solid var(--admin-border); }
+        .admin-aside .brand-logo { width: 2.25rem; height: 2.25rem; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
+        .admin-aside .brand-text { display: flex; flex-direction: column; min-width: 0; }
+        .admin-aside .brand-title { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .admin-aside .brand-user { font-size: .8rem; color: var(--admin-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .admin-menu { list-style: none; margin: .75rem 0 0; padding: 0; }
         .admin-menu .section { padding: .9rem 1.25rem .3rem; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--admin-muted); }
         .admin-menu a { display: block; padding: .45rem 1.25rem; color: inherit; text-decoration: none; border-left: 3px solid transparent; }
@@ -347,7 +351,15 @@
 <div id="page" class="admin-shell">
     <aside class="admin-aside">
         <div class="brand">
-            {% block brand %}<span>{% block brand_title %}Administration{% endblock %}</span>{% endblock %}
+            {% block brand %}
+                {% if app.site.logo is not empty %}
+                    <img class="brand-logo" src="{{ app.site.logo|thumbnail(64, 64) }}" alt="">
+                {% endif %}
+                <div class="brand-text">
+                    <span class="brand-title">{% block brand_title %}{{ app.site.title ?? 'Administration' }}{% endblock %}</span>
+                    {% if app.user %}<span class="brand-user">{{ app.user }}</span>{% endif %}
+                </div>
+            {% endblock %}
         </div>
         {% block main_menu %}
             {% if admin_context is defined and admin_context.mainMenu is not empty %}

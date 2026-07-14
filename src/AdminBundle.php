@@ -44,6 +44,9 @@ class AdminBundle extends AbstractBaseBundle
             ->addTag('base.admin.crud_controller')
             ->addTag('controller.service_arguments');
 
+        $container->registerForAutoconfiguration(\Base\Admin\Controller\AbstractDashboardController::class)
+            ->addTag('base.admin.dashboard_controller');
+
         $container->addCompilerPass(new AdminRoutePass());
     }
 }
