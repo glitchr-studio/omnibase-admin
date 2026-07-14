@@ -4,6 +4,20 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block page_title %}Admin{% endblock %}</title>
+    {# Applied before any CSS paints, not after - reading this in a normal
+       body-level script would show the light theme for one frame then
+       flash to dark. "auto" (the default - no explicit choice saved yet)
+       intentionally sets no attribute at all: the plain
+       @media(prefers-color-scheme:dark) rule below already covers it, no
+       need to duplicate that logic in JS too. #}
+    <script>
+        (function () {
+            var saved = localStorage.getItem('admin-theme');
+            if (saved === 'light' || saved === 'dark') {
+                document.documentElement.setAttribute('data-theme', saved);
+            }
+        })();
+    </script>
     {% block head_stylesheets %}
     <style>
         :root {
@@ -11,6 +25,34 @@
             --admin-text: #1f2429; --admin-muted: #6b7683; --admin-accent: #2563eb;
             --admin-danger: #dc2626; --admin-radius: 8px;
         }
+        {# "auto" (no data-theme attribute at all) follows the OS - explicit
+           data-theme="dark"/"light" (set above from a saved preference)
+           always wins regardless of OS setting. #}
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) {
+                --admin-bg: #16181d; --admin-surface: #1e2127; --admin-border: #2c3038;
+                --admin-text: #e6e8eb; --admin-muted: #8b94a1; --admin-accent: #6ea8fe;
+                --admin-danger: #f87171;
+            }
+        }
+        :root[data-theme="dark"] {
+            --admin-bg: #16181d; --admin-surface: #1e2127; --admin-border: #2c3038;
+            --admin-text: #e6e8eb; --admin-muted: #8b94a1; --admin-accent: #6ea8fe;
+            --admin-danger: #f87171;
+        }
+        .admin-topbar { display: flex; justify-content: flex-end; align-items: center; padding: .6rem .9rem; margin: -1.5rem -2rem 1.25rem; border-bottom: 1px solid var(--admin-border); }
+        .admin-theme-switch { position: relative; }
+        .admin-theme-switch > button { display: inline-flex; align-items: center; gap: .4rem; padding: .35rem .7rem; border-radius: 6px; border: 1px solid var(--admin-border);
+            background: var(--admin-surface); color: inherit; cursor: pointer; font: inherit; font-size: .85rem; }
+        .admin-theme-switch > button:hover { border-color: var(--admin-accent); color: var(--admin-accent); }
+        .admin-theme-menu { display: none; position: absolute; top: calc(100% + .3rem); right: 0; min-width: 150px; z-index: 20;
+            background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: var(--admin-radius); box-shadow: 0 8px 24px rgba(0,0,0,.15); overflow: hidden; }
+        .admin-theme-switch.is-open .admin-theme-menu { display: block; }
+        .admin-theme-menu button { display: flex; align-items: center; gap: .5rem; width: 100%; padding: .5rem .8rem; border: 0; background: none; text-align: left;
+            color: inherit; cursor: pointer; font: inherit; font-size: .85rem; }
+        .admin-theme-menu button:hover { background: var(--admin-bg); }
+        .admin-theme-menu button.is-active { color: var(--admin-accent); font-weight: 600; }
+        .admin-theme-menu button i { width: 1rem; text-align: center; }
         * { box-sizing: border-box; }
         body { margin: 0; font: 15px/1.5 system-ui, -apple-system, sans-serif; background: var(--admin-bg); color: var(--admin-text); }
         .admin-shell { display: flex; min-height: 100vh; }
@@ -224,6 +266,59 @@
                 });
             });
         </script>
+        <script>
+            // Topbar appearance dropdown - same delegated-on-document
+            // pattern as the boolean switch above, for the same reason
+            // (survives future in-admin AJAX swaps with nothing to
+            // rebind). One listener handles both opening/closing the menu
+            // and picking a choice from it.
+            document.addEventListener('click', function (e) {
+                const swtch = document.querySelector('[data-theme-switch]');
+                if (!swtch) return;
+
+                const choiceBtn = e.target.closest('[data-theme-choice]');
+                if (choiceBtn) {
+                    const choice = choiceBtn.dataset.themeChoice;
+                    if (choice === 'auto') {
+                        localStorage.removeItem('admin-theme');
+                        document.documentElement.removeAttribute('data-theme');
+                    } else {
+                        localStorage.setItem('admin-theme', choice);
+                        document.documentElement.setAttribute('data-theme', choice);
+                    }
+                    swtch.classList.remove('is-open');
+                    swtch.querySelector('button[aria-haspopup]').setAttribute('aria-expanded', 'false');
+                    return;
+                }
+
+                const toggleBtn = e.target.closest('[data-theme-switch] > button');
+                if (toggleBtn) {
+                    const isOpen = swtch.classList.toggle('is-open');
+                    toggleBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+                    return;
+                }
+
+                // click anywhere else closes it
+                swtch.classList.remove('is-open');
+                swtch.querySelector('button[aria-haspopup]').setAttribute('aria-expanded', 'false');
+            });
+            // reflect the saved/current choice with an "active" mark and
+            // keep it in sync if the OS theme changes while "system" is
+            // selected (no saved override) - re-runs the same tiny check
+            // rather than needing a page reload to notice.
+            (function () {
+                function markActive() {
+                    var saved = localStorage.getItem('admin-theme') || 'auto';
+                    document.querySelectorAll('[data-theme-choice]').forEach(function (btn) {
+                        btn.classList.toggle('is-active', btn.dataset.themeChoice === saved);
+                    });
+                }
+                markActive();
+                document.addEventListener('click', function (e) {
+                    if (e.target.closest('[data-theme-choice]')) markActive();
+                });
+            })();
+        </script>
     {% endblock %}
 </head>
 <body>
@@ -285,6 +380,20 @@
         {% endblock %}
     </aside>
     <main class="admin-main">
+        {% block topbar %}
+            <div class="admin-topbar">
+                <div class="admin-theme-switch" data-theme-switch>
+                    <button type="button" aria-haspopup="true" aria-expanded="false">
+                        <i class="fa-solid fa-circle-half-stroke"></i> {{ 'topbar.appearance'|trans({}, 'admin') }}
+                    </button>
+                    <div class="admin-theme-menu" role="menu">
+                        <button type="button" data-theme-choice="light"><i class="fa-solid fa-sun"></i> {{ 'topbar.theme_light'|trans({}, 'admin') }}</button>
+                        <button type="button" data-theme-choice="dark"><i class="fa-solid fa-moon"></i> {{ 'topbar.theme_dark'|trans({}, 'admin') }}</button>
+                        <button type="button" data-theme-choice="auto"><i class="fa-solid fa-desktop"></i> {{ 'topbar.theme_auto'|trans({}, 'admin') }}</button>
+                    </div>
+                </div>
+            </div>
+        {% endblock %}
         {% block flashes %}
             {% set flashes = app.flashes %}
             {% if flashes is not empty %}

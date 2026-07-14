@@ -2,6 +2,12 @@ dashboard:
     title: Tableau de bord
     welcome: Bienvenue dans votre administration. Choisissez une section dans le menu pour gérer vos contenus.
 
+topbar:
+    appearance: Apparence
+    theme_light: Clair
+    theme_dark: Sombre
+    theme_auto: Système
+
 field:
     translatable: Champ traduisible
     video: vidéo
