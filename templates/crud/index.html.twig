@@ -112,11 +112,16 @@
                                 <button class="btn text-danger" title="{{ action.label|trans }}"
                                         formaction="{{ admin_url(controller_fqcn, 'delete', row.entity.id) }}"><i class="fa-solid fa-trash"></i></button>
                             {% else %}
-                                <a class="btn {{ action.cssClass }}" href="{{ action.linkUrl ?? admin_url(controller_fqcn, action.crudActionName ?? action.name, row.entity.id) }}" title="{{ action.label|trans }}">
+                                <a class="btn {{ action.cssClass }}"
+                                   href="{{ admin_action_url(action, row.entity, controller_fqcn) }}"
+                                   title="{{ action.label|trans }}"
+                                   {%- if action.htmlAttributes['target'] is defined %} target="{{ action.htmlAttributes['target'] }}"{% endif %}>
                                     {%- if action.name == 'edit' -%}
                                         <i class="fa-solid fa-pen"></i>
                                     {%- elseif action.name == 'detail' -%}
                                         <i class="fa-solid fa-eye"></i>
+                                    {%- elseif action.name == 'goto' -%}
+                                        <i class="fa-solid fa-plug"></i>
                                     {%- else -%}
                                         {{ action.label|trans }}
                                     {%- endif -%}

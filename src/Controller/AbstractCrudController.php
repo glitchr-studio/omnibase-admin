@@ -3,6 +3,7 @@
 namespace Base\Admin\Controller;
 
 use Base\Admin\Config\Action;
+use function Symfony\Component\Translation\t;
 use Base\Admin\Config\Actions;
 use Base\Admin\Config\Crud;
 use Base\Admin\Context\AdminContext;
@@ -13,6 +14,7 @@ use Base\Admin\Field\IdField;
 use Base\Admin\Form\FieldFormBuilder;
 use Base\Admin\Orm\Paginator;
 use Base\Admin\Router\AdminUrlGenerator;
+use Base\Service\Model\LinkableInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\QueryBuilder;
 use LogicException;
@@ -130,7 +132,20 @@ abstract class AbstractCrudController extends AbstractController implements Crud
 
     public function configureActions(Actions $actions): Actions
     {
-        return $actions->addDefaults();
+        $actions = $actions->addDefaults();
+
+        // Entities that expose a real front-end URL (Article, Destination,
+        // Gallery, ...) get a "view on the live site" row action for free -
+        // no per-controller wiring needed, mirrors what every CRUD had
+        // under the old EasyAdmin-based admin.
+        if (is_subclass_of(static::getEntityFqcn(), LinkableInterface::class)) {
+            $actions->add(Actions::PAGE_INDEX, Action::new(Action::GOTO, t('action.goto', domain: 'admin'), 'fa-solid fa-fw fa-plug')
+                ->renderAsTooltip()
+                ->targetBlank()
+                ->linkToUrl(fn (object $entity) => $entity->__toLink() ?? ''));
+        }
+
+        return $actions;
     }
 
     public function configureCrud(Crud $crud): Crud

@@ -33,6 +33,7 @@ action:
     goto_prev: Previous
     goto_next: Next
     goto_see: See online
+    goto: View on site
     search: Search
 
 datagrid:
