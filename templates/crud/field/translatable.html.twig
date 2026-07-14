@@ -1,0 +1,21 @@
+{%- set raw = field.value -%}
+<span class="field-translatable">
+    <i class="fa-solid fa-language badge-muted" title="{{ 'field.translatable'|trans({}, 'admin') }}"></i>
+    {%- if raw is iterable -%}
+        {%- set count = raw|length -%}
+        {%- if count == 0 -%}
+            <span class="badge-muted">—</span>
+        {%- else -%}
+            <span class="badge">{{ count }} {{ count != 1 ? 'field.items'|trans({}, 'admin') : 'field.item'|trans({}, 'admin') }}</span>
+        {%- endif -%}
+    {%- else -%}
+        {%- set value = field.formattedValue -%}
+        {%- set max = field.customOption('maxLength') ?? 50 -%}
+        {%- if value is null or value == '' -%}
+            <span class="badge-muted">—</span>
+        {%- else -%}
+            {%- set value = '' ~ value -%}
+            {{ value|length > max ? value|slice(0, max) ~ '…' : value }}
+        {%- endif -%}
+    {%- endif -%}
+</span>

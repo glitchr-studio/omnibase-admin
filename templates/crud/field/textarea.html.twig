@@ -1,0 +1,8 @@
+{%- set raw = field.value -%}
+{%- set max = field.customOption('maxLength') ?? 120 -%}
+{%- if raw is null or raw == '' -%}
+    <span class="badge-muted">—</span>
+{%- else -%}
+    {%- set text = raw|striptags|trim -%}
+    {{ text|length > max ? text|slice(0, max) ~ '…' : text }}
+{%- endif -%}

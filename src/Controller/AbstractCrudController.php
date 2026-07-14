@@ -303,6 +303,54 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         return $this->redirect($this->adminUrlGenerator->setController(static::class)->setAction(Action::INDEX)->generateUrl());
     }
 
+    /**
+     * Backs crud/field/boolean.html.twig's inline switch - the whole reason
+     * this exists rather than routing a toggle through the normal edit
+     * form. Deliberately narrow: only properties that are ACTUALLY
+     * configured as a BooleanField with the switch option on, on THIS
+     * crud's own field list, can be flipped - a client can't toggle an
+     * arbitrary property just by guessing its name, and this can't be used
+     * to touch fields the controller never chose to expose as a switch in
+     * the first place. Requires edit permission, same CSRF token family as
+     * the rest of this controller's mutations.
+     */
+    public function toggle(Request $request, string $entityId): Response
+    {
+        $crud = $this->getCrudConfig(Crud::PAGE_EDIT, Action::EDIT);
+        $this->denyAccessUnlessGrantedToRun($crud);
+
+        $payload = $request->toArray();
+        $property = (string) ($payload['property'] ?? '');
+        $token = (string) ($payload['_token'] ?? '');
+
+        if (!$this->isCsrfTokenValid(\Base\Admin\Field\BooleanField::CSRF_TOKEN_NAME, $token)) {
+            throw $this->createAccessDeniedException('Invalid CSRF token.');
+        }
+
+        $togglable = null;
+        foreach ($this->getFields(Crud::PAGE_INDEX) as $field) {
+            $descriptor = $field->getAsDto();
+            if ($descriptor->getProperty() === $property
+                && $field instanceof \Base\Admin\Field\BooleanField
+                && $descriptor->getCustomOption(\Base\Admin\Field\BooleanField::OPTION_RENDER_AS_SWITCH)
+            ) {
+                $togglable = $descriptor;
+                break;
+            }
+        }
+        if (null === $togglable) {
+            throw $this->createNotFoundException(sprintf('"%s" is not a switchable field on this crud.', $property));
+        }
+
+        $entity = $this->findEntity($entityId);
+        $accessor = \Symfony\Component\PropertyAccess\PropertyAccess::createPropertyAccessor();
+        $newValue = !$accessor->getValue($entity, $property);
+        $accessor->setValue($entity, $property, $newValue);
+        $this->updateEntity($this->entityManager, $entity);
+
+        return $this->json(['property' => $property, 'value' => $newValue]);
+    }
+
     // -----------------------------------------------------------------
     // overridable persistence + query hooks
     // -----------------------------------------------------------------

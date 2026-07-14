@@ -2,6 +2,16 @@ dashboard:
     title: Dashboard
     welcome: Welcome to your administration. Pick a section in the menu to start managing your content.
 
+field:
+    translatable: Translatable field
+    video: video
+    audio: audio
+    file: file
+    files: files
+    item: item
+    items: items
+    unlimited: Unlimited
+
 action:
     index: Back to list
     new: Create

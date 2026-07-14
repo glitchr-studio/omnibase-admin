@@ -1,0 +1,15 @@
+{%- set raw = field.value -%}
+{%- set limit = field.customOption('displayLimit') ?? 2 -%}
+{%- if raw is null or (raw is iterable and raw|length == 0) -%}
+    <span class="badge-muted">—</span>
+{%- elseif raw is iterable -%}
+    {%- set total = raw|length -%}
+    <span class="badge-list">
+        {%- for item in raw|slice(0, limit) -%}
+            <span class="badge">{{ item }}</span>
+        {%- endfor -%}
+        {%- if total > limit -%}<span class="badge badge-muted">+{{ total - limit }}</span>{% endif -%}
+    </span>
+{%- else -%}
+    <span class="badge">{{ raw }}</span>
+{%- endif -%}

@@ -1,0 +1,11 @@
+{%- set raw = field.value -%}
+{%- if raw is null or raw == '' -%}
+    <span class="badge-muted">—</span>
+{%- else -%}
+    {%- set show = field.customOption('show') ?? 'icon' -%}
+    {%- set icon = field.customOption('icon') ?? 'fa-solid fa-at' -%}
+    <a href="mailto:{{ raw }}" title="{{ raw }}">
+        {%- if show in ['icon', 'all'] -%}<i class="{{ icon }}"></i>{% endif -%}
+        {%- if show in ['email', 'all'] %} {{ raw }}{% endif -%}
+    </a>
+{%- endif -%}

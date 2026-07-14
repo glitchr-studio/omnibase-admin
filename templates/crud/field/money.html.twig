@@ -1,0 +1,9 @@
+{%- set raw = field.value -%}
+{%- if raw is null -%}
+    <span class="badge-muted">—</span>
+{%- else -%}
+    {%- set currency = field.customOption('currency') ?? 'EUR' -%}
+    {%- set storedAsCents = field.customOption('storedAsCents') ?? true -%}
+    {%- set amount = storedAsCents ? raw / 100 : raw -%}
+    <span class="field-money">{{ amount|format_currency(currency) }}</span>
+{%- endif -%}

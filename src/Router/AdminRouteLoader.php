@@ -14,6 +14,7 @@ use Symfony\Component\Routing\RouteCollection;
  *   {prefix}/{slug}/{entityId} admin_crud_{slug}_detail       GET
  *   {prefix}/{slug}/{entityId}/edit    ..._edit               GET|POST
  *   {prefix}/{slug}/{entityId}/delete  ..._delete             POST
+ *   {prefix}/{slug}/{entityId}/toggle  ..._toggle             PATCH
  *   {prefix}/{slug}/batch      admin_crud_{slug}_batch_delete POST
  *
  * Loaded with: $routes->import('.', 'base_admin') in the app's routing config.
@@ -59,6 +60,7 @@ class AdminRouteLoader extends Loader
             $add('detail', '/{entityId}', ['GET']);
             $add('edit', '/{entityId}/edit', ['GET', 'POST']);
             $add('delete', '/{entityId}/delete', ['POST']);
+            $add('toggle', '/{entityId}/toggle', ['PATCH']);
         }
 
         return $routes;

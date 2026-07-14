@@ -2,6 +2,16 @@ dashboard:
     title: Tableau de bord
     welcome: Bienvenue dans votre administration. Choisissez une section dans le menu pour gérer vos contenus.
 
+field:
+    translatable: Champ traduisible
+    video: vidéo
+    audio: audio
+    file: fichier
+    files: fichiers
+    item: élément
+    items: éléments
+    unlimited: Illimité
+
 action:
     index: Retour à la liste
     new: Créer

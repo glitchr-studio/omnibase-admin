@@ -1,0 +1,7 @@
+{%- set raw = field.value -%}
+{%- set count = raw is iterable ? raw|length : (raw ? 1 : 0) -%}
+{%- if count == 0 -%}
+    <span class="badge-muted">—</span>
+{%- else -%}
+    <span class="field-media"><i class="fa-solid fa-crop-simple"></i> {{ count }}</span>
+{%- endif -%}

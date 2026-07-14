@@ -98,10 +98,16 @@
                             {% if action.name == 'delete' %}
                                 {# submits the surrounding batch form to the row's delete URL (same CSRF token) #}
                                 <button class="btn text-danger" title="{{ action.label|trans }}"
-                                        formaction="{{ admin_url(controller_fqcn, 'delete', row.entity.id) }}">✕</button>
+                                        formaction="{{ admin_url(controller_fqcn, 'delete', row.entity.id) }}"><i class="fa-solid fa-trash"></i></button>
                             {% else %}
                                 <a class="btn {{ action.cssClass }}" href="{{ action.linkUrl ?? admin_url(controller_fqcn, action.crudActionName ?? action.name, row.entity.id) }}" title="{{ action.label|trans }}">
-                                    {{ action.name == 'edit' ? '✎' : (action.name == 'detail' ? '👁' : action.label|trans) }}
+                                    {%- if action.name == 'edit' -%}
+                                        <i class="fa-solid fa-pen"></i>
+                                    {%- elseif action.name == 'detail' -%}
+                                        <i class="fa-solid fa-eye"></i>
+                                    {%- else -%}
+                                        {{ action.label|trans }}
+                                    {%- endif -%}
                                 </a>
                             {% endif %}
                         {% endif %}

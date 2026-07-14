@@ -1,0 +1,30 @@
+{%- set raw = field.value -%}
+{%- set crudFqcn = field.customOption('crudControllerFqcn') -%}
+{%- if raw is null -%}
+    <span class="badge-muted">—</span>
+{%- elseif raw is iterable -%}
+    {%- set items = raw|default([]) -%}
+    {%- set limit = field.customOption('displayLimit') ?? 2 -%}
+    {%- set total = items|length -%}
+    <span class="badge-list">
+        {%- for item in items|slice(0, limit) -%}
+            {%- if crudFqcn and item.id is defined -%}
+                <a class="badge" href="{{ admin_url(crudFqcn, 'detail', item.id) }}">{{ item }}</a>
+            {%- else -%}
+                <span class="badge">{{ item }}</span>
+            {%- endif -%}
+        {%- endfor -%}
+        {%- if total > limit -%}
+            <span class="badge badge-muted">+{{ total - limit }}</span>
+        {%- endif -%}
+        {%- if total == 0 -%}
+            <span class="badge-muted">—</span>
+        {%- endif -%}
+    </span>
+{%- else -%}
+    {%- if crudFqcn and raw.id is defined -%}
+        <span class="field-association"><a href="{{ admin_url(crudFqcn, 'detail', raw.id) }}">{{ raw }}</a></span>
+    {%- else -%}
+        {{ raw }}
+    {%- endif -%}
+{%- endif -%}

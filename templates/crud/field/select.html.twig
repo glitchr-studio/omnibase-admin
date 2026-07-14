@@ -1,0 +1,19 @@
+{%- set choices = field.customOption('choices') ?? {} -%}
+{%- macro badge(raw, choices) -%}
+    {%- set label = choices[raw] ?? null -%}
+    <span class="badge badge-accent">
+        {{- label is not null ? label|trans : raw|lower|replace({'_': ' '})|capitalize -}}
+    </span>
+{%- endmacro -%}
+{%- set raw = field.value -%}
+{%- if raw is null or raw == '' or (raw is iterable and raw|length == 0) -%}
+    <span class="badge-muted">—</span>
+{%- elseif raw is iterable -%}
+    <span class="badge-list">
+        {%- for item in raw -%}
+            {{ _self.badge(item, choices) }}
+        {%- endfor -%}
+    </span>
+{%- else -%}
+    {{ _self.badge(field.formattedValue, choices) }}
+{%- endif -%}

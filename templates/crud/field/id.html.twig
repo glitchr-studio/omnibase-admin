@@ -1,0 +1,6 @@
+{%- set raw = field.value -%}
+{%- if field.customOption('addLink') and entity is defined -%}
+    <a class="field-id" href="{{ admin_url(controller_fqcn, 'detail', raw) }}">#{{ raw }}</a>
+{%- else -%}
+    <span class="field-id">#{{ raw }}</span>
+{%- endif -%}

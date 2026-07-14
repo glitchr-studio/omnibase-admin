@@ -1,0 +1,8 @@
+{%- set raw = field.value -%}
+{%- if raw is null -%}
+    <span class="badge-muted">—</span>
+{%- elseif field.customOption('allowInfinity') and raw < 0 -%}
+    <span class="field-number" title="{{ 'field.unlimited'|trans({}, 'admin') }}">∞</span>
+{%- else -%}
+    <span class="field-number">{{ raw|number_format(0) }}</span>
+{%- endif -%}

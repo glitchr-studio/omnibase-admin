@@ -1,0 +1,7 @@
+{%- set raw = field.value -%}
+{%- if raw is null or raw == '' -%}
+    <span class="badge-muted">—</span>
+{%- else -%}
+    {%- set text = raw|striptags|trim -%}
+    <span class="badge-muted">{{ text|length > 60 ? text|slice(0, 60) ~ '…' : text }}</span>
+{%- endif -%}

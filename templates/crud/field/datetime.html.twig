@@ -1,0 +1,6 @@
+{%- set raw = field.value -%}
+{%- if raw is null -%}
+    <span class="badge-muted">—</span>
+{%- else -%}
+    <span class="field-mono">{{ raw|date('d/m/Y') }} <span class="badge-muted">{{ raw|date('H:i') }}</span></span>
+{%- endif -%}

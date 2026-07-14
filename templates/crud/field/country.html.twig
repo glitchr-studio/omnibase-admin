@@ -1,0 +1,14 @@
+{%- set raw = field.value -%}
+{%- if raw is null or raw == '' -%}
+    <span class="badge-muted">—</span>
+{%- else -%}
+    {%- set code = (raw|length > 2 ? raw|slice(0, 2) : raw)|upper -%}
+    {%- set showName = field.customOption('showName') is not same as(false) -%}
+    {%- set showCode = field.customOption('showCode') is same as(true) -%}
+    <span class="field-country">
+        {%- if showName -%}
+            {{- code|country_name(app.request.locale)|default(code) -}}
+        {%- endif -%}
+        {%- if showCode or not showName %} <span class="badge-muted">{{ code }}</span>{% endif -%}
+    </span>
+{%- endif -%}
