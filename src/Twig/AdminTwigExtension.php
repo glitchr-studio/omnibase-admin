@@ -3,14 +3,17 @@
 namespace Base\Admin\Twig;
 
 use Base\Admin\Config\Action;
+use Base\Admin\Field\FieldValueResolver;
 use Base\Admin\Router\AdminUrlGenerator;
 use Twig\Extension\AbstractExtension;
 use Twig\TwigFunction;
 
 class AdminTwigExtension extends AbstractExtension
 {
-    public function __construct(protected readonly AdminUrlGenerator $adminUrlGenerator)
-    {
+    public function __construct(
+        protected readonly AdminUrlGenerator $adminUrlGenerator,
+        protected readonly FieldValueResolver $fieldValueResolver,
+    ) {
     }
 
     public function getFunctions(): array
@@ -18,6 +21,7 @@ class AdminTwigExtension extends AbstractExtension
         return [
             new TwigFunction('admin_url', $this->adminUrl(...)),
             new TwigFunction('admin_action_url', $this->adminActionUrl(...)),
+            new TwigFunction('admin_display', $this->fieldValueResolver->formatValue(...)),
         ];
     }
 

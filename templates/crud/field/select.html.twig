@@ -27,7 +27,13 @@
 {%- elseif raw is iterable -%}
     <span class="badge-list">
         {%- for item in raw -%}
-            {{ _self.badge(item, choices, enumClass) }}
+            {#- a to-many association's raw value is a collection of real
+               entity objects (not scalar ids/strings) - admin_display()
+               turns each into the same safe string FieldValueResolver
+               already produces for a scalar field (__toString(), or
+               "ClassName #id" when there is none), so choices[] lookup
+               below never tries to use an object as an array key. #}
+            {{ _self.badge(admin_display(item), choices, enumClass) }}
         {%- endfor -%}
     </span>
 {%- else -%}

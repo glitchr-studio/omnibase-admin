@@ -9,9 +9,9 @@
     <span class="badge-list">
         {%- for item in items|slice(0, limit) -%}
             {%- if crudFqcn and item.id is defined -%}
-                <a class="badge" href="{{ admin_url(crudFqcn, 'detail', item.id) }}">{{ item }}</a>
+                <a class="badge" href="{{ admin_url(crudFqcn, 'detail', item.id) }}">{{ admin_display(item) }}</a>
             {%- else -%}
-                <span class="badge">{{ item }}</span>
+                <span class="badge">{{ admin_display(item) }}</span>
             {%- endif -%}
         {%- endfor -%}
         {%- if total > limit -%}
@@ -23,8 +23,8 @@
     </span>
 {%- else -%}
     {%- if crudFqcn and raw.id is defined -%}
-        <span class="field-association"><a href="{{ admin_url(crudFqcn, 'detail', raw.id) }}">{{ raw }}</a></span>
+        <span class="field-association"><a href="{{ admin_url(crudFqcn, 'detail', raw.id) }}">{{ admin_display(raw) }}</a></span>
     {%- else -%}
-        {{ raw }}
+        {{ admin_display(raw) }}
     {%- endif -%}
 {%- endif -%}

@@ -44,9 +44,13 @@ class FieldValueResolver
     /**
      * Default display formatting, done here rather than in Twig: templates
      * cannot reliably type-check values behind entity magic methods
-     * (BaseTrait's __get makes any attribute look "defined").
+     * (BaseTrait's __get makes any attribute look "defined"). Public so
+     * templates that must format individual items of a raw collection
+     * themselves (a SelectField's index badge, iterating real entity
+     * objects one by one) can reuse the exact same logic via the
+     * admin_display() twig function instead of duplicating it.
      */
-    protected function formatValue(mixed $value): mixed
+    public function formatValue(mixed $value): mixed
     {
         if ($value instanceof \DateTimeInterface) {
             return $value->format('Y-m-d H:i');
