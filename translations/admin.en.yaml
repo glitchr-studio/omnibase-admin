@@ -54,3 +54,10 @@ manual:
     title: Documentation
     empty: No page selected. Choose a topic from the sidebar.
     last_update: Last updated
+
+analytics:
+    today: Today
+    last_7_days: Last 7 days
+    page_views: "%count% page views"
+    unique_visitors: "%count% visitors"
+    unique_users: "%count% users"

@@ -23,6 +23,10 @@
         .admin-menu .selected > a { border-left-color: var(--admin-accent); color: var(--admin-accent); font-weight: 600; }
         .admin-usermenu { margin-top: auto; padding-top: .75rem; border-top: 1px solid var(--admin-border); }
         .admin-usermenu a i { width: 1.1rem; text-align: center; }
+        .admin-analytics { padding: .75rem 1.25rem; border-top: 1px solid var(--admin-border); font-size: .8rem; color: var(--admin-muted); }
+        .admin-analytics .analytics-window { font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; margin: .5rem 0 .2rem; }
+        .admin-analytics .analytics-window:first-child { margin-top: 0; }
+        .admin-analytics .row { margin: .1rem 0; }
         .admin-main { flex: 1; padding: 1.5rem 2rem; min-width: 0; }
         .admin-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.25rem; }
         .admin-header h1 { margin: 0; font-size: 1.35rem; }
@@ -163,6 +167,26 @@
                 {% endfor %}
             </ul>
             {% endif %}
+        {% endblock %}
+        {# Base\Service\Analytics's page-view/visitor/user counters, via the
+           Twig functions base-bundle's AnalyticsTwigExtension exposes - a
+           single summary() call gets every window in one round trip. #}
+        {% block analytics_widget %}
+            {% set stats = analytics_summary() %}
+            <div class="admin-analytics">
+                <div class="analytics-window">{{ 'analytics.today'|trans({}, 'admin') }}</div>
+                <div class="row">{{ 'analytics.page_views'|trans({'%count%': stats.today.pageViews}, 'admin') }}</div>
+                <div class="row">{{ 'analytics.unique_visitors'|trans({'%count%': stats.today.uniqueVisitors}, 'admin') }}</div>
+                {% if stats.today.uniqueUsers > 0 %}
+                <div class="row">{{ 'analytics.unique_users'|trans({'%count%': stats.today.uniqueUsers}, 'admin') }}</div>
+                {% endif %}
+                <div class="analytics-window">{{ 'analytics.last_7_days'|trans({}, 'admin') }}</div>
+                <div class="row">{{ 'analytics.page_views'|trans({'%count%': stats['7d'].pageViews}, 'admin') }}</div>
+                <div class="row">{{ 'analytics.unique_visitors'|trans({'%count%': stats['7d'].uniqueVisitors}, 'admin') }}</div>
+                {% if stats['7d'].uniqueUsers > 0 %}
+                <div class="row">{{ 'analytics.unique_users'|trans({'%count%': stats['7d'].uniqueUsers}, 'admin') }}</div>
+                {% endif %}
+            </div>
         {% endblock %}
     </aside>
     <main class="admin-main">

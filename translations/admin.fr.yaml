@@ -54,3 +54,10 @@ manual:
     title: Documentation
     empty: Aucune page sélectionnée. Choisissez un sujet dans le menu.
     last_update: Dernière mise à jour
+
+analytics:
+    today: Aujourd'hui
+    last_7_days: 7 derniers jours
+    page_views: "%count% vues"
+    unique_visitors: "%count% visiteurs"
+    unique_users: "%count% utilisateurs"
