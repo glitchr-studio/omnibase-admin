@@ -40,6 +40,15 @@ class AdminBundle extends AbstractBaseBundle
     {
         parent::build($container);
 
+        // Same App\-wins override convention BaseBundle uses for
+        // Entity/Repository/Enum/Notifier/Form: aliases every concrete
+        // Base\Admin\Controller\* class onto App\Admin\Controller\* UNLESS
+        // the app already defines a real class there (setAlias() only
+        // creates the alias when the App\ side doesn't exist yet) - runs
+        // once at container-compile time, not per-request, so it needs
+        // none of BaseBundle::warmUp()'s own cache layer.
+        $this->setMapping($this->getPath() . '/src/Controller', 'Base\Admin\Controller', 'App\Admin\Controller');
+
         $container->registerForAutoconfiguration(CrudControllerInterface::class)
             ->addTag('base.admin.crud_controller')
             ->addTag('controller.service_arguments');

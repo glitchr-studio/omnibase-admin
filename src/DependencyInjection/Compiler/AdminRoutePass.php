@@ -28,6 +28,16 @@ class AdminRoutePass implements CompilerPassInterface
             $controllers[] = $class;
         }
 
+        $dashboardControllers = [];
+        foreach ($container->findTaggedServiceIds('base.admin.dashboard_controller') as $serviceId => $tags) {
+            $definition = $container->getDefinition($serviceId);
+            if ($definition->isAbstract()) {
+                continue;
+            }
+            $dashboardControllers[] = $definition->getClass() ?? $serviceId;
+        }
+
         $container->getDefinition(AdminRouteRegistry::class)->setArgument('$controllerFqcns', array_unique($controllers));
+        $container->getDefinition(AdminRouteRegistry::class)->setArgument('$dashboardControllerFqcns', array_unique($dashboardControllers));
     }
 }

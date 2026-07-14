@@ -13,10 +13,17 @@ class AdminRouteRegistry
     /** @var array<string, string> controller FQCN => slug */
     protected array $controllers = [];
 
+    protected ?string $dashboardControllerFqcn = null;
+
     /**
      * @param string[] $controllerFqcns
+     * @param string[] $dashboardControllerFqcns every concrete (non-abstract)
+     *                 class tagged base.admin.dashboard_controller - normally
+     *                 just Base\Admin\Controller\DashboardController (the
+     *                 package's zero-config default) plus, optionally, one
+     *                 app-defined dashboard controller
      */
-    public function __construct(array $controllerFqcns = [], protected readonly string $urlPrefix = '/admin')
+    public function __construct(array $controllerFqcns = [], array $dashboardControllerFqcns = [], protected readonly string $urlPrefix = '/admin')
     {
         // cross-bundle override: when an App\ controller and a bundle
         // controller resolve to the same slug (same entity or same entity
@@ -34,6 +41,25 @@ class AdminRouteRegistry
         foreach ($bySlug as $slug => $fqcn) {
             $this->controllers[$fqcn] = $slug;
         }
+
+        // same App\-wins preference, but there is only ever one "slot" (the
+        // dashboard), not one per entity
+        foreach ($dashboardControllerFqcns as $fqcn) {
+            if (null === $this->dashboardControllerFqcn || (!str_starts_with($this->dashboardControllerFqcn, 'App\\') && str_starts_with($fqcn, 'App\\'))) {
+                $this->dashboardControllerFqcn = $fqcn;
+            }
+        }
+    }
+
+    /**
+     * The dashboard controller the admin should actually mount at
+     * getUrlPrefix() - an App\ override if one is registered, otherwise the
+     * package's own zero-config default. Null only if the app has somehow
+     * disabled dashboard controller autoconfiguration entirely.
+     */
+    public function getDashboardControllerFqcn(): ?string
+    {
+        return $this->dashboardControllerFqcn;
     }
 
     /**

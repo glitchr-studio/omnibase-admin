@@ -36,6 +36,7 @@ return function (ContainerConfigurator $configurator) {
 
     $services->set(AdminRouteRegistry::class)
         ->arg('$controllerFqcns', [])
+        ->arg('$dashboardControllerFqcns', [])
         ->arg('$urlPrefix', '/admin');
 
     $services->set(AdminRouteLoader::class)

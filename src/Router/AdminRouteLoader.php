@@ -3,6 +3,7 @@
 namespace Base\Admin\Router;
 
 use Symfony\Component\Config\Loader\Loader;
+use Symfony\Component\Routing\Attribute\Route as RouteAttribute;
 use Symfony\Component\Routing\Route;
 use Symfony\Component\Routing\RouteCollection;
 
@@ -63,6 +64,35 @@ class AdminRouteLoader extends Loader
             $add('toggle', '/{entityId}/toggle', ['PATCH']);
         }
 
+        $this->addDashboardRoute($routes, $prefix);
+
         return $routes;
+    }
+
+    /**
+     * Zero-config dashboard: synthesized exactly like every CRUD route
+     * above (an App\ dashboard controller, if registered, wins over the
+     * package's own Base\Admin\Controller\DashboardController default) -
+     * BUT only when the resolved controller doesn't already declare its
+     * own #[Route] attribute. Apps that wired their dashboard the
+     * original way (an explicit #[Route('/admin', name: 'admin')] on
+     * their own controller's index()) keep using that route untouched;
+     * this only fills the gap for apps that never wrote one at all.
+     */
+    private function addDashboardRoute(RouteCollection $routes, string $prefix): void
+    {
+        $fqcn = $this->registry->getDashboardControllerFqcn();
+        if (null === $fqcn || !\class_exists($fqcn)) {
+            return;
+        }
+
+        $reflection = new \ReflectionClass($fqcn);
+        $hasOwnRoute = [] !== $reflection->getAttributes(RouteAttribute::class)
+            || (($method = $reflection->hasMethod('index') ? $reflection->getMethod('index') : null) && [] !== $method->getAttributes(RouteAttribute::class));
+        if ($hasOwnRoute) {
+            return;
+        }
+
+        $routes->add('admin', new Route($prefix, ['_controller' => $fqcn . '::index'], [], [], '', [], ['GET']));
     }
 }
