@@ -39,6 +39,18 @@
                         <option value="{{ choiceValue }}" {{ value == choiceValue ? 'selected' }}>{{ choiceLabel|trans }}</option>
                     {% endfor %}
                 </select>
+            {% elseif filter.type == 'association' %}
+                {# choices here are real entity labels (Destination/Author/Tag
+                   names, ...), not translation keys - |trans would be a
+                   silent no-op most of the time, but skip it entirely to
+                   rule out a real entity happening to collide with an
+                   actual translation key #}
+                <select name="filters[{{ property }}]">
+                    <option value=""></option>
+                    {% for choiceValue, choiceLabel in filter.choices %}
+                        <option value="{{ choiceValue }}" {{ value == choiceValue ? 'selected' }}>{{ choiceLabel }}</option>
+                    {% endfor %}
+                </select>
             {% elseif filter.type == 'date' %}
                 <span class="filter-range">
                     <input type="date" name="filters[{{ property }}][from]" value="{{ value.from|default('') }}">

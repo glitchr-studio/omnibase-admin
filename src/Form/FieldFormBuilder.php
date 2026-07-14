@@ -99,6 +99,13 @@ class FieldFormBuilder
         if ([] !== $descriptor->getHtmlAttributes()) {
             $options['attr'] = array_merge($options['attr'] ?? [], $descriptor->getHtmlAttributes());
         }
+        if (null !== $descriptor->getColumns()) {
+            // Consumed by _form.html.twig as a CSS grid-column span (out of
+            // 12) - lets a form reuse the same ->setColumns() metadata the
+            // index/detail views were already carrying, without pulling in
+            // a Bootstrap-style col-N class system.
+            $options['row_attr'] = array_merge($options['row_attr'] ?? [], ['data-columns' => $descriptor->getColumns()]);
+        }
 
         return array_replace_recursive($options, $descriptor->getFormTypeOptions());
     }

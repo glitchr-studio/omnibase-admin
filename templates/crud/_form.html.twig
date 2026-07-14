@@ -14,14 +14,23 @@
 <div class="card">
     {{ form_start(form, {attr: {class: 'admin-form', novalidate: 'novalidate'}}) }}
         {{ form_errors(form) }}
+        <div class="form-grid">
         {% for child in form %}
-            <div class="form-row">
+            {# ->setColumns(N) on the field descriptor becomes a 12-column
+               CSS grid span here - no explicit value spans the full width,
+               matching how most fields are already declared. Values are
+               historically Bootstrap-style ("col-md-6") as well as bare
+               integers ("6") - splitting on '-' and taking the last chunk
+               normalizes both to just the trailing number. #}
+            {% set columns = child.vars.row_attr['data-columns']|default(null) %}
+            <div class="form-row" style="--col-span: {{ columns is null ? 12 : (columns|split('-')|last) }};">
                 {{ form_label(child) }}
                 {{ form_widget(child) }}
                 <div class="form-errors">{{ form_errors(child) }}</div>
                 {{ form_help(child) }}
             </div>
         {% endfor %}
+        </div>
         <div class="form-footer">
             {% for action in actions.getAll(crud.currentPage) %}
                 {% if action.htmlElement == 'button' %}

@@ -17,6 +17,7 @@ class Filter
     public const TYPE_CHOICE = 'choice';
     public const TYPE_DATE = 'date';
     public const TYPE_NUMERIC = 'numeric';
+    public const TYPE_ASSOCIATION = 'association';
 
     protected string $property;
     protected TranslatableInterface|string|null $label = null;
@@ -86,6 +87,34 @@ class Filter
         return $this->setType(self::TYPE_CHOICE);
     }
 
+    /**
+     * Filter by a to-one association (Destination, Author, Tag, ...) - a
+     * dropdown of the related entity's real rows rather than a free-text
+     * guess at an id. $entities is typically `$repository->findAll()` (or
+     * a narrower query - findBy(), a custom finder, ...); each becomes one
+     * choice, keyed by id, labeled with $labelCallback($entity) or the
+     * entity's own __toString() if none is given. The WHERE clause itself
+     * (entity.<property> = :id) is identical to a plain equality filter -
+     * Doctrine resolves a scalar compared against a to-one association to
+     * its join column automatically - so this is really "asChoice(), but
+     * the choices come from a repository instead of a hand-written array".
+     *
+     * @param iterable<object> $entities
+     */
+    public function asAssociation(iterable $entities, ?callable $labelCallback = null): static
+    {
+        $choices = [];
+        foreach ($entities as $entity) {
+            if (!method_exists($entity, 'getId')) {
+                continue;
+            }
+            $choices[(string) $entity->getId()] = null !== $labelCallback ? $labelCallback($entity) : (string) $entity;
+        }
+
+        $this->choices = $choices;
+        return $this->setType(self::TYPE_ASSOCIATION);
+    }
+
     public function getChoices(): array
     {
         return $this->choices;
@@ -132,6 +161,7 @@ class Filter
 
             case self::TYPE_NUMERIC:
             case self::TYPE_CHOICE:
+            case self::TYPE_ASSOCIATION:
                 $queryBuilder->andWhere(sprintf('%s = :%s', $field, $param))
                     ->setParameter($param, $value);
                 break;
