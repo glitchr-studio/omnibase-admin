@@ -3,7 +3,15 @@
 {%- macro badge(raw, choices, enumClass) -%}
     {%- set label = choices[raw] ?? null -%}
     {%- set enumLabel = enumClass ? raw|trans_enum(enumClass) : null -%}
-    <span class="badge badge-accent">
+    {#- EnumType::getIcon()/getColor() (IconizeInterface/ColorizeInterface) -
+       same per-value icon+color maps ThreadState/ConnectionState/etc already
+       declare and that the OLD EasyAdmin dashboard rendered; the enum()
+       twig function returns a live instance so its static methods are
+       callable directly from the template. #}
+    {%- set icon = enumClass ? enum(enumClass).getIcon(raw) : null -%}
+    {%- set color = enumClass ? enum(enumClass).getColor(raw) : null -%}
+    <span class="badge badge-accent"{% if color %} style="background:{{ color }}22; color:{{ color }}; border-color:{{ color }}55;"{% endif %}>
+        {%- if icon -%}<i class="{{ icon }}"></i> {%- endif -%}
         {%- if label is not null -%}
             {{- label|trans -}}
         {%- elseif enumLabel is not null -%}
