@@ -144,7 +144,22 @@
             {% if paginator.hasPreviousPage %}
                 <a class="btn" href="{{ admin_url(controller_fqcn, 'index', null, {'page': paginator.previousPage, 'sort': sort}) }}">‹</a>
             {% endif %}
-            <span class="btn" style="cursor:default">{{ paginator.page }} / {{ paginator.pageCount }}</span>
+            {# numbered pages with an ellipsis window (1 … n-1 n n+1 … last),
+               matching the production paginator instead of a bare "n / total" #}
+            {% set shown = [] %}
+            {% for p in 1..paginator.pageCount %}
+                {% if p == 1 or p == paginator.pageCount or (p >= paginator.page - 1 and p <= paginator.page + 1) %}
+                    {% if shown is not empty and p > shown|last + 1 %}
+                        <span class="btn pages-ellipsis">…</span>
+                    {% endif %}
+                    {% if p == paginator.page %}
+                        <span class="btn page-current">{{ p }}</span>
+                    {% else %}
+                        <a class="btn" href="{{ admin_url(controller_fqcn, 'index', null, {'page': p, 'sort': sort}) }}">{{ p }}</a>
+                    {% endif %}
+                    {% set shown = shown|merge([p]) %}
+                {% endif %}
+            {% endfor %}
             {% if paginator.hasNextPage %}
                 <a class="btn" href="{{ admin_url(controller_fqcn, 'index', null, {'page': paginator.nextPage, 'sort': sort}) }}">›</a>
             {% endif %}

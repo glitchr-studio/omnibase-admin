@@ -63,6 +63,12 @@
         .admin-aside .brand-title { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .admin-aside .brand-user { font-size: .8rem; color: var(--admin-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .admin-menu { list-style: none; margin: .75rem 0 0; padding: 0; }
+        {# prod-style vertical rhythm: quick links (dashboard) stay at the
+           top, the first section - and everything after it - is pushed to
+           the bottom of the aside, leaving the middle empty. Navigation
+           itself lives in the dashboard's central widget groups, NOT here. #}
+        aside.admin-aside > ul.admin-menu:first-of-type { flex: 1; display: flex; flex-direction: column; }
+        aside.admin-aside > ul.admin-menu:first-of-type > li:first-child { margin-bottom: auto; }
         .admin-menu .section { padding: .9rem 1.25rem .3rem; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--admin-muted); }
         .admin-menu a { display: block; padding: .45rem 1.25rem; color: inherit; text-decoration: none; border-left: 3px solid transparent; }
         .admin-menu a:hover { background: var(--admin-bg); }
@@ -94,6 +100,8 @@
         .datagrid .actions a, .datagrid .actions button { margin-left: .35rem; }
         .paginator { display: flex; align-items: center; gap: .75rem; padding: .75rem .9rem; color: var(--admin-muted); font-size: .9rem; }
         .paginator .pages { margin-left: auto; display: flex; gap: .25rem; }
+        .paginator .page-current { background: var(--admin-accent); border-color: var(--admin-accent); color: #fff; cursor: default; }
+        .paginator .pages-ellipsis { border: none; background: none; cursor: default; }
         form.admin-form .form-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 0 1.25rem; padding: 1.25rem; }
         form.admin-form .form-row { grid-column: span var(--col-span, 12); min-width: 0; margin-bottom: 1rem; }
         form.admin-form label { display: block; font-weight: 600; margin-bottom: .3rem; }
@@ -133,6 +141,20 @@
         .quick-access { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: .75rem; padding: 1.25rem; }
         .quick-access a { display: block; padding: 1rem; border: 1px solid var(--admin-border); border-radius: var(--admin-radius); text-decoration: none; color: inherit; background: var(--admin-surface); }
         .quick-access a:hover { border-color: var(--admin-accent); color: var(--admin-accent); }
+        .dashboard-header { align-items: center; gap: 1rem; }
+        .dashboard-brand-icon { width: 3.5rem; height: 3.5rem; display: flex; align-items: center; justify-content: center;
+                                font-size: 1.6rem; border: 1px solid var(--admin-border); border-radius: 12px; background: var(--admin-surface); }
+        .dashboard-slogan { color: var(--admin-muted); }
+        .dashboard-welcome { margin: 0 0 1.25rem 4.5rem; }
+        .widget-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 2.25rem 1.5rem; padding: 2rem; }
+        .widget-group h2 { margin: .6rem 0 .7rem; font-size: 1.25rem; }
+        .widget-icon { font-size: 2rem; }
+        .widget-group ul { list-style: none; margin: 0; padding: 0; }
+        .widget-group li { margin: .35rem 0; }
+        .widget-group li a { display: inline-flex; align-items: center; gap: .5rem; color: inherit; text-decoration: none; }
+        .widget-group li a:hover { color: var(--admin-accent); }
+        .widget-group li a i { width: 1.2rem; text-align: center; }
+        .widget-group li a .fa-circle-plus { color: var(--admin-accent); }
         .filter-bar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .75rem; padding: .75rem .9rem; margin-bottom: 1rem;
                       background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: var(--admin-radius); }
         .filter-bar label { display: flex; flex-direction: column; gap: .2rem; font-size: .82rem; color: var(--admin-muted); }
@@ -244,6 +266,42 @@
                     exceptions: [/^(?!\/admin(\/|$)).*/]
                 });
             }, { once: true });
+        </script>
+        <script>
+            // Quick GET submits (search box, filter bar): transparentJS only
+            // binds its form handling to forms present at first load (a
+            // static $("form").on(...) at init, not a delegated listener),
+            // and its submit path bails on admin forms anyway - so every
+            // search/filter submit was a full hard page load, unlike the
+            // production admin where Turbo Drive swapped them in place.
+            // Delegated interceptor: serialize the GET form into its target
+            // URL and hand it to transparentJS's link pipeline (a synthetic
+            // in-#page anchor click - __main__'s document-level click
+            // listener treats it exactly like any sidebar link, giving the
+            // same fast AJAX swap, progress bar included). POST forms
+            // (edit/new/delete/batch) keep their native submit.
+            document.addEventListener('submit', function (e) {
+                const form = e.target;
+                if (!(form instanceof HTMLFormElement)) return;
+                if ((form.method || 'get').toLowerCase() !== 'get') return;
+                const page = document.getElementById('page');
+                if (!page || !page.contains(form)) return;
+
+                e.preventDefault();
+                const url = new URL(form.getAttribute('action') || location.pathname, location.origin);
+                url.search = new URLSearchParams(new FormData(form)).toString();
+
+                if (window.Transparent) {
+                    const anchor = document.createElement('a');
+                    anchor.href = url.pathname + url.search;
+                    anchor.style.display = 'none';
+                    form.appendChild(anchor);
+                    anchor.click();
+                    anchor.remove();
+                } else {
+                    location.assign(url.toString());
+                }
+            });
         </script>
         <script>
             // crud/field/boolean.html.twig's inline switch: a delegated

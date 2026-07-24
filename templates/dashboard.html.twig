@@ -3,23 +3,58 @@
 {% block page_title %}{{ 'dashboard.title'|trans({}, 'admin') }}{% endblock %}
 
 {% block content_header %}
-<div class="admin-header">
-    <h1>{{ 'dashboard.title'|trans({}, 'admin') }}</h1>
+<div class="admin-header dashboard-header">
+    {# site identity, matching the historical dashboard: icon tile + real
+       site title/slogan, not a generic "Dashboard" heading #}
+    <div class="dashboard-brand-icon"><i class="fa-solid fa-house-laptop"></i></div>
+    <div>
+        <h1>{{ app.site.title ?? 'dashboard.title'|trans({}, 'admin') }}</h1>
+        {% if app.site.slogan is defined and app.site.slogan %}<div class="dashboard-slogan">{{ app.site.slogan }}</div>{% endif %}
+    </div>
 </div>
 {% endblock %}
 
 {% block content %}
+<p class="dashboard-welcome">{{ 'dashboard.welcome'|trans({}, 'admin') }}</p>
+
+{% if widgets is defined and widgets is not empty %}
 <div class="card">
-    {% if quick_access is defined and quick_access is not empty %}
-        <div class="quick-access">
-            {% for card in quick_access %}
-                <a href="{{ card.url }}">
-                    {% if card.icon %}<i class="{{ card.icon }}"></i> {% endif %}{{ card.label }}
-                </a>
-            {% endfor %}
-        </div>
-    {% else %}
-        <div class="empty-state">{{ 'dashboard.welcome'|trans({}, 'admin') }}</div>
-    {% endif %}
+    <div class="widget-grid">
+        {% for group in widgets %}
+            <div class="widget-group">
+                {% if group.icon %}<div class="widget-icon"><i class="{{ group.icon }}"></i></div>{% endif %}
+                <h2>{{ group.label|trans({}, 'admin') }}</h2>
+                <ul>
+                    {% for item in group.subItems %}
+                        {% if item.linkUrl %}
+                        <li>
+                            <a href="{{ item.linkUrl }}">
+                                {%- if item.crudActionName == 'new' -%}
+                                    <i class="fa-solid fa-circle-plus"></i>
+                                {%- elseif item.icon -%}
+                                    <i class="{{ item.icon }}"></i>
+                                {%- endif -%}
+                                {{ item.label|trans({}, 'admin') }}
+                            </a>
+                        </li>
+                        {% endif %}
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endfor %}
+    </div>
 </div>
+{% elseif quick_access is defined and quick_access is not empty %}
+<div class="card">
+    <div class="quick-access">
+        {% for card in quick_access %}
+            <a href="{{ card.url }}">
+                {% if card.icon %}<i class="{{ card.icon }}"></i> {% endif %}{{ card.label }}
+            </a>
+        {% endfor %}
+    </div>
+</div>
+{% else %}
+<div class="card"><div class="empty-state">{{ 'dashboard.welcome'|trans({}, 'admin') }}</div></div>
+{% endif %}
 {% endblock %}

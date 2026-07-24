@@ -49,9 +49,14 @@ abstract class AbstractDashboardController extends AbstractController
         $this->adminContext->setMainMenu($menu);
         $this->adminContext->setUserMenu($this->menuBuilder->resolve($this->toArray($this->configureUserMenu())));
 
+        $widgets = $this->menuBuilder->resolve($this->toArray($this->configureWidgetItems()));
+
         return $this->render('@Admin/dashboard.html.twig', [
             'admin_context' => $this->adminContext,
-            'quick_access' => $this->buildQuickAccess($menu),
+            'widgets' => $widgets,
+            // flat one-card-per-CRUD fallback, only rendered when no
+            // widget groups are configured
+            'quick_access' => [] === $widgets ? $this->buildQuickAccess($menu) : [],
         ]);
     }
 
@@ -89,6 +94,26 @@ abstract class AbstractDashboardController extends AbstractController
     public function configureUserMenu(): iterable
     {
         return $this->menuBuilder->buildUserMenuDefault($this->getUser());
+    }
+
+    /**
+     * The dashboard's central navigation: sections (label + big icon)
+     * each carrying sub-items (regular MenuItem crud/route links, plus
+     * optional create shortcuts via ->setCrudAction('new')) - the
+     * historical configureWidgetItems() card grid. Empty by default:
+     * without groups the dashboard falls back to the flat
+     * one-card-per-CRUD quick-access listing.
+     *
+     *     yield MenuItem::section('menu.section.blog', 'fa-solid fa-newspaper')->setSubItems([
+     *         MenuItem::linkToCrud(Article::class, 'menu.item.articles', 'fa-solid fa-newspaper'),
+     *         MenuItem::linkToCrud(Article::class, 'menu.item.articles', 'fa-solid fa-plus-circle')->setCrudAction('new'),
+     *     ]);
+     *
+     * @return iterable<MenuItem>
+     */
+    public function configureWidgetItems(): iterable
+    {
+        return [];
     }
 
     // -----------------------------------------------------------------
