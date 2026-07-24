@@ -48,7 +48,11 @@ class AdminTwigExtension extends AbstractExtension
             return $action->getLinkUrl();
         }
 
-        return $this->adminUrl($controllerFqcn, $action->getCrudActionName() ?? $action->getName(), $entity->getId());
+        $crudAction = $action->getCrudActionName() ?? $action->getName();
+
+        // index takes no entity - passing one would only leak a stray
+        // ?entityId= query param into an otherwise clean listing URL
+        return $this->adminUrl($controllerFqcn, $crudAction, 'index' === $crudAction ? null : $entity->getId());
     }
 
     public function adminUrl(string $controllerFqcn, string $action = 'index', mixed $entityId = null, array $parameters = []): string

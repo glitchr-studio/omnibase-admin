@@ -40,9 +40,32 @@
                     </button>
                 {% elseif action.crudActionName == 'index' %}
                     <a class="btn" href="{{ admin_url(controller_fqcn, 'index') }}">{{ action.label|trans }}</a>
+                {% elseif action.name == 'delete' and entity is defined and entity.id %}
+                    {# stands OUTSIDE the edit form (rendered after form_end
+                       below would be invalid nesting) - a formaction button
+                       can't be used here since the surrounding form is the
+                       edit form itself, so this navigates via a dedicated
+                       mini-form marker handled after form_end #}
+                {% elseif entity is defined and entity.id %}
+                    {% set href = admin_action_url(action, entity, controller_fqcn) %}
+                    {% if href %}
+                        <a class="btn {{ action.cssClass }}" href="{{ href }}"
+                           {%- if action.htmlAttributes['target'] is defined %} target="{{ action.htmlAttributes['target'] }}"{% endif %}
+                           {%- if action.htmlAttributes['tooltip'] is defined %} title="{{ action.label|trans }}"{% endif %}>
+                            {%- if action.icon -%}<i class="{{ action.icon }}"></i>{%- endif -%}
+                            {%- if action.htmlAttributes['tooltip'] is not defined %} {{ action.label|trans }}{% endif -%}
+                        </a>
+                    {% endif %}
                 {% endif %}
             {% endfor %}
         </div>
     {{ form_end(form) }}
+    {% if entity is defined and entity.id and actions.getAll(crud.currentPage)|filter(a => a.name == 'delete')|length > 0 %}
+        <form class="form-footer form-footer-danger" method="post" action="{{ admin_url(controller_fqcn, 'delete', entity.id) }}"
+              data-confirm="{{ 'action.delete_confirm'|trans({}, 'admin') }}">
+            <input type="hidden" name="_token" value="{{ csrf_token('admin-batch-' ~ crud.entityFqcn) }}">
+            <button class="btn text-danger"><i class="fa-solid fa-trash"></i> {{ 'action.delete'|trans({}, 'admin') }}</button>
+        </form>
+    {% endif %}
 </div>
 {% endblock %}

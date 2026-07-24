@@ -34,6 +34,8 @@ action:
     goto_next: Suivant
     goto_see: Voir en ligne
     goto: Voir sur le site
+    cancel: Annuler
+    confirm: Confirmer
     search: Rechercher
 
 datagrid:

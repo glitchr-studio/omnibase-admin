@@ -10,9 +10,22 @@
             <input type="search" name="query" value="{{ query ?? '' }}" placeholder="{{ 'datagrid.search_placeholder'|trans({}, 'admin') }}">
         </form>
         {% for action in actions.globalActions('index') %}
-            <a class="btn btn-primary {{ action.cssClass }}" href="{{ admin_url(controller_fqcn, action.crudActionName ?? 'new') }}">
-                {{ action.label|trans }}
-            </a>
+            {% if action.crudActionName == 'new' and new_variants is defined and new_variants|length > 1 %}
+                {# inheritance-tree entity: creating means choosing WHICH
+                   concrete subclass - the historical discriminator dropdown #}
+                <details class="new-dropdown">
+                    <summary class="btn btn-primary">{{ action.label|trans }} <i class="fa-solid fa-caret-down"></i></summary>
+                    <div class="new-dropdown-menu">
+                        {% for variant in new_variants %}
+                            <a href="{{ variant.url }}">{{ variant.label }}</a>
+                        {% endfor %}
+                    </div>
+                </details>
+            {% else %}
+                <a class="btn btn-primary {{ action.cssClass }}" href="{{ admin_url(controller_fqcn, action.crudActionName ?? 'new') }}">
+                    {{ action.label|trans }}
+                </a>
+            {% endif %}
         {% endfor %}
     </div>
 </div>
@@ -56,8 +69,21 @@
                     <input type="date" name="filters[{{ property }}][from]" value="{{ value.from|default('') }}">
                     <input type="date" name="filters[{{ property }}][to]" value="{{ value.to|default('') }}">
                 </span>
-            {% elseif filter.type == 'numeric' %}
-                <input type="number" step="any" name="filters[{{ property }}]" value="{{ value ?? '' }}">
+            {% elseif filter.type == 'numeric' or filter.type == 'text' %}
+                {# comparison + value pair (filters[x][comparison]=gt&filters[x][value]=3,
+                   the historical URL shape); a bare scalar submitted by an
+                   external link still works and means the default operator #}
+                {% set rawValue = value is iterable ? (value.value ?? '') : (value ?? '') %}
+                {% set rawComparison = value is iterable ? (value.comparison ?? null) : null %}
+                <span class="filter-comparison">
+                    <select name="filters[{{ property }}][comparison]">
+                        {% for op, symbol in filter.comparisons %}
+                            <option value="{{ op }}" {{ rawComparison == op ? 'selected' }}>{{ symbol }}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="{{ filter.type == 'numeric' ? 'number' : 'text' }}" {{ filter.type == 'numeric' ? 'step="any"' }}
+                           name="filters[{{ property }}][value]" value="{{ rawValue }}">
+                </span>
             {% else %}
                 <input type="text" name="filters[{{ property }}]" value="{{ value ?? '' }}">
             {% endif %}
@@ -72,7 +98,7 @@
         <div class="empty-state">{{ 'datagrid.empty'|trans({}, 'admin') }}</div>
     {% else %}
     <form method="post" action="{{ admin_url(controller_fqcn, 'batchDelete') }}" class="batch-form"
-          onsubmit="return confirm('{{ 'action.delete_confirm'|trans({}, 'admin') }}');">
+          data-confirm="{{ 'action.delete_confirm'|trans({}, 'admin') }}">
     <input type="hidden" name="_token" value="{{ csrf_token('admin-batch-' ~ crud.entityFqcn) }}">
     <table class="datagrid">
         <thead>

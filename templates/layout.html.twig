@@ -102,6 +102,13 @@
         .paginator .pages { margin-left: auto; display: flex; gap: .25rem; }
         .paginator .page-current { background: var(--admin-accent); border-color: var(--admin-accent); color: #fff; cursor: default; }
         .paginator .pages-ellipsis { border: none; background: none; cursor: default; }
+        dialog#admin-confirm { border: 1px solid var(--admin-border); border-radius: var(--admin-radius); background: var(--admin-surface);
+                               color: inherit; padding: 1.5rem; max-width: 420px; box-shadow: 0 18px 50px rgba(0,0,0,.25); }
+        dialog#admin-confirm::backdrop { background: rgba(15, 23, 42, .45); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
+        dialog#admin-confirm p { margin: 0 0 1.25rem; }
+        .admin-confirm-actions { display: flex; justify-content: flex-end; gap: .5rem; }
+        .btn-danger { background: var(--admin-danger); border-color: var(--admin-danger); color: #fff; }
+        .form-footer-danger { border-top: none; padding-top: 0; }
         form.admin-form .form-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 0 1.25rem; padding: 1.25rem; }
         form.admin-form .form-row { grid-column: span var(--col-span, 12); min-width: 0; margin-bottom: 1rem; }
         form.admin-form label { display: block; font-weight: 600; margin-bottom: .3rem; }
@@ -160,6 +167,16 @@
         .filter-bar label { display: flex; flex-direction: column; gap: .2rem; font-size: .82rem; color: var(--admin-muted); }
         .filter-bar input, .filter-bar select { padding: .4rem .55rem; border: 1px solid var(--admin-border); border-radius: 6px; font: inherit; background: var(--admin-bg); }
         .filter-bar .filter-range { display: flex; gap: .3rem; }
+        .filter-bar .filter-comparison { display: flex; gap: .3rem; }
+        .filter-bar .filter-comparison select { width: auto; min-width: 3.2rem; }
+        .new-dropdown { position: relative; display: inline-block; }
+        .new-dropdown summary { list-style: none; }
+        .new-dropdown summary::-webkit-details-marker { display: none; }
+        .new-dropdown-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 30; min-width: 180px;
+                             background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: var(--admin-radius);
+                             box-shadow: 0 8px 24px rgba(0,0,0,.15); padding: .3rem; }
+        .new-dropdown-menu a { display: block; padding: .45rem .7rem; border-radius: 6px; color: inherit; text-decoration: none; }
+        .new-dropdown-menu a:hover { background: var(--admin-bg); color: var(--admin-accent); }
         .datagrid th.batch, .datagrid td.batch { width: 2rem; text-align: center; }
 
         {# ── Field-type templates (crud/field/*.html.twig) ──────────────── #}
@@ -498,6 +515,46 @@
         {% block content %}{% endblock %}
     </main>
 </div>
+{# Shared confirmation modal (native <dialog>, replaces window.confirm):
+   any form carrying data-confirm="message" gets intercepted; confirming
+   re-submits it through requestSubmit() with the ORIGINAL submitter
+   button preserved (a plain form.submit() would drop a row-delete
+   button's formaction and delete via the form's own action instead). #}
+<dialog id="admin-confirm">
+    <p id="admin-confirm-message"></p>
+    <div class="admin-confirm-actions">
+        <button type="button" class="btn" data-role="cancel">{{ 'action.cancel'|trans({}, 'admin') }}</button>
+        <button type="button" class="btn btn-danger" data-role="confirm">{{ 'action.confirm'|trans({}, 'admin') }}</button>
+    </div>
+</dialog>
+<script>
+    (function () {
+        var dialog = document.getElementById('admin-confirm');
+        var pendingForm = null, pendingSubmitter = null;
+
+        document.addEventListener('submit', function (e) {
+            var form = e.target;
+            if (!(form instanceof HTMLFormElement) || !form.dataset.confirm) return;
+            if (form.dataset.confirmed === '1') { delete form.dataset.confirmed; return; }
+            e.preventDefault();
+            pendingForm = form;
+            pendingSubmitter = e.submitter || null;
+            document.getElementById('admin-confirm-message').textContent = form.dataset.confirm;
+            dialog.showModal();
+        }, true);
+
+        dialog.addEventListener('click', function (e) {
+            var role = e.target.closest('[data-role]')?.dataset.role;
+            if (!role) return;
+            dialog.close();
+            if (role === 'confirm' && pendingForm) {
+                pendingForm.dataset.confirmed = '1';
+                pendingForm.requestSubmit(pendingSubmitter);
+            }
+            pendingForm = pendingSubmitter = null;
+        });
+    })();
+</script>
 {% block body_javascript %}{% endblock %}
 {# NOT calling parent.Transparent.notifyNestReady() here (tried it,
    reverted - see git history / transparent.js's mount()). A plain

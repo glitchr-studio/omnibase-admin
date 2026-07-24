@@ -135,17 +135,74 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         $actions = $actions->addDefaults();
 
         // Entities that expose a real front-end URL (Article, Destination,
-        // Gallery, ...) get a "view on the live site" row action for free -
-        // no per-controller wiring needed, mirrors what every CRUD had
-        // under the old EasyAdmin-based admin.
+        // Gallery, ...) get a "view on the live site" action for free - no
+        // per-controller wiring needed, mirrors what every CRUD had under
+        // the old EasyAdmin-based admin: a plug icon on index rows, a
+        // "see online" entry in the edit/detail action bars.
         if (is_subclass_of(static::getEntityFqcn(), LinkableInterface::class)) {
-            $actions->add(Actions::PAGE_INDEX, Action::new(Action::GOTO, t('action.goto', domain: 'admin'), 'fa-solid fa-fw fa-plug')
+            $seeOnline = fn () => Action::new(Action::GOTO, t('action.goto', domain: 'admin'), 'fa-solid fa-fw fa-plug')
                 ->renderAsTooltip()
                 ->targetBlank()
-                ->linkToUrl(fn (object $entity) => $entity->__toLink() ?? ''));
+                ->linkToUrl(fn (object $entity) => $entity->__toLink() ?? '');
+
+            $actions->add(Actions::PAGE_INDEX, $seeOnline());
+            $actions->add(Actions::PAGE_EDIT, $seeOnline()->setIcon('fa-solid fa-fw fa-square-up-right'));
+            $actions->add(Actions::PAGE_DETAIL, $seeOnline()->setIcon('fa-solid fa-fw fa-square-up-right'));
+        }
+
+        // Edit/detail get the full historical action bar: jump to detail,
+        // delete, and previous/next record navigation (following the
+        // default id ordering; the callables resolve lazily per entity at
+        // render time, no query happens unless the page renders them).
+        $actions->add(Actions::PAGE_EDIT, Action::new(Action::DETAIL, t('action.detail', domain: 'admin'), 'fa-solid fa-fw fa-magnifying-glass')
+            ->setCssClass('action-detail')
+            ->linkToCrudAction(Action::DETAIL));
+        $actions->add(Actions::PAGE_EDIT, Action::new(Action::DELETE, t('action.delete', domain: 'admin'), 'fa-solid fa-fw fa-trash')
+            ->setCssClass('action-delete text-danger')
+            ->linkToCrudAction(Action::DELETE));
+
+        foreach ([Actions::PAGE_EDIT, Actions::PAGE_DETAIL] as $page) {
+            $actions->add($page, Action::new(Action::GOTO_PREV, t('action.goto_prev', domain: 'admin'), 'fa-solid fa-fw fa-angle-left')
+                ->renderAsTooltip()
+                ->linkToUrl(fn (object $entity) => $this->adjacentEntityUrl($entity, 'prev', $page)));
+            $actions->add($page, Action::new(Action::GOTO_NEXT, t('action.goto_next', domain: 'admin'), 'fa-solid fa-fw fa-angle-right')
+                ->renderAsTooltip()
+                ->linkToUrl(fn (object $entity) => $this->adjacentEntityUrl($entity, 'next', $page)));
         }
 
         return $actions;
+    }
+
+    /**
+     * Edit/detail URL of the neighbouring record in the index's default id
+     * ordering (id DESC: "next" walks down the list toward older rows) -
+     * empty string when there is no neighbour, which the action templates
+     * treat as "don't render this action".
+     */
+    protected function adjacentEntityUrl(object $entity, string $direction, string $page): string
+    {
+        $queryBuilder = $this->entityManager->createQueryBuilder()
+            ->select('e.id')
+            ->from(static::getEntityFqcn(), 'e')
+            ->setMaxResults(1)
+            ->setParameter('id', $entity->getId());
+
+        if ('prev' === $direction) {
+            $queryBuilder->where('e.id > :id')->orderBy('e.id', 'ASC');
+        } else {
+            $queryBuilder->where('e.id < :id')->orderBy('e.id', 'DESC');
+        }
+
+        $neighbour = $queryBuilder->getQuery()->getOneOrNullResult();
+        if (null === $neighbour) {
+            return '';
+        }
+
+        return $this->adminUrlGenerator
+            ->setController(static::class)
+            ->setAction(Actions::PAGE_DETAIL === $page ? Action::DETAIL : Action::EDIT)
+            ->setEntityId($neighbour['id'])
+            ->generateUrl();
     }
 
     public function configureCrud(Crud $crud): Crud
@@ -209,7 +266,53 @@ abstract class AbstractCrudController extends AbstractController implements Crud
             'query' => $query,
             'filters' => $filters,
             'filter_values' => $filterValues,
+            'new_variants' => $this->getNewVariants(),
         ]);
+    }
+
+    /**
+     * The concrete creatable classes reachable from this CRUD's "new"
+     * button: the entity itself plus any Doctrine discriminator-map
+     * subclass that has its own registered CRUD controller. More than one
+     * entry turns the index's create button into a subclass chooser (the
+     * historical "action-discriminator" dropdown); a lone entry (the
+     * common case, no inheritance) keeps the plain button.
+     *
+     * @return array<int, array{label: string, url: string}>
+     */
+    protected function getNewVariants(): array
+    {
+        $entityFqcn = static::getEntityFqcn();
+        $metadata = $this->entityManager->getClassMetadata($entityFqcn);
+
+        $variants = [];
+        foreach ($metadata->discriminatorMap ?: [$entityFqcn] as $class) {
+            if ($class !== $entityFqcn && !is_subclass_of($class, $entityFqcn)) {
+                continue;
+            }
+            if ((new \ReflectionClass($class))->isAbstract()) {
+                continue;
+            }
+
+            $controller = static::getCrudControllerFqcn($class);
+            if (null === $controller) {
+                continue;
+            }
+
+            try {
+                $url = $this->adminUrlGenerator->setController($controller)->setAction(Action::NEW)->generateUrl();
+            } catch (\InvalidArgumentException) {
+                continue; // controller exists but isn't registered (mid-migration)
+            }
+
+            $shortName = substr((string) strrchr('\\' . $class, '\\'), 1);
+            $variants[$url] = [
+                'label' => ucfirst(strtolower(trim(preg_replace('/(?<=[a-z0-9])([A-Z])/', ' $1', $shortName)))),
+                'url' => $url,
+            ];
+        }
+
+        return array_values($variants);
     }
 
     public function detail(Request $request, string $entityId): Response

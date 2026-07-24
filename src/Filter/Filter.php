@@ -126,11 +126,45 @@ class Filter
         return $this;
     }
 
+    // comparison operators, historical URL shape:
+    //   filters[prop][comparison]=like|eq|neq|gt|lt & filters[prop][value]=...
+    // a bare scalar (filters[prop]=x) is still accepted and means the
+    // type's default comparison, so simple links stay simple
+    public const COMPARISON_LIKE = 'like';
+    public const COMPARISON_EQ = 'eq';
+    public const COMPARISON_NEQ = 'neq';
+    public const COMPARISON_GT = 'gt';
+    public const COMPARISON_LT = 'lt';
+
+    /**
+     * The comparison operators this filter's widget should offer, keyed by
+     * operator, valued with a short display symbol. Empty = no chooser
+     * (boolean/choice/association/date have a fixed semantic).
+     *
+     * @return array<string, string>
+     */
+    public function getComparisons(): array
+    {
+        return match ($this->type) {
+            self::TYPE_TEXT => [self::COMPARISON_LIKE => '≈', self::COMPARISON_EQ => '=', self::COMPARISON_NEQ => '≠'],
+            self::TYPE_NUMERIC => [self::COMPARISON_EQ => '=', self::COMPARISON_GT => '>', self::COMPARISON_LT => '<', self::COMPARISON_NEQ => '≠'],
+            default => [],
+        };
+    }
+
     /**
      * @param mixed $value the raw request value (already checked non-empty)
      */
     public function apply(QueryBuilder $queryBuilder, string $alias, mixed $value): void
     {
+        // normalize the {comparison, value} URL shape; scalars mean the
+        // type's default comparison
+        $comparison = null;
+        if (\is_array($value) && \array_key_exists('value', $value)) {
+            $comparison = $value['comparison'] ?? null;
+            $value = $value['value'];
+        }
+
         if (null !== $this->applyCallable) {
             ($this->applyCallable)($queryBuilder, $alias, $value);
             return;
@@ -160,6 +194,16 @@ class Filter
                 break;
 
             case self::TYPE_NUMERIC:
+                $operator = match ($comparison) {
+                    self::COMPARISON_GT => '>',
+                    self::COMPARISON_LT => '<',
+                    self::COMPARISON_NEQ => '!=',
+                    default => '=',
+                };
+                $queryBuilder->andWhere(sprintf('%s %s :%s', $field, $operator, $param))
+                    ->setParameter($param, $value);
+                break;
+
             case self::TYPE_CHOICE:
             case self::TYPE_ASSOCIATION:
                 $queryBuilder->andWhere(sprintf('%s = :%s', $field, $param))
@@ -167,6 +211,11 @@ class Filter
                 break;
 
             default:
+                if (self::COMPARISON_EQ === $comparison || self::COMPARISON_NEQ === $comparison) {
+                    $queryBuilder->andWhere(sprintf('%s %s :%s', $field, self::COMPARISON_NEQ === $comparison ? '!=' : '=', $param))
+                        ->setParameter($param, $value);
+                    break;
+                }
                 $queryBuilder->andWhere(sprintf('LOWER(%s) LIKE :%s', $field, $param))
                     ->setParameter($param, '%' . mb_strtolower((string) $value) . '%');
         }
@@ -178,6 +227,10 @@ class Filter
     public static function isActive(mixed $value): bool
     {
         if (\is_array($value)) {
+            if (\array_key_exists('value', $value)) {
+                return null !== $value['value'] && '' !== trim((string) $value['value']);
+            }
+
             return '' !== trim((string) ($value['from'] ?? '')) || '' !== trim((string) ($value['to'] ?? ''));
         }
 
