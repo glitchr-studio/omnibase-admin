@@ -40,19 +40,26 @@
             --admin-text: #e6e8eb; --admin-muted: #8b94a1; --admin-accent: #6ea8fe;
             --admin-danger: #f87171;
         }
-        .admin-topbar { display: flex; justify-content: flex-end; align-items: center; padding: .6rem .9rem; margin: -1.5rem -2rem 1.25rem; border-bottom: 1px solid var(--admin-border); }
-        .admin-theme-switch { position: relative; }
-        .admin-theme-switch > button { display: inline-flex; align-items: center; gap: .4rem; padding: .35rem .7rem; border-radius: 6px; border: 1px solid var(--admin-border);
-            background: var(--admin-surface); color: inherit; cursor: pointer; font: inherit; font-size: .85rem; }
-        .admin-theme-switch > button:hover { border-color: var(--admin-accent); color: var(--admin-accent); }
-        .admin-theme-menu { display: none; position: absolute; top: calc(100% + .3rem); right: 0; min-width: 150px; z-index: 20;
+        .admin-topbar { display: flex; align-items: center; gap: 1rem; padding: .6rem .9rem; margin: -1.5rem -2rem 1.25rem; border-bottom: 1px solid var(--admin-border);
+                       position: sticky; top: 0; z-index: 15; background: var(--admin-bg); }
+        .topbar-search { flex: 1; max-width: 420px; display: flex; align-items: center; gap: .5rem; padding: .4rem .8rem; border: 1px solid var(--admin-border);
+                         border-radius: 999px; background: var(--admin-surface); color: var(--admin-muted); }
+        .topbar-search i { flex: 0 0 auto; }
+        .topbar-search input { flex: 1; border: 0; background: none; font: inherit; color: inherit; min-width: 0; }
+        .topbar-search input:focus { outline: none; }
+        .admin-topbar-icons { margin-left: auto; display: flex; align-items: center; gap: .4rem; }
+        .admin-icon-dropdown { position: relative; }
+        .admin-icon-btn { display: flex; align-items: center; justify-content: center; width: 2.1rem; height: 2.1rem; border-radius: 999px; border: 1px solid transparent;
+            background: none; color: var(--admin-muted); cursor: pointer; font: inherit; }
+        .admin-icon-btn:hover { border-color: var(--admin-border); color: var(--admin-accent); background: var(--admin-surface); }
+        .admin-dropdown-menu { display: none; position: absolute; top: calc(100% + .3rem); right: 0; min-width: 150px; z-index: 20;
             background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: var(--admin-radius); box-shadow: 0 8px 24px rgba(0,0,0,.15); overflow: hidden; }
-        .admin-theme-switch.is-open .admin-theme-menu { display: block; }
-        .admin-theme-menu button { display: flex; align-items: center; gap: .5rem; width: 100%; padding: .5rem .8rem; border: 0; background: none; text-align: left;
-            color: inherit; cursor: pointer; font: inherit; font-size: .85rem; }
-        .admin-theme-menu button:hover { background: var(--admin-bg); }
-        .admin-theme-menu button.is-active { color: var(--admin-accent); font-weight: 600; }
-        .admin-theme-menu button i { width: 1rem; text-align: center; }
+        .admin-icon-dropdown.is-open .admin-dropdown-menu { display: block; }
+        .admin-dropdown-menu button, .admin-dropdown-menu a { display: flex; align-items: center; gap: .5rem; width: 100%; padding: .5rem .8rem; border: 0; background: none; text-align: left;
+            color: inherit; text-decoration: none; cursor: pointer; font: inherit; font-size: .85rem; box-sizing: border-box; }
+        .admin-dropdown-menu button:hover, .admin-dropdown-menu a:hover { background: var(--admin-bg); }
+        .admin-dropdown-menu button.is-active, .admin-dropdown-menu a.is-active { color: var(--admin-accent); font-weight: 600; }
+        .admin-dropdown-menu i { width: 1rem; text-align: center; }
         * { box-sizing: border-box; }
         body { margin: 0; font: 15px/1.5 system-ui, -apple-system, sans-serif; background: var(--admin-bg); color: var(--admin-text); }
         .admin-shell { display: flex; min-height: 100vh; }
@@ -82,7 +89,12 @@
         .admin-analytics .analytics-window:first-child { margin-top: 0; }
         .admin-analytics .row { margin: .1rem 0; }
         .admin-main { flex: 1; padding: 1.5rem 2rem; min-width: 0; }
-        .admin-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.25rem; }
+        {# sticks right under the topbar (itself sticky at top:0) so the
+           title/entity-actions stay reachable while scrolling a long form
+           or datagrid, matching production - top offset matches the
+           topbar's own rendered height (icon buttons + vertical padding). #}
+        .admin-header { display: flex; align-items: center; gap: 1rem; margin: 0 -2rem 1.25rem; padding: 1rem 2rem;
+                        position: sticky; top: 3.3rem; z-index: 14; background: var(--admin-bg); }
         .admin-header h1 { margin: 0; font-size: 1.35rem; }
         .admin-header .global-actions { margin-left: auto; display: flex; gap: .5rem; }
         .card { background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: var(--admin-radius); }
@@ -133,6 +145,39 @@
            once ->setColumns() puts them in something less than the full
            12-span. Forcing 100% keeps them honest to the grid track. #}
         form.admin-form .select2-container { width: 100% !important; }
+        {# The system-settings pages (API keys, site settings) build their
+           form straight from base-bundle's raw PasswordType/BooleanType/
+           RouteType/etc - form_rest(form) - never going through a CRUD
+           FieldDescriptor, so none of the .form-grid/.form-row markup
+           above applies to them. That raw markup is Bootstrap-shaped
+           (.form-group/.input-group/.input-group-text/.form-check) but,
+           like the confirm-modal above, no Bootstrap CSS loads here - left
+           unstyled the icon addon and input stack vertically instead of
+           sitting side by side, and every field looks structurally broken
+           rather than just plain. #}
+        form.admin-form .form-group { margin-bottom: 1.1rem; }
+        form.admin-form .form-group .form-group { margin-bottom: .6rem; }
+        form.admin-form .label-wrapper { display: flex; align-items: center; gap: .4rem; margin-bottom: .3rem; }
+        form.admin-form .label-wrapper label { margin-bottom: 0; }
+        form.admin-form .badge.label { display: inline-flex; align-items: center; padding: .1rem .35rem; border-radius: 5px;
+                                       background: var(--admin-bg); color: var(--admin-muted); font-size: .75rem; }
+        form.admin-form .input-group { display: flex; align-items: stretch; position: relative; }
+        form.admin-form .input-group-text { display: flex; align-items: center; padding: 0 .65rem; border: 1px solid var(--admin-border);
+                                            border-right: 0; border-radius: 6px 0 0 6px; background: var(--admin-bg); color: var(--admin-muted); flex: 0 0 auto; }
+        form.admin-form .input-group input, form.admin-form .input-group select { border-radius: 0 6px 6px 0; }
+        form.admin-form .input-group .form-password-revealer { color: var(--admin-muted); }
+        form.admin-form .input-group .form-password-revealer:hover { color: var(--admin-accent); }
+        form.admin-form .form-password-strength { display: flex; gap: .2rem; margin-top: .4rem; }
+        form.admin-form .form-password-strength .strength { flex: 1; height: 3px; border-radius: 2px; background: var(--admin-border); }
+        form.admin-form .form-text { font-size: .82rem; color: var(--admin-muted); margin-top: .35rem; }
+        form.admin-form .form-text.text-danger { color: var(--admin-danger); display: flex; align-items: center; gap: .35rem; }
+        form.admin-form .form-text.text-danger::before { content: "\f071"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
+        form.admin-form .form-check { display: flex; align-items: center; gap: .5rem; }
+        form.admin-form .form-check-input { width: 1.1rem; height: 1.1rem; margin: 0; accent-color: var(--admin-accent); }
+        form.admin-form footer { margin-top: .4rem; }
+        form.admin-form footer hr { display: none; }
+        form.admin-form .form-entity, form.admin-form .form-translatable, form.admin-form .form-collection-items,
+        form.admin-form .form-collection-no-add-button { display: block; }
         .form-footer { display: flex; gap: .5rem; padding: 1rem 1.25rem; border-top: 1px solid var(--admin-border); }
         dl.detail { padding: 1.25rem; display: grid; grid-template-columns: 200px 1fr; gap: .5rem 1rem; margin: 0; }
         dl.detail dt { font-weight: 600; color: var(--admin-muted); }
@@ -364,40 +409,52 @@
             });
         </script>
         <script>
-            // Topbar appearance dropdown - same delegated-on-document
-            // pattern as the boolean switch above, for the same reason
-            // (survives future in-admin AJAX swaps with nothing to
-            // rebind). One listener handles both opening/closing the menu
-            // and picking a choice from it.
+            // Generic dropdown open/close - drives the topbar's appearance
+            // and language menus, plus the sidebar account menu (same
+            // [data-dropdown] wrapper + .admin-icon-btn/[aria-haspopup]
+            // toggle convention). Delegated on document (same pattern as
+            // the boolean switch above) so it survives future in-admin
+            // AJAX swaps with nothing to rebind. Opening one dropdown
+            // closes any other that's open; clicking anything inside the
+            // menu (a real link, or a choice button below) closes it too.
             document.addEventListener('click', function (e) {
-                const swtch = document.querySelector('[data-theme-switch]');
-                if (!swtch) return;
-
-                const choiceBtn = e.target.closest('[data-theme-choice]');
-                if (choiceBtn) {
-                    const choice = choiceBtn.dataset.themeChoice;
-                    if (choice === 'auto') {
-                        localStorage.removeItem('admin-theme');
-                        document.documentElement.removeAttribute('data-theme');
-                    } else {
-                        localStorage.setItem('admin-theme', choice);
-                        document.documentElement.setAttribute('data-theme', choice);
+                const toggle = e.target.closest('[data-dropdown] > .admin-icon-btn, [data-dropdown] > [aria-haspopup]');
+                if (toggle) {
+                    const dropdown = toggle.closest('[data-dropdown]');
+                    const willOpen = !dropdown.classList.contains('is-open');
+                    document.querySelectorAll('[data-dropdown].is-open').forEach(function (d) {
+                        d.classList.remove('is-open');
+                        const btn = d.querySelector('[aria-haspopup]');
+                        if (btn) btn.setAttribute('aria-expanded', 'false');
+                    });
+                    if (willOpen) {
+                        dropdown.classList.add('is-open');
+                        toggle.setAttribute('aria-expanded', 'true');
                     }
-                    swtch.classList.remove('is-open');
-                    swtch.querySelector('button[aria-haspopup]').setAttribute('aria-expanded', 'false');
                     return;
                 }
 
-                const toggleBtn = e.target.closest('[data-theme-switch] > button');
-                if (toggleBtn) {
-                    const isOpen = swtch.classList.toggle('is-open');
-                    toggleBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-                    return;
+                const openDropdown = document.querySelector('[data-dropdown].is-open');
+                if (openDropdown) {
+                    openDropdown.classList.remove('is-open');
+                    const btn = openDropdown.querySelector('[aria-haspopup]');
+                    if (btn) btn.setAttribute('aria-expanded', 'false');
                 }
+            });
+            // Theme choice itself: separate from the generic open/close
+            // above, only cares about which [data-theme-choice] was picked.
+            document.addEventListener('click', function (e) {
+                const choiceBtn = e.target.closest('[data-theme-choice]');
+                if (!choiceBtn) return;
 
-                // click anywhere else closes it
-                swtch.classList.remove('is-open');
-                swtch.querySelector('button[aria-haspopup]').setAttribute('aria-expanded', 'false');
+                const choice = choiceBtn.dataset.themeChoice;
+                if (choice === 'auto') {
+                    localStorage.removeItem('admin-theme');
+                    document.documentElement.removeAttribute('data-theme');
+                } else {
+                    localStorage.setItem('admin-theme', choice);
+                    document.documentElement.setAttribute('data-theme', choice);
+                }
             });
             // reflect the saved/current choice with an "active" mark and
             // keep it in sync if the OS theme changes while "system" is
@@ -487,15 +544,42 @@
     <main class="admin-main">
         {% block topbar %}
             <div class="admin-topbar">
-                <div class="admin-theme-switch" data-theme-switch>
-                    <button type="button" aria-haspopup="true" aria-expanded="false">
-                        <i class="fa-solid fa-circle-half-stroke"></i> {{ 'topbar.appearance'|trans({}, 'admin') }}
-                    </button>
-                    <div class="admin-theme-menu" role="menu">
-                        <button type="button" data-theme-choice="light"><i class="fa-solid fa-sun"></i> {{ 'topbar.theme_light'|trans({}, 'admin') }}</button>
-                        <button type="button" data-theme-choice="dark"><i class="fa-solid fa-moon"></i> {{ 'topbar.theme_dark'|trans({}, 'admin') }}</button>
-                        <button type="button" data-theme-choice="auto"><i class="fa-solid fa-desktop"></i> {{ 'topbar.theme_auto'|trans({}, 'admin') }}</button>
+                {% if admin_context is defined and admin_context.crudControllerFqcn %}
+                    {# persistent search, present on every page of a CRUD (index/
+                       new/edit/detail) not just the index listing - always
+                       submits back to that CRUD's own index, matching
+                       production's global-looking-but-context-scoped search bar #}
+                    <form class="topbar-search" method="get" action="{{ admin_url(admin_context.crudControllerFqcn, 'index') }}">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="search" name="query" placeholder="{{ 'datagrid.search_placeholder'|trans({}, 'admin') }}">
+                    </form>
+                {% else %}
+                    <span></span>
+                {% endif %}
+                <div class="admin-topbar-icons">
+                    <div class="admin-icon-dropdown" data-dropdown>
+                        <button type="button" class="admin-icon-btn" aria-haspopup="true" aria-expanded="false" title="{{ 'topbar.appearance'|trans({}, 'admin') }}">
+                            <i class="fa-solid fa-circle-half-stroke"></i>
+                        </button>
+                        <div class="admin-dropdown-menu" role="menu" data-theme-menu>
+                            <button type="button" data-theme-choice="light"><i class="fa-solid fa-sun"></i> {{ 'topbar.theme_light'|trans({}, 'admin') }}</button>
+                            <button type="button" data-theme-choice="dark"><i class="fa-solid fa-moon"></i> {{ 'topbar.theme_dark'|trans({}, 'admin') }}</button>
+                            <button type="button" data-theme-choice="auto"><i class="fa-solid fa-cloud-moon"></i> {{ 'topbar.theme_auto'|trans({}, 'admin') }}</button>
+                        </div>
                     </div>
+                    {% set availableLocales = app.localizer.availableLocales %}
+                    {% if availableLocales|length > 1 %}
+                        <div class="admin-icon-dropdown" data-dropdown>
+                            <button type="button" class="admin-icon-btn" aria-haspopup="true" aria-expanded="false" title="{{ 'topbar.language'|trans({}, 'admin') }}">
+                                <i class="fa-solid fa-globe"></i>
+                            </button>
+                            <div class="admin-dropdown-menu" role="menu">
+                                {% for locale in availableLocales %}
+                                    <a href="{{ path('_switch_locale', {_locale: locale|lang}) }}" class="{{ locale == app.localizer.locale ? 'is-active' }}">{{ locale|lang_name|capitalize }}</a>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
         {% endblock %}
