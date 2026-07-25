@@ -115,8 +115,21 @@
         .btn-primary { background: var(--admin-accent); border-color: var(--admin-accent); color: #fff; }
         .btn-primary:hover { color: #fff; filter: brightness(1.08); }
         .text-danger, .btn.text-danger { color: var(--admin-danger); }
-        table.datagrid { width: 100%; border-collapse: collapse; }
-        .datagrid th, .datagrid td { text-align: left; padding: .6rem .9rem; border-bottom: 1px solid var(--admin-border); }
+        {# Row actions (edit/detail/goto/delete) carry only an icon, no
+           label, but shared the same left/right padding as text buttons
+           ("Filtrer", "Créer"...) - that padding is sized for text, so an
+           icon alone sat inside a rectangle noticeably wider than tall,
+           looking arbitrarily larger/smaller next to its neighbours
+           depending on how much surrounding whitespace happened to render.
+           Square, fixed-size buttons for icon-only actions fix that. #}
+        .btn-icon { width: 2.1rem; height: 2.1rem; padding: 0; justify-content: center; flex-shrink: 0; }
+        {# A datagrid can easily grow past the viewport width (many
+           entities have 8-10+ index columns) - without its own scroll
+           container that either overflows the whole page (fighting the
+           sticky sidebar/header) or squeezes columns unreadably thin. #}
+        .table-responsive { overflow-x: auto; }
+        table.datagrid { width: 100%; min-width: max-content; border-collapse: collapse; }
+        .datagrid th, .datagrid td { text-align: left; padding: .6rem .9rem; border-bottom: 1px solid var(--admin-border); white-space: nowrap; }
         .datagrid th a { color: inherit; text-decoration: none; }
         .datagrid tr:hover td { background: var(--admin-bg); }
         .datagrid td.actions, .datagrid th.actions { text-align: right; white-space: nowrap; }
@@ -374,6 +387,21 @@
                 } else {
                     location.assign(url.toString());
                 }
+            });
+        </script>
+        <script>
+            // Filter bar: [data-autosubmit] selects/date inputs (boolean,
+            // choice, association, comparison-operator, date range) apply
+            // immediately on change instead of requiring a separate click on
+            // "Filtrer" - matches prod's instant filtering. Free-text/number
+            // value inputs deliberately do NOT autosubmit (that would fire
+            // on every keystroke); those still need the explicit button.
+            // Delegated on document for the same AJAX-swap-survival reason
+            // as the switch/dropdown listeners around it.
+            document.addEventListener('change', function (e) {
+                const field = e.target.closest('[data-autosubmit]');
+                if (!field || !field.form) return;
+                field.form.requestSubmit();
             });
         </script>
         <script>
