@@ -3,7 +3,9 @@
 {%- set count = raw is iterable ? raw|length : (raw ? 1 : 0) -%}
 {%- if count == 0 -%}
     <span class="badge-muted">—</span>
+{%- elseif format == 'avatar' -%}
+    <img class="field-avatar-thumb" src="{{ raw|thumbnail(40, 40) }}" alt="">
 {%- else -%}
-    {%- set icon = format == 'video' ? 'fa-solid fa-circle-play' : (format == 'audio' ? 'fa-solid fa-volume-high' : (format in ['image', 'avatar', 'cropper'] ? 'fa-solid fa-image' : 'fa-solid fa-paperclip')) -%}
+    {%- set icon = format == 'video' ? 'fa-solid fa-circle-play' : (format == 'audio' ? 'fa-solid fa-volume-high' : (format in ['image', 'cropper'] ? 'fa-solid fa-image' : 'fa-solid fa-paperclip')) -%}
     <span class="field-media"><i class="{{ icon }}"></i> {{ count }} {{ count != 1 ? 'field.files'|trans({}, 'admin') : 'field.file'|trans({}, 'admin') }}</span>
 {%- endif -%}
