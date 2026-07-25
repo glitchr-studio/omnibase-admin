@@ -253,6 +253,20 @@
         form.admin-form .form-text.text-danger { color: var(--admin-danger); display: flex; align-items: center; gap: .35rem; }
         form.admin-form .form-text.text-danger::before { content: "\f071"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
         form.admin-form .form-check { display: flex; align-items: center; gap: .5rem; }
+        {# File inputs (avatar/image/document upload fields) were entirely
+           unstyled - the native browser "Choose File" button/label don't
+           pick up any of the admin's theme (light OR dark: the label text
+           stays whatever color the OS renders it, independent of this
+           page's own color scheme), and its height/padding never matched
+           any other control on the same form. ::file-selector-button is
+           the standard, well-supported way to theme the native button
+           itself without replacing the whole control with a JS widget. #}
+        form.admin-form input[type=file] { display: flex; align-items: center; gap: .6rem; color: var(--admin-muted); font: inherit; font-size: .85rem; }
+        form.admin-form input[type=file]::file-selector-button {
+            padding: .45rem .9rem; border-radius: 6px; border: 1px solid var(--admin-border);
+            background: var(--admin-surface); color: inherit; font: inherit; font-size: .9rem; cursor: pointer;
+        }
+        form.admin-form input[type=file]::file-selector-button:hover { border-color: var(--admin-accent); color: var(--admin-accent); }
         {# A boolean field reads as a toggle switch everywhere else it
            appears (datagrid rows, detail page) but fell back to a tiny bare
            native checkbox here - the one visibly "non-uniform" field in an
@@ -287,7 +301,8 @@
         .flash-warning { border-color: #fde68a; background: #fffbeb; color: #92400e; }
         .flash-danger, .flash-error { border-color: #fecaca; background: #fef2f2; color: #991b1b; }
         .search-form { display: inline-flex; gap: .4rem; }
-        .search-form input { padding: .45rem .65rem; border: 1px solid var(--admin-border); border-radius: 6px; font: inherit; min-width: 220px; }
+        .search-form input { padding: .45rem .65rem; border: 1px solid var(--admin-border); border-radius: 6px; font: inherit; min-width: 220px;
+                             background: var(--admin-bg); color: var(--admin-text); }
         .quick-access { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: .75rem; padding: 1.25rem; }
         .quick-access a { display: block; padding: 1rem; border: 1px solid var(--admin-border); border-radius: var(--admin-radius); text-decoration: none; color: inherit; background: var(--admin-surface); }
         .quick-access a:hover { border-color: var(--admin-accent); color: var(--admin-accent); }
@@ -305,6 +320,17 @@
         .widget-group li a:hover { color: var(--admin-accent); }
         .widget-group li a i { width: 1.2rem; text-align: center; }
         .widget-group li a .fa-circle-plus { color: var(--admin-accent); }
+        .analytics-card { padding: 1.5rem; margin-bottom: 1.5rem; }
+        .analytics-card-header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 1.5rem; margin-bottom: 1.25rem; }
+        .analytics-card-header h2 { margin: 0; font-size: 1.1rem; }
+        .analytics-stat-row { display: flex; gap: 1.75rem; flex-wrap: wrap; }
+        .analytics-stat { min-width: 6rem; }
+        .analytics-stat-value { display: block; font-size: 1.4rem; font-weight: 700; line-height: 1.2; }
+        .analytics-stat-label { display: block; font-size: .78rem; color: var(--admin-muted); text-transform: uppercase; letter-spacing: .03em; }
+        .analytics-stat-change { font-size: .8rem; font-weight: 600; margin-left: .4rem; }
+        .analytics-stat-change.is-up { color: var(--admin-success); }
+        .analytics-stat-change.is-down { color: var(--admin-danger); }
+        .analytics-chart-wrap { position: relative; height: 240px; }
         .filter-bar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .75rem; padding: .75rem .9rem; margin-bottom: 1rem;
                       background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: var(--admin-radius); }
         .filter-bar label { display: flex; flex-direction: column; gap: .2rem; font-size: .82rem; color: var(--admin-muted); }
@@ -384,6 +410,14 @@
            from DOM markers rendered by @Base/form/form_div_layout.html.twig #}
         {{ encore_entry_link_tags('form') }}
         {{ encore_entry_script_tags('form') }}
+        {# Chart.js (tree-shaken to line/point/linear+category-scale/filler/
+           tooltip/legend only) - a generic [data-admin-chart] initializer
+           any page can use, not just the dashboard. Loaded globally like
+           'form'/'base' rather than per-page: transparentJS's in-admin
+           navigation only swaps #page's content, so a <head> script tied
+           to one specific page would never (re-)run when navigating INTO
+           that page via the SPA swap instead of a fresh full load. #}
+        {{ encore_entry_script_tags('admin-charts') }}
         {# FontAwesome's class rules (.fa-solid/.fas/.far/...) live in the
            'base' entry's CSS, not 'form' - the font FILES were always
            reachable, but nothing mapped fa-* classes to glyphs, so every

@@ -1,6 +1,7 @@
 dashboard:
     title: Tableau de bord
     welcome: Bienvenue dans votre administration. Choisissez une section dans le menu pour gérer vos contenus.
+    analytics_title: Trafic (14 derniers jours)
 
 topbar:
     appearance: Apparence
@@ -90,3 +91,7 @@ analytics:
     page_views: "%count% vues"
     unique_visitors: "%count% visiteurs"
     unique_users: "%count% utilisateurs"
+    label:
+        page_views: Vues
+        unique_visitors: Visiteurs
+        unique_users: Utilisateurs

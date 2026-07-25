@@ -1,6 +1,7 @@
 dashboard:
     title: Dashboard
     welcome: Welcome to your administration. Pick a section in the menu to start managing your content.
+    analytics_title: Traffic (last 14 days)
 
 topbar:
     appearance: Appearance
@@ -90,3 +91,7 @@ analytics:
     page_views: "%count% page views"
     unique_visitors: "%count% visitors"
     unique_users: "%count% users"
+    label:
+        page_views: Page views
+        unique_visitors: Visitors
+        unique_users: Users
