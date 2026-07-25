@@ -8,22 +8,20 @@
     <div class="global-actions">
         {% for action in actions.getAll('detail') %}
             {% if action.name == 'delete' %}
-                <form method="post" action="{{ admin_url(controller_fqcn, 'delete', entityId) }}" style="display:inline"
+                <form method="post" action="{{ admin_url(controller_fqcn, 'delete', entityId) }}" style="display:contents"
                       data-confirm="{{ 'action.delete_confirm'|trans({}, 'admin') }}">
                     <input type="hidden" name="_token" value="{{ csrf_token('admin-batch-' ~ crud.entityFqcn) }}">
-                    <button class="btn text-danger">{{ action.label|trans }}</button>
+                    <button class="btn btn-icon text-danger" title="{{ action.label|trans }}"><i class="fa-solid fa-trash"></i></button>
                 </form>
             {% elseif action.name != 'separator' %}
                 {% set href = admin_action_url(action, entity, controller_fqcn) %}
                 {% if href %}
-                    <a class="btn {{ action.name == 'edit' ? 'btn-primary' }}" href="{{ href }}"
+                    {% set isIconOnly = action.htmlAttributes['tooltip'] is defined %}
+                    <a class="btn {{ isIconOnly ? 'btn-icon' }} {{ action.name == 'edit' ? 'btn-primary' }}" href="{{ href }}"
                        {%- if action.htmlAttributes['target'] is defined %} target="{{ action.htmlAttributes['target'] }}"{% endif %}
-                       {%- if action.htmlAttributes['tooltip'] is defined %} title="{{ action.label|trans }}"{% endif %}>
-                        {%- if action.icon and action.htmlAttributes['tooltip'] is defined -%}
-                            <i class="{{ action.icon }}"></i>
-                        {%- else -%}
-                            {{ action.label|trans }}
-                        {%- endif -%}
+                       {%- if isIconOnly %} title="{{ action.label|trans }}"{% endif %}>
+                        {%- if action.icon -%}<i class="{{ action.icon }}"></i>{%- endif -%}
+                        {%- if not isIconOnly %} {{ action.label|trans }}{% endif -%}
                     </a>
                 {% endif %}
             {% endif %}

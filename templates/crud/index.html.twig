@@ -14,7 +14,7 @@
                 {# inheritance-tree entity: creating means choosing WHICH
                    concrete subclass - the historical discriminator dropdown #}
                 <details class="new-dropdown">
-                    <summary class="btn btn-primary">{{ action.label|trans }} <i class="fa-solid fa-caret-down"></i></summary>
+                    <summary class="btn btn-primary">{% if action.icon %}<i class="{{ action.icon }}"></i> {% endif %}{{ action.label|trans }} <i class="fa-solid fa-caret-down"></i></summary>
                     <div class="new-dropdown-menu">
                         {% for variant in new_variants %}
                             <a href="{{ variant.url }}">{{ variant.label }}</a>
@@ -23,7 +23,7 @@
                 </details>
             {% else %}
                 <a class="btn btn-primary {{ action.cssClass }}" href="{{ admin_url(controller_fqcn, action.crudActionName ?? 'new') }}">
-                    {{ action.label|trans }}
+                    {% if action.icon %}<i class="{{ action.icon }}"></i> {% endif %}{{ action.label|trans }}
                 </a>
             {% endif %}
         {% endfor %}
@@ -89,8 +89,8 @@
             {% endif %}
         </label>
     {% endfor %}
-    <button class="btn" type="submit">{{ 'filters.apply'|trans({}, 'admin') }}</button>
-    <a class="btn" href="{{ admin_url(controller_fqcn, 'index') }}">{{ 'filters.reset'|trans({}, 'admin') }}</a>
+    <button class="btn" type="submit"><i class="fa-solid fa-filter"></i> {{ 'filters.apply'|trans({}, 'admin') }}</button>
+    <a class="btn" href="{{ admin_url(controller_fqcn, 'index') }}"><i class="fa-solid fa-xmark"></i> {{ 'filters.reset'|trans({}, 'admin') }}</a>
 </form>
 {% endif %}
 <div class="card">

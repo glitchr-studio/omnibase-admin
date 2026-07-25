@@ -171,20 +171,20 @@ class Actions
                 ->displayAsSeparator()
                 ->linkToCrudAction(Action::SEPARATOR),
 
-            Action::INDEX => Action::new(Action::INDEX, t('action.index', domain: 'admin'))
+            Action::INDEX => Action::new(Action::INDEX, t('action.index', domain: 'admin'), 'fa-solid fa-arrow-left')
                 ->setCssClass('action-index btn btn-secondary')
                 ->linkToCrudAction(Action::INDEX),
 
-            Action::NEW => Action::new(Action::NEW, t('action.new', domain: 'admin'))
+            Action::NEW => Action::new(Action::NEW, t('action.new', domain: 'admin'), 'fa-solid fa-plus')
                 ->setCssClass('action-new btn btn-primary')
                 ->createAsGlobalAction()
                 ->linkToCrudAction(Action::NEW),
 
-            Action::DETAIL => Action::new(Action::DETAIL, t('action.detail', domain: 'admin'))
+            Action::DETAIL => Action::new(Action::DETAIL, t('action.detail', domain: 'admin'), 'fa-solid fa-eye')
                 ->setCssClass('action-detail')
                 ->linkToCrudAction(Action::DETAIL),
 
-            Action::EDIT => Action::new(Action::EDIT, t('action.edit', domain: 'admin'))
+            Action::EDIT => Action::new(Action::EDIT, t('action.edit', domain: 'admin'), 'fa-solid fa-pen')
                 ->setCssClass('action-edit')
                 ->linkToCrudAction(Action::EDIT),
 
@@ -197,7 +197,7 @@ class Actions
                 ->createAsBatchAction()
                 ->linkToCrudAction(Action::BATCH_DELETE),
 
-            Action::SAVE_AND_RETURN => Action::new(Action::SAVE_AND_RETURN, t(self::PAGE_EDIT === $pageName ? 'action.save' : 'action.create', domain: 'admin'))
+            Action::SAVE_AND_RETURN => Action::new(Action::SAVE_AND_RETURN, t(self::PAGE_EDIT === $pageName ? 'action.save' : 'action.create', domain: 'admin'), 'fa-solid fa-check')
                 ->setCssClass('action-saveAndReturn')
                 ->addCssClass('btn btn-primary action-save')
                 ->setHtmlAttributes(['name' => 'submit_action', 'value' => $actionName])
@@ -211,7 +211,7 @@ class Actions
                 ->renderAsButton()
                 ->linkToCrudAction(self::PAGE_EDIT === $pageName ? Action::EDIT : Action::NEW),
 
-            Action::SAVE_AND_ADD_ANOTHER => Action::new(Action::SAVE_AND_ADD_ANOTHER, t('action.create_and_add_another', domain: 'admin'))
+            Action::SAVE_AND_ADD_ANOTHER => Action::new(Action::SAVE_AND_ADD_ANOTHER, t('action.create_and_add_another', domain: 'admin'), 'fa-solid fa-plus')
                 ->setCssClass('action-saveAndAddAnother')
                 ->addCssClass('btn btn-secondary action-save')
                 ->setHtmlAttributes(['name' => 'submit_action', 'value' => $actionName])
