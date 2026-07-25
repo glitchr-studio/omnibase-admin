@@ -251,7 +251,25 @@
         form.admin-form .form-text.text-danger { color: var(--admin-danger); display: flex; align-items: center; gap: .35rem; }
         form.admin-form .form-text.text-danger::before { content: "\f071"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
         form.admin-form .form-check { display: flex; align-items: center; gap: .5rem; }
-        form.admin-form .form-check-input { width: 1.1rem; height: 1.1rem; margin: 0; accent-color: var(--admin-accent); }
+        {# A boolean field reads as a toggle switch everywhere else it
+           appears (datagrid rows, detail page) but fell back to a tiny bare
+           native checkbox here - the one visibly "non-uniform" field in an
+           otherwise consistent form. Same visual as .field-switch (the
+           datagrid's PATCH-toggle), pure CSS this time since a form
+           checkbox already submits correctly on its own - no JS/PATCH
+           wiring needed, just appearance. #}
+        form.admin-form .form-check-input[type=checkbox] {
+            appearance: none; -webkit-appearance: none; width: 34px; height: 19px; margin: 0; flex-shrink: 0;
+            border: none; border-radius: 999px; background: var(--admin-border); position: relative; cursor: pointer;
+            transition: background .15s ease;
+        }
+        form.admin-form .form-check-input[type=checkbox]::after {
+            content: ''; position: absolute; top: 2px; left: 2px; width: 15px; height: 15px; border-radius: 50%;
+            background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.3); transition: transform .15s ease;
+        }
+        form.admin-form .form-check-input[type=checkbox]:checked { background: var(--admin-accent); }
+        form.admin-form .form-check-input[type=checkbox]:checked::after { transform: translateX(15px); }
+        form.admin-form .form-check-input:not([type=checkbox]) { width: 1.1rem; height: 1.1rem; margin: 0; accent-color: var(--admin-accent); }
         form.admin-form footer { margin-top: .4rem; }
         form.admin-form footer hr { display: none; }
         form.admin-form .form-entity, form.admin-form .form-translatable, form.admin-form .form-collection-items,
