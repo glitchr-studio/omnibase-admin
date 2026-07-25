@@ -58,6 +58,7 @@ login:
 
 menu:
     profile: My profile
+    settings: Account settings
     logout: Sign out
     dashboard: Dashboard
 

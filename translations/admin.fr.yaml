@@ -58,6 +58,7 @@ login:
 
 menu:
     profile: Mon profil
+    settings: Paramètres du compte
     logout: Déconnexion
     dashboard: Tableau de bord
 

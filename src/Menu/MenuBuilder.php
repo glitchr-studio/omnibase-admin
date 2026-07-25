@@ -73,6 +73,8 @@ class MenuBuilder
             $items[] = MenuItemFactory::linkToRoute('user_profile', ['id' => $user->getId()], $this->translator->trans('menu.profile', [], 'admin'), 'fa-solid fa-id-badge');
         }
 
+        $items[] = MenuItemFactory::linkToRoute('user_settings', [], $this->translator->trans('menu.settings', [], 'admin'), 'fa-solid fa-sliders');
+
         $items[] = MenuItemFactory::linkToRoute('security_logout', [], $this->translator->trans('menu.logout', [], 'admin'), 'fa-solid fa-arrow-right-from-bracket');
 
         return $this->resolve($items);
