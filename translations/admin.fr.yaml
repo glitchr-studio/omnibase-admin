@@ -47,6 +47,14 @@ page:
     new: Nouveau %entity%
     edit: "Modifier %entity% #%id%"
 
+login:
+    title: Administration
+    identifier: Identifiant
+    password: Mot de passe
+    remember_me: Se souvenir de moi
+    sign_in: Se connecter
+    back_to_site: Retour au site
+
 menu:
     profile: Mon profil
     logout: Déconnexion

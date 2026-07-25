@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="{{ app.request.locale|default('en') }}">
+{# Standalone admin login: deliberately does NOT extend @Admin/layout.html.twig -
+   that layout assumes an authenticated context (admin_context, app.user,
+   analytics_summary(), the sidebar/topbar), none of which exist on the
+   login page. Same CSS-variable palette + FontAwesome so it still reads as
+   the admin, but self-contained. #}
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ (page_title ?? app.site.title ?? 'login.title'|trans({}, 'admin'))|striptags }}</title>
+    <script>
+        (function () {
+            var saved = localStorage.getItem('admin-theme');
+            if (saved === 'light' || saved === 'dark') {
+                document.documentElement.setAttribute('data-theme', saved);
+            }
+        })();
+    </script>
+    {{ encore_entry_link_tags('base') }}
+    {{ encore_entry_link_tags('form') }}
+    <style>
+        :root {
+            --admin-bg: #f6f7f9; --admin-surface: #fff; --admin-border: #e3e6ea;
+            --admin-text: #1f2429; --admin-muted: #6b7683; --admin-accent: #2563eb;
+            --admin-danger: #dc2626; --admin-radius: 8px;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) {
+                --admin-bg: #16181d; --admin-surface: #1e2127; --admin-border: #2c3038;
+                --admin-text: #e6e8eb; --admin-muted: #8b94a1; --admin-accent: #6ea8fe;
+                --admin-danger: #f87171;
+            }
+        }
+        :root[data-theme="dark"] {
+            --admin-bg: #16181d; --admin-surface: #1e2127; --admin-border: #2c3038;
+            --admin-text: #e6e8eb; --admin-muted: #8b94a1; --admin-accent: #6ea8fe;
+            --admin-danger: #f87171;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1.5rem;
+               background: var(--admin-bg); color: var(--admin-text);
+               font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+        .login-card { width: 100%; max-width: 360px; background: var(--admin-surface); border: 1px solid var(--admin-border);
+                      border-radius: 12px; padding: 2rem; box-shadow: 0 12px 40px rgba(0,0,0,.08); }
+        .login-brand { display: flex; flex-direction: column; align-items: center; gap: .75rem; margin-bottom: 1.5rem; text-align: center; }
+        .login-brand img { width: 64px; height: 64px; border-radius: 12px; object-fit: cover; }
+        .login-brand .login-icon { width: 56px; height: 56px; display: flex; align-items: center; justify-content: center;
+                                   font-size: 1.5rem; border-radius: 12px; background: var(--admin-bg); color: var(--admin-accent); }
+        .login-brand h1 { margin: 0; font-size: 1.25rem; }
+        .login-field { margin-bottom: .9rem; }
+        .login-field label { display: block; font-size: .82rem; color: var(--admin-muted); margin-bottom: .3rem; }
+        .login-field .input-group { display: flex; align-items: stretch; }
+        .login-field .input-group > span { display: flex; align-items: center; padding: 0 .7rem; border: 1px solid var(--admin-border);
+                                           border-right: 0; border-radius: 8px 0 0 8px; background: var(--admin-bg); color: var(--admin-muted); }
+        .login-field input { flex: 1; min-width: 0; padding: .55rem .7rem; border: 1px solid var(--admin-border); border-radius: 0 8px 8px 0;
+                             font: inherit; background: var(--admin-bg); color: inherit; }
+        .login-field.no-icon input { border-radius: 8px; }
+        .login-remember { display: flex; align-items: center; gap: .5rem; margin: .5rem 0 1rem; font-size: .88rem; color: var(--admin-muted); }
+        .login-error { background: color-mix(in srgb, var(--admin-danger) 12%, transparent); color: var(--admin-danger);
+                       border: 1px solid color-mix(in srgb, var(--admin-danger) 40%, transparent); border-radius: 8px;
+                       padding: .6rem .75rem; margin-bottom: 1rem; font-size: .88rem; }
+        .login-submit { width: 100%; padding: .6rem; border: 0; border-radius: 8px; background: var(--admin-accent); color: #fff;
+                        font: inherit; font-weight: 600; cursor: pointer; }
+        .login-submit:hover { filter: brightness(1.05); }
+        .login-footer { margin-top: 1.25rem; text-align: center; font-size: .85rem; }
+        .login-footer a { color: var(--admin-accent); text-decoration: none; }
+    </style>
+</head>
+<body>
+<div class="login-card">
+    <div class="login-brand">
+        {% if logo %}
+            <img alt="" src="{{ logo|thumbnail(256, 256) }}">
+        {% else %}
+            <span class="login-icon"><i class="fa-solid fa-lock"></i></span>
+        {% endif %}
+        <h1>{{ page_title|default(app.site.title ?? 'login.title'|trans({}, 'admin')) }}</h1>
+    </div>
+
+    {{ form_start(form, {attr: {novalidate: 'novalidate'}}) }}
+        <input type="hidden" name="_target_path" value="{{ target_path|default(app.referrer) }}">
+
+        {% if error is defined and error %}
+            <div class="login-error">{{ error.messageKey|trans(error.messageData, 'security') }}</div>
+        {% endif %}
+
+        <div class="login-field">
+            <label>{{ 'login.identifier'|trans({}, 'admin') }}</label>
+            <div class="input-group">
+                <span><i class="fa-solid fa-fw fa-user"></i></span>
+                {{ form_widget(form.identifier, {attr: {placeholder: 'login.identifier'|trans({}, 'admin')}}) }}
+            </div>
+        </div>
+
+        <div class="login-field">
+            <label>{{ 'login.password'|trans({}, 'admin') }}</label>
+            <div class="input-group">
+                <span><i class="fa-solid fa-fw fa-lock"></i></span>
+                {{ form_widget(form.password, {attr: {placeholder: 'login.password'|trans({}, 'admin')}}) }}
+            </div>
+        </div>
+
+        <label class="login-remember">
+            {{ form_widget(form._remember_me) }}
+            {{ 'login.remember_me'|trans({}, 'admin') }}
+        </label>
+
+        {{ form_rest(form) }}
+
+        <button type="submit" class="login-submit">{{ 'login.sign_in'|trans({}, 'admin') }}</button>
+    {{ form_end(form) }}
+
+    <div class="login-footer">
+        <a href="{{ path(app.site.index) }}"><i class="fa-solid fa-arrow-left"></i> {{ 'login.back_to_site'|trans({}, 'admin') }}</a>
+    </div>
+</div>
+</body>
+</html>
