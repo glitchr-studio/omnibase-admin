@@ -173,6 +173,55 @@
            once ->setColumns() puts them in something less than the full
            12-span. Forcing 100% keeps them honest to the grid track. #}
         form.admin-form .select2-container { width: 100% !important; }
+        {# select2's vendored "bootstrap4" theme is a fixed light palette -
+           it never adapts to the admin's own light/dark toggle, so every
+           select2-enhanced field (Authors, Tags, Keywords, Icon, ...) stayed
+           a stark white box against an otherwise dark page. Re-themed with
+           the same CSS variables as the rest of the admin. Written twice
+           (explicit data-theme="dark" + the @media/auto case) rather than
+           combined into one selector list, since mixing a plain selector
+           and an @media block in one comma-separated prelude is invalid
+           CSS and silently drops the whole rule. #}
+        :root[data-theme="dark"] .select2-container--bootstrap4 .select2-selection {
+            background: var(--admin-bg); border-color: var(--admin-border); color: var(--admin-text);
+        }
+        :root[data-theme="dark"] .select2-selection__rendered { color: var(--admin-text); }
+        :root[data-theme="dark"] .select2-selection__placeholder { color: var(--admin-muted); }
+        :root[data-theme="dark"] .select2-selection__arrow b { border-color: var(--admin-muted) transparent transparent transparent; }
+        :root[data-theme="dark"] .select2-selection__choice {
+            background: var(--admin-surface); border-color: var(--admin-border); color: var(--admin-text);
+        }
+        :root[data-theme="dark"] .select2-selection__choice__remove { color: var(--admin-muted); }
+        :root[data-theme="dark"] .select2-dropdown {
+            background: var(--admin-surface); border-color: var(--admin-border); color: var(--admin-text);
+        }
+        :root[data-theme="dark"] .select2-search__field {
+            background: var(--admin-bg); border-color: var(--admin-border); color: var(--admin-text);
+        }
+        :root[data-theme="dark"] .select2-results__option { color: var(--admin-text); }
+        :root[data-theme="dark"] .select2-results__option--highlighted { background: var(--admin-accent) !important; color: #fff !important; }
+        :root[data-theme="dark"] .select2-results__group { color: var(--admin-muted); }
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) .select2-container--bootstrap4 .select2-selection {
+                background: var(--admin-bg); border-color: var(--admin-border); color: var(--admin-text);
+            }
+            :root:not([data-theme="light"]) .select2-selection__rendered { color: var(--admin-text); }
+            :root:not([data-theme="light"]) .select2-selection__placeholder { color: var(--admin-muted); }
+            :root:not([data-theme="light"]) .select2-selection__arrow b { border-color: var(--admin-muted) transparent transparent transparent; }
+            :root:not([data-theme="light"]) .select2-selection__choice {
+                background: var(--admin-surface); border-color: var(--admin-border); color: var(--admin-text);
+            }
+            :root:not([data-theme="light"]) .select2-selection__choice__remove { color: var(--admin-muted); }
+            :root:not([data-theme="light"]) .select2-dropdown {
+                background: var(--admin-surface); border-color: var(--admin-border); color: var(--admin-text);
+            }
+            :root:not([data-theme="light"]) .select2-search__field {
+                background: var(--admin-bg); border-color: var(--admin-border); color: var(--admin-text);
+            }
+            :root:not([data-theme="light"]) .select2-results__option { color: var(--admin-text); }
+            :root:not([data-theme="light"]) .select2-results__option--highlighted { background: var(--admin-accent) !important; color: #fff !important; }
+            :root:not([data-theme="light"]) .select2-results__group { color: var(--admin-muted); }
+        }
         {# The system-settings pages (API keys, site settings) build their
            form straight from base-bundle's raw PasswordType/BooleanType/
            RouteType/etc - form_rest(form) - never going through a CRUD
