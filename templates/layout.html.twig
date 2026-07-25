@@ -23,7 +23,7 @@
         :root {
             --admin-bg: #f6f7f9; --admin-surface: #fff; --admin-border: #e3e6ea;
             --admin-text: #1f2429; --admin-muted: #6b7683; --admin-accent: #2563eb;
-            --admin-danger: #dc2626; --admin-radius: 8px;
+            --admin-danger: #dc2626; --admin-success: #16a34a; --admin-radius: 8px;
         }
         {# "auto" (no data-theme attribute at all) follows the OS - explicit
            data-theme="dark"/"light" (set above from a saved preference)
@@ -32,13 +32,13 @@
             :root:not([data-theme="light"]) {
                 --admin-bg: #16181d; --admin-surface: #1e2127; --admin-border: #2c3038;
                 --admin-text: #e6e8eb; --admin-muted: #8b94a1; --admin-accent: #6ea8fe;
-                --admin-danger: #f87171;
+                --admin-danger: #f87171; --admin-success: #4ade80;
             }
         }
         :root[data-theme="dark"] {
             --admin-bg: #16181d; --admin-surface: #1e2127; --admin-border: #2c3038;
             --admin-text: #e6e8eb; --admin-muted: #8b94a1; --admin-accent: #6ea8fe;
-            --admin-danger: #f87171;
+            --admin-danger: #f87171; --admin-success: #4ade80;
         }
         .admin-topbar { display: flex; align-items: center; gap: 1rem; padding: .6rem .9rem; margin: -1.5rem -2rem 1.25rem; border-bottom: 1px solid var(--admin-border);
                        position: sticky; top: 0; z-index: 15; background: var(--admin-bg); }
@@ -107,13 +107,17 @@
         .admin-header { display: flex; align-items: center; gap: 1rem; margin: 0 -2rem 1.25rem; padding: 1rem 2rem;
                         position: sticky; top: 3.3rem; z-index: 14; background: var(--admin-bg); }
         .admin-header h1 { margin: 0; font-size: 1.35rem; }
-        .admin-header .global-actions { margin-left: auto; display: flex; gap: .5rem; }
+        .admin-header-titles { min-width: 0; }
+        .admin-header-subtitle { font-size: .82rem; color: var(--admin-muted); margin-top: .2rem; }
+        .admin-header .global-actions { margin-left: auto; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .5rem; }
         .card { background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: var(--admin-radius); }
         .btn { display: inline-flex; align-items: center; gap: .4rem; padding: .45rem .9rem; border-radius: 6px; border: 1px solid var(--admin-border);
                background: var(--admin-surface); color: inherit; text-decoration: none; font-size: .9rem; cursor: pointer; }
         .btn:hover { border-color: var(--admin-accent); color: var(--admin-accent); }
         .btn-primary { background: var(--admin-accent); border-color: var(--admin-accent); color: #fff; }
         .btn-primary:hover { color: #fff; filter: brightness(1.08); }
+        .btn-success { background: var(--admin-success); border-color: var(--admin-success); color: #fff; }
+        .btn-success:hover { color: #fff; filter: brightness(1.08); }
         .text-danger, .btn.text-danger { color: var(--admin-danger); }
         {# Row actions (edit/detail/goto/delete) carry only an icon, no
            label, but shared the same left/right padding as text buttons

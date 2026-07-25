@@ -4,15 +4,57 @@
    render the DOM markers its form-defer JS bundles initialise from #}
 {% form_theme form with ['@Admin/crud/form_theme.html.twig'] %}
 
+{# Save/save-and-continue/etc. buttons live in the header (see below), not
+   the form footer - form="admin-form" targets them at the form by id
+   regardless of where they sit in the document. #}
 {% block content_header %}
 <div class="admin-header">
-    <h1>{% block form_title %}{% endblock %}</h1>
+    <div class="admin-header-titles">
+        <h1>{% block form_title %}{% endblock %}</h1>
+        {% if entity is defined and entity.id %}
+            <div class="admin-header-subtitle">{{ crud.entityLabelInSingular ?? crud.entityFqcn|split('\\')|last }} ID #{{ entity.id }}</div>
+        {% endif %}
+    </div>
+    <div class="global-actions">
+        {% for action in actions.getAll(crud.currentPage) %}
+            {% if action.htmlElement == 'button' %}
+                {% set isMainSave = 'action-saveAndReturn' in action.cssClass %}
+                <button class="btn {{ isMainSave ? 'btn-success' : 'btn-primary' }}" type="submit" form="admin-form"
+                        name="{{ action.htmlAttributes.name|default('submit_action') }}" value="{{ action.htmlAttributes.value|default(action.name) }}">
+                    {{ action.label|trans }}
+                </button>
+            {% elseif action.crudActionName == 'index' %}
+                <a class="btn" href="{{ admin_url(controller_fqcn, 'index') }}">{{ action.label|trans }}</a>
+            {% elseif action.name == 'delete' and entity is defined and entity.id %}
+                {# a real <form> as a flex child of .global-actions, exactly
+                   like detail.html.twig's own delete action - can't reuse
+                   admin-form (different destination URL, and nesting a
+                   <form> inside another is invalid HTML). #}
+                <form method="post" action="{{ admin_url(controller_fqcn, 'delete', entity.id) }}" style="display:contents"
+                      data-confirm="{{ 'action.delete_confirm'|trans({}, 'admin') }}">
+                    <input type="hidden" name="_token" value="{{ csrf_token('admin-batch-' ~ crud.entityFqcn) }}">
+                    <button class="btn btn-icon text-danger" title="{{ action.label|trans }}"><i class="fa-solid fa-trash"></i></button>
+                </form>
+            {% elseif entity is defined and entity.id %}
+                {% set href = admin_action_url(action, entity, controller_fqcn) %}
+                {% if href %}
+                    {% set isIconOnly = action.htmlAttributes['tooltip'] is defined %}
+                    <a class="btn {{ isIconOnly ? 'btn-icon' }} {{ action.cssClass }}" href="{{ href }}"
+                       {%- if action.htmlAttributes['target'] is defined %} target="{{ action.htmlAttributes['target'] }}"{% endif %}
+                       {%- if isIconOnly %} title="{{ action.label|trans }}"{% endif %}>
+                        {%- if action.icon -%}<i class="{{ action.icon }}"></i>{%- endif -%}
+                        {%- if not isIconOnly %} {{ action.label|trans }}{% endif -%}
+                    </a>
+                {% endif %}
+            {% endif %}
+        {% endfor %}
+    </div>
 </div>
 {% endblock %}
 
 {% block content %}
 <div class="card">
-    {{ form_start(form, {attr: {class: 'admin-form', novalidate: 'novalidate'}}) }}
+    {{ form_start(form, {attr: {id: 'admin-form', class: 'admin-form', novalidate: 'novalidate'}}) }}
         {{ form_errors(form) }}
         <div class="form-grid">
         {% for child in form %}
@@ -31,41 +73,6 @@
             </div>
         {% endfor %}
         </div>
-        <div class="form-footer">
-            {% for action in actions.getAll(crud.currentPage) %}
-                {% if action.htmlElement == 'button' %}
-                    <button class="btn {{ 'action-save' in action.cssClass ? 'btn-primary' : '' }}" type="submit"
-                            name="{{ action.htmlAttributes.name|default('submit_action') }}" value="{{ action.htmlAttributes.value|default(action.name) }}">
-                        {{ action.label|trans }}
-                    </button>
-                {% elseif action.crudActionName == 'index' %}
-                    <a class="btn" href="{{ admin_url(controller_fqcn, 'index') }}">{{ action.label|trans }}</a>
-                {% elseif action.name == 'delete' and entity is defined and entity.id %}
-                    {# stands OUTSIDE the edit form (rendered after form_end
-                       below would be invalid nesting) - a formaction button
-                       can't be used here since the surrounding form is the
-                       edit form itself, so this navigates via a dedicated
-                       mini-form marker handled after form_end #}
-                {% elseif entity is defined and entity.id %}
-                    {% set href = admin_action_url(action, entity, controller_fqcn) %}
-                    {% if href %}
-                        <a class="btn {{ action.cssClass }}" href="{{ href }}"
-                           {%- if action.htmlAttributes['target'] is defined %} target="{{ action.htmlAttributes['target'] }}"{% endif %}
-                           {%- if action.htmlAttributes['tooltip'] is defined %} title="{{ action.label|trans }}"{% endif %}>
-                            {%- if action.icon -%}<i class="{{ action.icon }}"></i>{%- endif -%}
-                            {%- if action.htmlAttributes['tooltip'] is not defined %} {{ action.label|trans }}{% endif -%}
-                        </a>
-                    {% endif %}
-                {% endif %}
-            {% endfor %}
-        </div>
     {{ form_end(form) }}
-    {% if entity is defined and entity.id and actions.getAll(crud.currentPage)|filter(a => a.name == 'delete')|length > 0 %}
-        <form class="form-footer form-footer-danger" method="post" action="{{ admin_url(controller_fqcn, 'delete', entity.id) }}"
-              data-confirm="{{ 'action.delete_confirm'|trans({}, 'admin') }}">
-            <input type="hidden" name="_token" value="{{ csrf_token('admin-batch-' ~ crud.entityFqcn) }}">
-            <button class="btn text-danger"><i class="fa-solid fa-trash"></i> {{ 'action.delete'|trans({}, 'admin') }}</button>
-        </form>
-    {% endif %}
 </div>
 {% endblock %}
