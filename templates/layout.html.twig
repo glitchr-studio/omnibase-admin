@@ -60,6 +60,7 @@
         .admin-dropdown-menu button:hover, .admin-dropdown-menu a:hover { background: var(--admin-bg); }
         .admin-dropdown-menu button.is-active, .admin-dropdown-menu a.is-active { color: var(--admin-accent); font-weight: 600; }
         .admin-dropdown-menu i { width: 1rem; text-align: center; }
+        .admin-locale-flag { width: 1.15rem; height: .85rem; object-fit: cover; border-radius: 2px; flex-shrink: 0; }
         * { box-sizing: border-box; }
         body { margin: 0; font: 15px/1.5 system-ui, -apple-system, sans-serif; background: var(--admin-bg); color: var(--admin-text); }
         .admin-shell { display: flex; min-height: 100vh; }
@@ -681,7 +682,10 @@
                             </button>
                             <div class="admin-dropdown-menu" role="menu">
                                 {% for locale in availableLocales %}
-                                    <a href="{{ path('_switch_locale', {_locale: locale|lang}) }}" class="{{ locale == app.localizer.locale ? 'is-active' }}">{{ locale|lang_name|capitalize }}</a>
+                                    <a href="{{ path('_switch_locale', {_locale: locale|lang}) }}" class="{{ locale == app.localizer.locale ? 'is-active' }}">
+                                        <img class="admin-locale-flag" alt="{{ locale|country }}" src="{{ asset('bundles/base/images/flags/' ~ (locale|country) ~ '.svg') }}">
+                                        {{ locale|lang_name|capitalize }}
+                                    </a>
                                 {% endfor %}
                             </div>
                         </div>
