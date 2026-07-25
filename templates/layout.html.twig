@@ -262,11 +262,20 @@
            the standard, well-supported way to theme the native button
            itself without replacing the whole control with a JS widget. #}
         form.admin-form input[type=file] { display: flex; align-items: center; gap: .6rem; color: var(--admin-muted); font: inherit; font-size: .85rem; }
+        {# Safari/WebKit only recognizes the vendor-prefixed pseudo-element -
+           the unprefixed ::file-selector-button silently matches nothing
+           there, leaving the native button unstyled. Both rules target the
+           same button; harmless duplication in engines that support both. #}
         form.admin-form input[type=file]::file-selector-button {
             padding: .45rem .9rem; border-radius: 6px; border: 1px solid var(--admin-border);
             background: var(--admin-surface); color: inherit; font: inherit; font-size: .9rem; cursor: pointer;
         }
         form.admin-form input[type=file]::file-selector-button:hover { border-color: var(--admin-accent); color: var(--admin-accent); }
+        form.admin-form input[type=file]::-webkit-file-upload-button {
+            padding: .45rem .9rem; border-radius: 6px; border: 1px solid var(--admin-border);
+            background: var(--admin-surface); color: inherit; font: inherit; font-size: .9rem; cursor: pointer;
+        }
+        form.admin-form input[type=file]::-webkit-file-upload-button:hover { border-color: var(--admin-accent); color: var(--admin-accent); }
         {# A boolean field reads as a toggle switch everywhere else it
            appears (datagrid rows, detail page) but fell back to a tiny bare
            native checkbox here - the one visibly "non-uniform" field in an
