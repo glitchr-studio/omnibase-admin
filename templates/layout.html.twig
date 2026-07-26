@@ -40,8 +40,14 @@
             --admin-text: #e6e8eb; --admin-muted: #8b94a1; --admin-accent: #6ea8fe;
             --admin-danger: #f87171; --admin-success: #4ade80;
         }
+        {# Sticky at top:0 with no shadow, only a 1px border, gave the bar no
+           visual weight of its own - at rest (no scroll needed, the negative
+           margin already pulls it flush with the viewport edge) it read as
+           part of whatever sits above the page rather than page content.
+           A real shadow gives it depth/definition regardless of what's
+           behind/above it. #}
         .admin-topbar { display: flex; align-items: center; gap: 1rem; padding: .6rem .9rem; margin: -1.5rem -2rem 1.25rem; border-bottom: 1px solid var(--admin-border);
-                       position: sticky; top: 0; z-index: 15; background: var(--admin-bg); }
+                       position: sticky; top: 0; z-index: 15; background: var(--admin-bg); box-shadow: 0 2px 6px rgba(0,0,0,.1); }
         .topbar-search { flex: 1; max-width: 420px; display: flex; align-items: center; gap: .5rem; padding: .4rem .8rem; border: 1px solid var(--admin-border);
                          border-radius: 999px; background: var(--admin-surface); color: var(--admin-muted); }
         .topbar-search i { flex: 0 0 auto; }
@@ -106,7 +112,7 @@
            or datagrid, matching production - top offset matches the
            topbar's own rendered height (icon buttons + vertical padding). #}
         .admin-header { display: flex; align-items: center; gap: 1rem; margin: 0 -2rem 1.25rem; padding: 1rem 2rem;
-                        position: sticky; top: 3.3rem; z-index: 14; background: var(--admin-bg); }
+                        position: sticky; top: 3.3rem; z-index: 14; background: var(--admin-bg); box-shadow: 0 2px 4px rgba(0,0,0,.05); }
         .admin-header h1 { margin: 0; font-size: 1.35rem; }
         .admin-header-titles { min-width: 0; }
         .admin-header-subtitle { font-size: .82rem; color: var(--admin-muted); margin-top: .2rem; }
