@@ -32,10 +32,11 @@
                    point, gated on reaching this branch (matches how many
                    widget items there are: one, today) rather than always
                    rendering unconditionally at the top of the page. #}
-                <div class="widget-block {{ widget.hidden ? 'is-hidden' }}" data-sortable-item data-sortable-key="{{ widget.key }}">
+                <div class="widget-block widget-size-{{ widget.size }} {{ widget.hidden ? 'is-hidden' }}" data-sortable-item data-sortable-key="{{ widget.key }}" data-widget-size="{{ widget.size }}">
                     {% if customize_enabled is defined and customize_enabled %}
                         <div class="item-controls widget-controls">
                             <button type="button" class="item-handle" data-sortable-handle title="{{ 'customize.reorder'|trans({}, 'admin') }}"><i class="fa-solid fa-grip-vertical"></i></button>
+                            <button type="button" class="item-resize" data-cycle-size title="{{ 'customize.resize'|trans({}, 'admin') }}"><i class="fa-solid fa-up-right-and-down-left-from-center"></i></button>
                             <button type="button" class="item-toggle" data-toggle-hidden title="{{ 'customize.toggle_visibility'|trans({}, 'admin') }}"><i class="fa-solid fa-eye{{ widget.hidden ? '-slash' }}"></i></button>
                         </div>
                     {% endif %}
@@ -83,10 +84,11 @@
                     {% endif %}
                 </div>
             {% else %}
-                <div class="widget-group card {{ widget.hidden ? 'is-hidden' }}" data-sortable-item data-sortable-key="{{ widget.key }}">
+                <div class="widget-group card widget-size-{{ widget.size }} {{ widget.hidden ? 'is-hidden' }}" data-sortable-item data-sortable-key="{{ widget.key }}" data-widget-size="{{ widget.size }}">
                     {% if customize_enabled is defined and customize_enabled %}
                         <div class="item-controls widget-controls">
                             <button type="button" class="item-handle" data-sortable-handle title="{{ 'customize.reorder'|trans({}, 'admin') }}"><i class="fa-solid fa-grip-vertical"></i></button>
+                            <button type="button" class="item-resize" data-cycle-size title="{{ 'customize.resize'|trans({}, 'admin') }}"><i class="fa-solid fa-up-right-and-down-left-from-center"></i></button>
                             <button type="button" class="item-toggle" data-toggle-hidden title="{{ 'customize.toggle_visibility'|trans({}, 'admin') }}"><i class="fa-solid fa-eye{{ widget.hidden ? '-slash' }}"></i></button>
                         </div>
                     {% endif %}

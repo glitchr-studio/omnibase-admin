@@ -19,6 +19,7 @@ sidebar:
 customize:
     reorder: Glisser pour réorganiser
     toggle_visibility: Afficher/masquer
+    resize: Cliquer pour redimensionner
     done: Terminé
     saved: Mise en page enregistrée.
 

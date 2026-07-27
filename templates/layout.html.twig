@@ -107,9 +107,9 @@
         body.is-customizing .item-controls { display: inline-flex; }
         .admin-menu li { display: flex; align-items: center; justify-content: space-between; }
         .admin-menu li a { flex: 1; }
-        .item-handle, .item-toggle { display: flex; align-items: center; justify-content: center; width: 1.6rem; height: 1.6rem; border: 0; border-radius: 6px;
+        .item-handle, .item-toggle, .item-resize { display: flex; align-items: center; justify-content: center; width: 1.6rem; height: 1.6rem; border: 0; border-radius: 6px;
             background: none; color: var(--admin-muted); cursor: pointer; font-size: .78rem; flex-shrink: 0; }
-        .item-handle:hover, .item-toggle:hover { background: var(--admin-bg); color: var(--admin-text); }
+        .item-handle:hover, .item-toggle:hover, .item-resize:hover { background: var(--admin-bg); color: var(--admin-text); }
         .item-handle { cursor: grab; touch-action: none; }
         body.is-customizing [data-sortable-item] { cursor: default; }
         .is-dragging { opacity: .85; box-shadow: 0 8px 20px rgba(0,0,0,.18); border-radius: 6px; background: var(--admin-surface); }
@@ -356,6 +356,16 @@
         .dashboard-slogan { color: var(--admin-muted); }
         .dashboard-welcome { margin: 0 0 1.25rem 4.5rem; }
         .widget-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1.5rem; }
+        {# Widgets span 1-3 auto-fill tracks (superadmin-adjustable via the
+           resize control in customize mode, persisted like everything else
+           in LayoutConfig). Each widget is also its own CSS containment
+           context, so its content can react to the space IT was actually
+           given rather than just the viewport - see the analytics_card
+           @container rules below for what that unlocks at size 1. #}
+        .widget-block, .widget-group { container-type: inline-size; }
+        .widget-size-2 { grid-column: span 2; }
+        .widget-size-3 { grid-column: span 3; }
+        @media (max-width: 720px) { .widget-size-2, .widget-size-3 { grid-column: span 1 !important; } }
         .widget-group { padding: 1.25rem 1.5rem; }
         .widget-group h2 { margin: .6rem 0 .7rem; font-size: 1.25rem; }
         .widget-icon { font-size: 2rem; }
@@ -376,6 +386,18 @@
         .analytics-stat-change.is-up { color: var(--admin-success); }
         .analytics-stat-change.is-down { color: var(--admin-danger); }
         .analytics-chart-wrap { position: relative; height: 240px; }
+        {# Elementary info only (just the 3 numbers) once the widget is
+           shrunk down to a single grid track - the chart needs real width
+           to be legible and just clips awkwardly otherwise. Queries the
+           widget's own rendered width (container-type: inline-size above),
+           not the viewport, so this reacts to a customize-mode resize the
+           same way it reacts to a narrow screen. #}
+        @container (max-width: 320px) {
+            .analytics-card { padding: 1.1rem; }
+            .analytics-card-header { flex-direction: column; gap: .5rem; }
+            .analytics-stat-row { gap: 1rem; }
+            .analytics-chart-wrap { display: none; }
+        }
         .filter-bar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .75rem; padding: .75rem .9rem; margin-bottom: 1rem;
                       background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: var(--admin-radius); }
         .filter-bar label { display: flex; flex-direction: column; gap: .2rem; font-size: .82rem; color: var(--admin-muted); }
@@ -946,6 +968,22 @@
             if (icon) icon.classList.toggle('fa-eye', !item.classList.contains('is-hidden'));
         });
 
+        // resize cycle - 1 -> 2 -> 3 -> 1 grid-column span, batched the same
+        // way as visibility. A free-drag resize handle would need to measure
+        // the grid's actual track width to snap sensibly; a click-to-cycle
+        // button is the simpler, always-correct alternative and the widget
+        // itself already adapts its content to whatever size it lands on
+        // (see the analytics_card @container rules in the CSS above).
+        document.addEventListener('click', function (e) {
+            var resize = e.target.closest('[data-cycle-size]');
+            if (!resize || !body.classList.contains('is-customizing')) return;
+            var item = resize.closest('[data-sortable-item]');
+            if (!item) return;
+            var next = (parseInt(item.dataset.widgetSize || '1', 10) % 3) + 1;
+            item.className = item.className.replace(/\bwidget-size-\d\b/, 'widget-size-' + next);
+            item.dataset.widgetSize = next;
+        });
+
         function captureLevel(container) {
             var items = [];
             container.querySelectorAll(':scope > [data-sortable-item]').forEach(function (el) {
@@ -953,6 +991,7 @@
                 items.push({
                     key: el.dataset.sortableKey,
                     visible: !el.classList.contains('is-hidden'),
+                    size: parseInt(el.dataset.widgetSize || '1', 10),
                     children: childContainer ? captureLevel(childContainer) : [],
                 });
             });

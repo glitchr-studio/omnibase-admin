@@ -53,6 +53,9 @@ class MenuItem
     /** runtime state, set by the layout arranger - hidden items still render (greyed, in customize mode) so they can be un-hidden */
     protected bool $hidden = false;
 
+    /** Grid column span for dashboard widgets (1-3). Ignored by sidebar items. */
+    protected int $size = 1;
+
     public function __construct(string $type, TranslatableInterface|string|null $label = null, ?string $icon = null)
     {
         $this->type = $type;
@@ -322,6 +325,17 @@ class MenuItem
     public function setHidden(bool $hidden): static
     {
         $this->hidden = $hidden;
+        return $this;
+    }
+
+    public function getSize(): int
+    {
+        return $this->size;
+    }
+
+    public function setSize(int $size): static
+    {
+        $this->size = max(1, min(3, $size));
         return $this;
     }
 }

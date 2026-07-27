@@ -4,20 +4,22 @@ namespace Base\Admin\Layout;
 
 /**
  * One persisted layout: an ordered, hide/show-annotated tree of item keys.
- * Shape: {version, items: [{key, visible, children: [...]}]}. fromArray()
- * is the validation boundary for data coming back out of SettingBag (itself
- * reachable and hand-editable via the generic settings CRUD) - it must
- * never throw or produce something LayoutArranger can't safely consume,
- * no matter how malformed the input.
+ * Shape: {version, items: [{key, visible, size, children: [...]}]}.
+ * fromArray() is the validation boundary for data coming back out of
+ * SettingBag (itself reachable and hand-editable via the generic settings
+ * CRUD) - it must never throw or produce something LayoutArranger can't
+ * safely consume, no matter how malformed the input.
  */
 class LayoutConfig
 {
     private const MAX_DEPTH = 2;
     private const MAX_ITEMS = 500;
+    private const MIN_SIZE = 1;
+    private const MAX_SIZE = 3;
 
     protected int $version = 1;
 
-    /** @var array<int, array{key: string, visible: bool, children: array}> */
+    /** @var array<int, array{key: string, visible: bool, size: int, children: array}> */
     protected array $items = [];
 
     public static function new(): static
@@ -55,9 +57,12 @@ class LayoutConfig
                 continue;
             }
 
+            $size = \is_int($item['size'] ?? null) ? $item['size'] : self::MIN_SIZE;
+
             $sanitized[] = [
                 'key' => $item['key'],
                 'visible' => !\array_key_exists('visible', $item) || (bool) $item['visible'],
+                'size' => max(self::MIN_SIZE, min(self::MAX_SIZE, $size)),
                 'children' => self::sanitizeItems($item['children'] ?? [], $depthRemaining - 1),
             ];
         }

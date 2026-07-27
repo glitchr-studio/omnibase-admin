@@ -138,7 +138,10 @@ abstract class AbstractDashboardController extends AbstractController
      */
     public function configureDashboardBlockItems(): iterable
     {
-        return [MenuItemFactory::block('analytics_card', 'dashboard.analytics_title', 'fa-solid fa-chart-line')];
+        return [
+            MenuItemFactory::block('analytics_card', 'dashboard.analytics_title', 'fa-solid fa-chart-line')
+                ->setSize(3), // chart-heavy by default; superadmins can shrink it in customize mode
+        ];
     }
 
     /**

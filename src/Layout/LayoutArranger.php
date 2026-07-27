@@ -50,6 +50,7 @@ class LayoutArranger
             }
 
             $item->setHidden(!$entry['visible']);
+            $item->setSize($entry['size'] ?? $item->getSize());
             if ([] !== $item->getSubItems()) {
                 $item->setSubItems($this->applyLevel($item->getSubItems(), $entry['children'] ?? []));
             }
@@ -97,6 +98,7 @@ class LayoutArranger
             $captured[] = [
                 'key' => $item->getKey(),
                 'visible' => !$item->isHidden(),
+                'size' => $item->getSize(),
                 'children' => $this->captureLevel($item->getSubItems()),
             ];
         }

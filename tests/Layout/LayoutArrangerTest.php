@@ -98,4 +98,24 @@ class LayoutArrangerTest extends TestCase
 
         $this->assertSame(['a', 'b'], array_map(fn ($i) => $i->getKey(), $result));
     }
+
+    public function testAppliesAStoredSizeAndClampsItToTheValidRange(): void
+    {
+        $a = MenuItem::linkToUrl('A', null, '/a')->setKey('a')->setSize(1);
+
+        $config = LayoutConfig::fromArray(['items' => [['key' => 'a', 'visible' => true, 'size' => 99]]]);
+        $result = $this->arranger->apply([$a], $config);
+
+        $this->assertSame(3, $result[0]->getSize());
+    }
+
+    public function testCaptureThenApplyRoundTripsTheCodeDefinedSize(): void
+    {
+        $a = MenuItem::linkToUrl('A', null, '/a')->setKey('a')->setSize(3);
+
+        $captured = $this->arranger->capture([$a]);
+        $result = $this->arranger->apply([$a], $captured);
+
+        $this->assertSame(3, $result[0]->getSize());
+    }
 }
