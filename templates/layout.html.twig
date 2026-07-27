@@ -193,8 +193,14 @@
         html.is-sidebar-collapsed .section-group > ul .sub { display: list-item; }
         html.is-sidebar-collapsed .section-group > ul a, html.is-sidebar-collapsed .section-group > ul .flyout-heading { justify-content: flex-start; padding: .45rem 1rem; }
         html.is-sidebar-collapsed .section-group > ul a i { margin-right: .3rem; }
-        .flyout-heading { display: none; padding: .3rem 1rem .5rem; font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; color: var(--admin-muted); }
-        html.is-sidebar-collapsed .section-group > ul .flyout-heading { display: block; }
+        {# ".admin-menu li" (0,0,1,1) beats a bare ".flyout-heading" (0,0,1,0)
+           on specificity regardless of source order, so its display:flex
+           was winning over this rule's display:none - the heading rendered
+           in NORMAL expanded mode too, duplicating the section's own label
+           right underneath it. Scoped through .admin-menu li to match or
+           beat that specificity instead of relying on source-order luck. #}
+        .admin-menu li.flyout-heading { display: none; padding: .3rem 1rem .5rem; font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; color: var(--admin-muted); }
+        html.is-sidebar-collapsed .section-group > ul li.flyout-heading { display: block; }
         #admin-sidebar-collapse-toggle i { transition: transform .15s; }
         html.is-sidebar-collapsed #admin-sidebar-collapse-toggle i { transform: rotate(180deg); }
         {# Bottom-right corner grab point, dragged horizontally to grow/shrink
@@ -963,7 +969,13 @@
                        past the icon row reveals it directly. This anchor link is
                        just a shortcut (native in-container anchor scroll, no JS)
                        for anyone who'd rather click than scroll. #}
-                    <a class="admin-icon-btn" href="#admin-sidebar-stats" title="{{ 'sidebar.stats'|trans({}, 'admin') }}">
+                    {# data-skip-hash: belt-and-suspenders alongside transparent.js's
+                       own currentPathname()/currentSearch() fix - stops
+                       Transparent.scrollToHash()'s callback from ever writing
+                       window.location.hash on the nested (opaque-origin) document
+                       at all, so there's nothing for a stray hashchange to
+                       mis-resolve regardless. #}
+                    <a class="admin-icon-btn" href="#admin-sidebar-stats" data-skip-hash="true" title="{{ 'sidebar.stats'|trans({}, 'admin') }}">
                         <i class="fa-solid fa-chart-simple"></i>
                     </a>
                 {% endif %}
