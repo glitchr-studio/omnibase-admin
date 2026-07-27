@@ -76,7 +76,7 @@
            sidebar - including the bottom Système/Rôles/Documentation
            sections - scrolls away with the page instead of staying put. #}
         .admin-aside { width: 230px; flex-shrink: 0; display: flex; flex-direction: column; background: var(--admin-surface); border-right: 1px solid var(--admin-border); padding: 1rem 0;
-                      position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+                      position: sticky; top: 0; height: 100vh; overflow-y: auto; scroll-behavior: smooth; }
         .admin-aside .brand { display: flex; align-items: center; gap: .6rem; padding: 0 1.25rem .9rem; border-bottom: 1px solid var(--admin-border); }
         .admin-aside .brand-logo { width: 2.25rem; height: 2.25rem; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
         .admin-aside .brand-text { display: flex; flex-direction: column; min-width: 0; }
@@ -118,16 +118,16 @@
         .widget-group, .widget-block { position: relative; }
         #admin-customize-done { display: none; }
         body.is-customizing #admin-customize-done { display: inline-flex; }
-        .admin-sidebar-footer { display: flex; align-items: center; justify-content: center; gap: .5rem; padding: .9rem 1.25rem; border-top: 1px solid var(--admin-border); }
-        {# Bottom-anchored trigger: the dropdown must open UPWARD (bottom:
-           100%, not top: 100% like the topbar's identical-looking dropdowns)
-           or it would render off the bottom of the viewport. #}
-        .admin-sidebar-footer .admin-dropdown-menu { top: auto; bottom: calc(100% + .3rem); left: 50%; right: auto; transform: translateX(-50%); }
-        .admin-dropdown-menu-analytics { min-width: 220px; padding: .75rem .9rem; }
-        .admin-dropdown-menu-analytics .admin-analytics { font-size: .8rem; color: var(--admin-muted); }
-        .admin-dropdown-menu-analytics .analytics-window { font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; margin: .5rem 0 .2rem; }
-        .admin-dropdown-menu-analytics .analytics-window:first-child { margin-top: 0; }
-        .admin-dropdown-menu-analytics .row { margin: .1rem 0; }
+        .admin-sidebar-footer { display: flex; align-items: center; justify-content: center; gap: .5rem; padding: .9rem 1.25rem; border-top: 1px solid var(--admin-border); flex-shrink: 0; }
+        {# Real in-flow content below the icon row, not a dropdown: revealed
+           by scrolling .admin-aside itself (it's already overflow-y:auto),
+           the same way the menu above it scrolls if it ever runs long. The
+           footer's #admin-sidebar-stats anchor link just jumps here. #}
+        .admin-sidebar-stats { flex-shrink: 0; padding: .9rem 1.25rem 1.1rem; border-top: 1px solid var(--admin-border); scroll-margin-top: .5rem; }
+        .admin-sidebar-stats .admin-analytics { font-size: .8rem; color: var(--admin-muted); }
+        .admin-sidebar-stats .analytics-window { font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; margin: .5rem 0 .2rem; }
+        .admin-sidebar-stats .analytics-window:first-child { margin-top: 0; }
+        .admin-sidebar-stats .row { margin: .1rem 0; }
         .admin-account { position: relative; }
         .admin-aside .brand[role=button] { cursor: pointer; }
         .admin-aside .brand[role=button]:hover { background: var(--admin-bg); }
@@ -355,7 +355,8 @@
                                 font-size: 1.6rem; border: 1px solid var(--admin-border); border-radius: 12px; background: var(--admin-surface); }
         .dashboard-slogan { color: var(--admin-muted); }
         .dashboard-welcome { margin: 0 0 1.25rem 4.5rem; }
-        .widget-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 2.25rem 1.5rem; padding: 2rem; }
+        .widget-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1.5rem; }
+        .widget-group { padding: 1.25rem 1.5rem; }
         .widget-group h2 { margin: .6rem 0 .7rem; font-size: 1.25rem; }
         .widget-icon { font-size: 2rem; }
         .widget-group ul { list-style: none; margin: 0; padding: 0; }
@@ -364,7 +365,7 @@
         .widget-group li a:hover { color: var(--admin-accent); }
         .widget-group li a i { width: 1.2rem; text-align: center; }
         .widget-group li a .fa-circle-plus { color: var(--admin-accent); }
-        .analytics-card { padding: 1.5rem; margin-bottom: 1.5rem; }
+        .analytics-card { padding: 1.5rem; }
         .analytics-card-header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 1.5rem; margin-bottom: 1.25rem; }
         .analytics-card-header h2 { margin: 0; font-size: 1.1rem; }
         .analytics-stat-row { display: flex; gap: 1.75rem; flex-wrap: wrap; }
@@ -752,43 +753,47 @@
                     <i class="fa-solid fa-house"></i>
                 </a>
                 {% if analyticsItem and not analyticsItem.hidden %}
-                    <div class="admin-icon-dropdown" data-dropdown>
-                        <button type="button" class="admin-icon-btn" aria-haspopup="true" aria-expanded="false" title="{{ 'sidebar.stats'|trans({}, 'admin') }}">
-                            <i class="fa-solid fa-chart-simple"></i>
-                        </button>
-                        <div class="admin-dropdown-menu admin-dropdown-menu-analytics" role="menu">
-                            {# Base\Service\Analytics's page-view/visitor/user counters, via
-                               the Twig functions base-bundle's AnalyticsTwigExtension exposes -
-                               a single summary() call gets every window in one round trip.
-                               Named block (still overridable/reusable by FQCN) defined here,
-                               inside its one actual render point (the stats dropdown), rather
-                               than as a standalone block that would render inline unconditionally -
-                               matches production's layout (home/exit icon row at the sidebar's
-                               bottom-left, no permanently-expanded stats block). #}
-                            {% block analytics_widget %}
-                                {% set stats = analytics_summary() %}
-                                <div class="admin-analytics">
-                                    <div class="analytics-window">{{ 'analytics.today'|trans({}, 'admin') }}</div>
-                                    <div class="row">{{ 'analytics.page_views'|trans({'%count%': stats.today.pageViews}, 'admin') }}</div>
-                                    <div class="row">{{ 'analytics.unique_visitors'|trans({'%count%': stats.today.uniqueVisitors}, 'admin') }}</div>
-                                    {% if stats.today.uniqueUsers > 0 %}
-                                    <div class="row">{{ 'analytics.unique_users'|trans({'%count%': stats.today.uniqueUsers}, 'admin') }}</div>
-                                    {% endif %}
-                                    <div class="analytics-window">{{ 'analytics.last_7_days'|trans({}, 'admin') }}</div>
-                                    <div class="row">{{ 'analytics.page_views'|trans({'%count%': stats['7d'].pageViews}, 'admin') }}</div>
-                                    <div class="row">{{ 'analytics.unique_visitors'|trans({'%count%': stats['7d'].uniqueVisitors}, 'admin') }}</div>
-                                    {% if stats['7d'].uniqueUsers > 0 %}
-                                    <div class="row">{{ 'analytics.unique_users'|trans({'%count%': stats['7d'].uniqueUsers}, 'admin') }}</div>
-                                    {% endif %}
-                                </div>
-                            {% endblock %}
-                        </div>
-                    </div>
+                    {# Not a click-to-open dropdown anymore: the stats panel is real,
+                       in-flow content placed right below this footer, inside the
+                       same scrollable .admin-aside - scrolling the sidebar down
+                       past the icon row reveals it directly. This anchor link is
+                       just a shortcut (native in-container anchor scroll, no JS)
+                       for anyone who'd rather click than scroll. #}
+                    <a class="admin-icon-btn" href="#admin-sidebar-stats" title="{{ 'sidebar.stats'|trans({}, 'admin') }}">
+                        <i class="fa-solid fa-chart-simple"></i>
+                    </a>
                 {% endif %}
                 <a class="admin-icon-btn" href="{{ path('security_logout') }}" title="{{ 'sidebar.exit'|trans({}, 'admin') }}">
                     <i class="fa-solid fa-arrow-right-from-bracket"></i>
                 </a>
             </div>
+            {% if analyticsItem and not analyticsItem.hidden %}
+                <div class="admin-sidebar-stats" id="admin-sidebar-stats">
+                    {# Base\Service\Analytics's page-view/visitor/user counters, via
+                       the Twig functions base-bundle's AnalyticsTwigExtension exposes -
+                       a single summary() call gets every window in one round trip.
+                       Named block (still overridable/reusable by FQCN) defined here,
+                       inside its one actual render point, rather than as a standalone
+                       block that would render inline unconditionally. #}
+                    {% block analytics_widget %}
+                        {% set stats = analytics_summary() %}
+                        <div class="admin-analytics">
+                            <div class="analytics-window">{{ 'analytics.today'|trans({}, 'admin') }}</div>
+                            <div class="row">{{ 'analytics.page_views'|trans({'%count%': stats.today.pageViews}, 'admin') }}</div>
+                            <div class="row">{{ 'analytics.unique_visitors'|trans({'%count%': stats.today.uniqueVisitors}, 'admin') }}</div>
+                            {% if stats.today.uniqueUsers > 0 %}
+                            <div class="row">{{ 'analytics.unique_users'|trans({'%count%': stats.today.uniqueUsers}, 'admin') }}</div>
+                            {% endif %}
+                            <div class="analytics-window">{{ 'analytics.last_7_days'|trans({}, 'admin') }}</div>
+                            <div class="row">{{ 'analytics.page_views'|trans({'%count%': stats['7d'].pageViews}, 'admin') }}</div>
+                            <div class="row">{{ 'analytics.unique_visitors'|trans({'%count%': stats['7d'].uniqueVisitors}, 'admin') }}</div>
+                            {% if stats['7d'].uniqueUsers > 0 %}
+                            <div class="row">{{ 'analytics.unique_users'|trans({'%count%': stats['7d'].uniqueUsers}, 'admin') }}</div>
+                            {% endif %}
+                        </div>
+                    {% endblock %}
+                </div>
+            {% endif %}
         {% endblock %}
     </aside>
     <main class="admin-main">

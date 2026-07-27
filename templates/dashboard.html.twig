@@ -18,8 +18,12 @@
 <p class="dashboard-welcome">{{ 'dashboard.welcome'|trans({}, 'admin') }}</p>
 
 {% if widgets is defined and widgets is not empty %}
-<div class="card">
-    <div class="widget-grid" data-sortable="dashboard">
+{# .widget-grid is a plain grid, not a .card itself - every widget below
+   supplies its OWN single .card (either analytics_card's, or the
+   .widget-group class right below), so nothing is ever a card nested
+   inside another card. New widget types must follow the same rule: one
+   .card per grid item, never a wrapping card around the whole grid. #}
+<div class="widget-grid" data-sortable="dashboard">
         {% for widget in widgets %}
             {% if widget.type == 'block' %}
                 {# blockName-referenced blocks (e.g. analytics_card below)
@@ -79,7 +83,7 @@
                     {% endif %}
                 </div>
             {% else %}
-                <div class="widget-group {{ widget.hidden ? 'is-hidden' }}" data-sortable-item data-sortable-key="{{ widget.key }}">
+                <div class="widget-group card {{ widget.hidden ? 'is-hidden' }}" data-sortable-item data-sortable-key="{{ widget.key }}">
                     {% if customize_enabled is defined and customize_enabled %}
                         <div class="item-controls widget-controls">
                             <button type="button" class="item-handle" data-sortable-handle title="{{ 'customize.reorder'|trans({}, 'admin') }}"><i class="fa-solid fa-grip-vertical"></i></button>
@@ -107,7 +111,6 @@
                 </div>
             {% endif %}
         {% endfor %}
-    </div>
 </div>
 {% elseif quick_access is defined and quick_access is not empty %}
 <div class="card">
