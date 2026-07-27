@@ -125,12 +125,12 @@
         {# Bottom-right corner grab point, dragged horizontally to grow/shrink
            a widget's grid-column span - see the resize drag handler in the
            customize-mode script below for how drag distance maps to size. #}
-        .item-resize-handle { display: none; position: absolute; bottom: 0; right: 0; width: 1.4rem; height: 1.4rem;
+        .item-resize-handle { display: none; position: absolute; bottom: 0; right: 0; width: 1.9rem; height: 1.9rem; z-index: 2;
             align-items: center; justify-content: center; color: var(--admin-muted); cursor: ew-resize; touch-action: none;
-            border-radius: 6px 0 6px 0; }
+            background: var(--admin-bg); border-radius: 8px 0 8px 0; border-top: 1px solid var(--admin-border); border-left: 1px solid var(--admin-border); }
         body.is-customizing .item-resize-handle { display: flex; }
-        .item-resize-handle:hover, .item-resize-handle.is-resizing { background: var(--admin-bg); color: var(--admin-accent); }
-        .item-resize-handle i { font-size: .7rem; }
+        .item-resize-handle:hover, .item-resize-handle.is-resizing { color: var(--admin-accent); border-color: var(--admin-accent); }
+        .item-resize-handle i { font-size: .8rem; }
         .item-handle { cursor: grab; touch-action: none; }
         body.is-customizing [data-sortable-item] { cursor: default; }
         .is-dragging { opacity: .85; box-shadow: 0 8px 20px rgba(0,0,0,.18); border-radius: 6px; background: var(--admin-surface); }
@@ -1032,29 +1032,29 @@
         // then batches into the same "Done" save as reorder/hide.
         var resizing = null;
 
-        function gridColumnWidth(grid) {
-            var cols = getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean);
-            var gap = parseFloat(getComputedStyle(grid).columnGap) || 0;
-            return cols.length ? parseFloat(cols[0]) + gap : grid.clientWidth;
-        }
-
         document.addEventListener('pointerdown', function (e) {
             var handle = e.target.closest('[data-resize-handle]');
             if (!handle || !body.classList.contains('is-customizing')) return;
             var item = handle.closest('[data-sortable-item]');
-            var grid = item && item.closest('[data-sortable]');
-            if (!item || !grid) return;
+            if (!item) return;
 
             e.preventDefault();
             handle.setPointerCapture(e.pointerId);
             handle.classList.add('is-resizing');
+            var startSize = parseInt(item.dataset.widgetSize || '1', 10);
+            // Measured from the widget's OWN current rendered width divided
+            // by how many columns it currently spans, rather than parsing
+            // the grid's computed gridTemplateColumns string - fewer ways
+            // for this to silently come back wrong (e.g. an empty/
+            // unparsed value would previously make every drag a no-op).
+            var columnWidth = item.getBoundingClientRect().width / startSize;
             resizing = {
                 item: item,
                 handle: handle,
                 pointerId: e.pointerId,
                 startX: e.clientX,
-                startSize: parseInt(item.dataset.widgetSize || '1', 10),
-                columnWidth: gridColumnWidth(grid),
+                startSize: startSize,
+                columnWidth: columnWidth || 240,
             };
         });
 
