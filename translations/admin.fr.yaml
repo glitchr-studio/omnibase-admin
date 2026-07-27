@@ -10,6 +10,7 @@ topbar:
     theme_auto: Système
     language: Langue
     customize: Personnaliser la mise en page
+    collapse_sidebar: Réduire le menu latéral
 
 sidebar:
     home: Retour au site

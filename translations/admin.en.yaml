@@ -10,6 +10,7 @@ topbar:
     theme_auto: System
     language: Language
     customize: Customize layout
+    collapse_sidebar: Collapse sidebar
 
 sidebar:
     home: Back to site
