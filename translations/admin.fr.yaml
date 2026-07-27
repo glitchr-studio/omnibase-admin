@@ -118,3 +118,4 @@ analytics:
         14d: 14 jours
         30d: 30 jours
         all: Depuis toujours
+        since_prefix: "Depuis le"

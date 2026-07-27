@@ -1438,6 +1438,14 @@
                 .then(function (data) {
                     if (requestId !== picker._analyticsRequestId) return;
                     if (window.AdminCharts) window.AdminCharts.update(canvas, data);
+                    // "Depuis toujours" only covers days actually tracked, so
+                    // it can show a SHORTER span than "30 jours" (which
+                    // zero-fills days before tracking even began) - a title
+                    // showing the real start date explains why, rather than
+                    // making it look inconsistent or broken.
+                    if (btn.dataset.range === 'all' && btn.dataset.sincePrefix && data.labels && data.labels.length) {
+                        btn.title = btn.dataset.sincePrefix + ' ' + data.labels[0];
+                    }
                     picker.classList.remove('is-loading');
                 })
                 .catch(function () {

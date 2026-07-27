@@ -79,7 +79,7 @@
                                     all: path('admin_analytics_breakdown', {range: 'all'}),
                                 }|json_encode }}">
                                     {% for range in ['today', '7d', '14d', '30d', 'all'] %}
-                                        <button type="button" class="analytics-range-btn {{ range == '14d' ? 'is-active' }}" data-range="{{ range }}">{{ ('analytics.range.' ~ range)|trans({}, 'admin') }}</button>
+                                        <button type="button" class="analytics-range-btn {{ range == '14d' ? 'is-active' }}" data-range="{{ range }}" {% if range == 'all' %}data-since-prefix="{{ 'analytics.range.since_prefix'|trans({}, 'admin') }}"{% endif %}>{{ ('analytics.range.' ~ range)|trans({}, 'admin') }}</button>
                                     {% endfor %}
                                 </div>
                                 <div class="analytics-chart-wrap">

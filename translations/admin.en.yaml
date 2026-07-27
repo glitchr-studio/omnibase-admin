@@ -118,3 +118,4 @@ analytics:
         14d: 14 days
         30d: 30 days
         all: All time
+        since_prefix: "Since"
