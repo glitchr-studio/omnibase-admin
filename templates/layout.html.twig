@@ -1214,6 +1214,15 @@
 
         document.addEventListener('pointerup', function (e) {
             if (!resizing || e.pointerId !== resizing.pointerId) return;
+            // A plain click (negligible movement, size never changed
+            // mid-drag) still cycles the size by one step - so the handle
+            // visibly does SOMETHING on the simplest possible interaction,
+            // not just a drag past the first column-width threshold.
+            if (Math.abs(e.clientX - resizing.startX) < 5 && parseInt(resizing.item.dataset.widgetSize, 10) === resizing.startSize) {
+                var next = (resizing.startSize % 3) + 1;
+                resizing.item.className = resizing.item.className.replace(/\bwidget-size-\d\b/, 'widget-size-' + next);
+                resizing.item.dataset.widgetSize = next;
+            }
             resizing.handle.classList.remove('is-resizing');
             resizing.handle.releasePointerCapture(e.pointerId);
             resizing = null;
