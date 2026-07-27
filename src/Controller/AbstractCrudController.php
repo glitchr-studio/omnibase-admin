@@ -61,7 +61,7 @@ abstract class AbstractCrudController extends AbstractController implements Crud
      * Convention: App\Controller\Admin\Crud\Xxx\YyyCrudController maps to
      * App\Entity\Xxx\Yyy. Override for non-conventional locations.
      */
-    public static array $crudNamespaceCandidates = ['\\Controller\\Crud\\', '\\Controller\\Backoffice\\Crud\\'];
+    public static array $crudNamespaceCandidates = ['\\Controller\\Crud\\', '\\Controller\\Admin\\Crud\\', '\\Controller\\Backoffice\\Crud\\'];
 
     public static function getEntityFqcn(): string
     {
@@ -100,17 +100,35 @@ abstract class AbstractCrudController extends AbstractController implements Crud
             $entityFqcn = substr($entityFqcn, $pos + 8);
         }
 
+        // App\ wins regardless of WHICH namespace candidate it lives under -
+        // check every candidate's App\ variant before falling back to a
+        // Base\/direct match, otherwise an early match on an earlier
+        // candidate (e.g. the bundle's own Base\...\Backoffice\... default)
+        // shadows a real override that only exists under a later candidate
+        // (e.g. an app using \Controller\Admin\Crud\...).
+        $fallback = null;
         foreach (static::$crudNamespaceCandidates as $namespace) {
             $controllerFqcn = str_replace('\\Entity\\', $namespace, $entityFqcn) . 'CrudController';
 
             $appVariant = preg_replace('/^Base\\\\/', 'App\\', $controllerFqcn);
             $baseVariant = preg_replace('/^App\\\\/', 'Base\\', $controllerFqcn);
 
-            foreach (array_unique([$appVariant, $controllerFqcn, $baseVariant]) as $candidate) {
-                if (class_exists($candidate)) {
-                    return $candidate;
+            if (class_exists($appVariant)) {
+                return $appVariant;
+            }
+
+            if (null === $fallback) {
+                foreach (array_unique([$controllerFqcn, $baseVariant]) as $candidate) {
+                    if (class_exists($candidate)) {
+                        $fallback = $candidate;
+                        break;
+                    }
                 }
             }
+        }
+
+        if (null !== $fallback) {
+            return $fallback;
         }
 
         return null !== get_parent_class($entityFqcn) && false !== get_parent_class($entityFqcn)
@@ -607,12 +625,28 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         return $crud;
     }
 
+    protected ?Actions $actionsConfig = null;
+
     protected function getActionsConfig(): Actions
     {
+        if (null !== $this->actionsConfig) {
+            return $this->actionsConfig;
+        }
+
         $actions = $this->configureActions(Actions::new());
+
+        foreach ([Actions::PAGE_INDEX, Actions::PAGE_DETAIL, Actions::PAGE_EDIT, Actions::PAGE_NEW] as $pageName) {
+            foreach ($actions->getAll($pageName) as $actionName => $action) {
+                $permission = $actions->getEffectivePermission($actionName, $action);
+                if (null !== $permission && !$this->isGranted($permission)) {
+                    $actions->remove($pageName, $actionName);
+                }
+            }
+        }
+
         $this->adminContext->setActions($actions);
 
-        return $actions;
+        return $this->actionsConfig = $actions;
     }
 
     /**
@@ -654,8 +688,16 @@ abstract class AbstractCrudController extends AbstractController implements Crud
 
     protected function denyAccessUnlessGrantedToRun(Crud $crud): void
     {
-        // per-action permissions are declared with Actions::setPermission();
-        // entity-level restriction hooks in here later (EA_ACCESS_ENTITY)
+        $entityPermission = $crud->getEntityPermission();
+        if (null !== $entityPermission && !$this->isGranted($entityPermission)) {
+            throw $this->createAccessDeniedException(sprintf('Access to "%s" requires "%s".', static::getEntityFqcn(), $entityPermission));
+        }
+
+        $actionName = $crud->getCurrentAction();
+        $permission = null !== $actionName ? $this->getActionsConfig()->getEffectivePermission($actionName) : null;
+        if (null !== $permission && !$this->isGranted($permission)) {
+            throw $this->createAccessDeniedException(sprintf('"%s" requires "%s".', $actionName, $permission));
+        }
     }
 
     protected function redirectAfterSubmit(Request $request, object $entity): Response
@@ -684,6 +726,7 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         return $this->render($template, $parameters + [
             'admin_context' => $this->adminContext,
             'controller_fqcn' => static::class,
+            'customize_enabled' => $this->isGranted(\Base\Enum\UserRole::SUPERADMIN),
         ]);
     }
 }

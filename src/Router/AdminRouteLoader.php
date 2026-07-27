@@ -65,8 +65,28 @@ class AdminRouteLoader extends Loader
         }
 
         $this->addDashboardRoute($routes, $prefix);
+        $this->addLayoutRoute($routes, $prefix);
 
         return $routes;
+    }
+
+    /**
+     * The superadmin customize-mode save endpoint - see LayoutController.
+     * One route for both scopes (sidebar/dashboard), matching how the CRUD
+     * routes above use a single {entityId} placeholder rather than one
+     * route per entity.
+     */
+    private function addLayoutRoute(RouteCollection $routes, string $prefix): void
+    {
+        $routes->add('admin_layout_save', new Route(
+            $prefix . '/layout/{scope}',
+            ['_controller' => \Base\Admin\Controller\LayoutController::class . '::save'],
+            ['scope' => 'sidebar|dashboard'],
+            [],
+            '',
+            [],
+            ['POST']
+        ));
     }
 
     /**

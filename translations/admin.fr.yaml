@@ -9,6 +9,18 @@ topbar:
     theme_dark: Sombre
     theme_auto: Système
     language: Langue
+    customize: Personnaliser la mise en page
+
+sidebar:
+    home: Retour au site
+    stats: Statistiques
+    exit: Déconnexion
+
+customize:
+    reorder: Glisser pour réorganiser
+    toggle_visibility: Afficher/masquer
+    done: Terminé
+    saved: Mise en page enregistrée.
 
 field:
     translatable: Champ traduisible

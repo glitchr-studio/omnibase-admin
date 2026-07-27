@@ -9,6 +9,18 @@ topbar:
     theme_dark: Dark
     theme_auto: System
     language: Language
+    customize: Customize layout
+
+sidebar:
+    home: Back to site
+    stats: Statistics
+    exit: Sign out
+
+customize:
+    reorder: Drag to reorder
+    toggle_visibility: Show/hide
+    done: Done
+    saved: Layout saved.
 
 field:
     translatable: Translatable field

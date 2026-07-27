@@ -5,6 +5,9 @@ namespace Symfony\Component\DependencyInjection\Loader\Configurator;
 use Base\Admin\Context\AdminContext;
 use Base\Admin\Field\FieldValueResolver;
 use Base\Admin\Form\FieldFormBuilder;
+use Base\Admin\Controller\LayoutController;
+use Base\Admin\Layout\LayoutArranger;
+use Base\Admin\Layout\LayoutStore;
 use Base\Admin\Router\AdminRouteLoader;
 use Base\Admin\Router\AdminRouteRegistry;
 use Base\Admin\Router\AdminUrlGenerator;
@@ -57,6 +60,16 @@ return function (ContainerConfigurator $configurator) {
     $services->set(\Base\Admin\EventSubscriber\NestHeaderSubscriber::class)
         ->tag('kernel.event_subscriber');
 
+    $services->set(LayoutStore::class)
+        ->args([service('setting_bag')]);
+
+    $services->set(LayoutArranger::class);
+
+    $services->set(LayoutController::class)
+        ->args([service(LayoutStore::class)])
+        ->public(true)
+        ->tag('controller.service_arguments');
+
     $services->set(\Base\Admin\Menu\MenuBuilder::class)
         ->args([
             service(AdminRouteRegistry::class),
@@ -64,6 +77,9 @@ return function (ContainerConfigurator $configurator) {
             service('router'),
             service('request_stack'),
             service('translator'),
+            service('security.authorization_checker'),
+            service(LayoutStore::class),
+            service(LayoutArranger::class),
             tagged_iterator('base.admin.dashboard_controller'),
         ]);
 };

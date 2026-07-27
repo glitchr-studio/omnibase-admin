@@ -36,9 +36,23 @@ class Crud
     protected ?string $currentAction = null;
     protected ?string $currentPage = null;
 
+    /** Entity-level access gate (EA_ACCESS_ENTITY-equivalent) - null means anyone with backend access. */
+    protected ?string $entityPermission = null;
+
     public static function new(): static
     {
         return new static();
+    }
+
+    public function getEntityPermission(): ?string
+    {
+        return $this->entityPermission;
+    }
+
+    public function setEntityPermission(?string $entityPermission): static
+    {
+        $this->entityPermission = $entityPermission;
+        return $this;
     }
 
     public function getEntityFqcn(): ?string

@@ -56,4 +56,17 @@ class MenuItem
         return (new Item(Item::TYPE_SUBMENU, $label, $icon))
             ->setUrl($url);
     }
+
+    /**
+     * Renders a Twig block (by name, resolved in the current template
+     * inheritance chain) rather than a link - used for widgets that aren't
+     * navigation, like the analytics chart/stats. Auto-keyed under
+     * "core.<blockName>" so it's orderable/hideable like everything else.
+     */
+    public static function block(string $blockName, TranslatableInterface|string|null $label = null, ?string $icon = null): Item
+    {
+        return (new Item(Item::TYPE_BLOCK, $label, $icon))
+            ->setBlockName($blockName)
+            ->setKey('core.' . $blockName);
+    }
 }

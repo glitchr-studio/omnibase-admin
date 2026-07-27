@@ -19,6 +19,8 @@ class MenuItem
     public const TYPE_URL = 'url';
     public const TYPE_SECTION = 'section';
     public const TYPE_SUBMENU = 'submenu';
+    /** References a Twig block name, rendered via {{ block(item.blockName) }} - no URL. */
+    public const TYPE_BLOCK = 'block';
 
     protected string $type;
     protected TranslatableInterface|string|null $label = null;
@@ -37,6 +39,8 @@ class MenuItem
 
     protected ?string $url = null;
 
+    protected ?string $blockName = null;
+
     /** @var MenuItem[] */
     protected array $subItems = [];
 
@@ -44,6 +48,10 @@ class MenuItem
     protected ?string $linkUrl = null;
     protected bool $selected = false;
     protected bool $expanded = false;
+
+    protected ?string $key = null;
+    /** runtime state, set by the layout arranger - hidden items still render (greyed, in customize mode) so they can be un-hidden */
+    protected bool $hidden = false;
 
     public function __construct(string $type, TranslatableInterface|string|null $label = null, ?string $icon = null)
     {
@@ -105,7 +113,7 @@ class MenuItem
         return $this->permission;
     }
 
-    public function setPermission(string $permission): static
+    public function setPermission(?string $permission): static
     {
         $this->permission = $permission;
         return $this;
@@ -194,6 +202,17 @@ class MenuItem
         return $this;
     }
 
+    public function getBlockName(): ?string
+    {
+        return $this->blockName;
+    }
+
+    public function setBlockName(?string $blockName): static
+    {
+        $this->blockName = $blockName;
+        return $this;
+    }
+
     /**
      * @return MenuItem[]
      */
@@ -254,6 +273,55 @@ class MenuItem
      */
     public function getAsDto(): static
     {
+        return $this;
+    }
+
+    public function setKey(?string $key): static
+    {
+        $this->key = $key;
+        return $this;
+    }
+
+    /**
+     * Stable identity for the persisted layout config (see the customizable
+     * dashboard/sidebar feature). An explicit key wins; otherwise a hash of
+     * the item's structural identity - deliberately NOT positional
+     * (inserting an item elsewhere mustn't renumber everyone else's stored
+     * config) and NOT the raw translated string (translation keys are
+     * locale-stable; routeParameters is included because e.g. a
+     * per-role sidebar shortcut differs from its siblings only by a query
+     * parameter).
+     */
+    public function getKey(): string
+    {
+        if (null !== $this->key) {
+            return $this->key;
+        }
+
+        $label = $this->label;
+        if ($label instanceof TranslatableInterface) {
+            $label = method_exists($label, 'getMessage') ? $label->getMessage() : $label::class;
+        }
+
+        return 'auto.' . substr(sha1(implode('|', [
+            $this->type,
+            $this->entityFqcn ?? '',
+            $this->crudActionName ?? '',
+            $this->routeName ?? '',
+            json_encode($this->routeParameters),
+            $this->url ?? '',
+            \is_string($label) ? $label : '',
+        ])), 0, 12);
+    }
+
+    public function isHidden(): bool
+    {
+        return $this->hidden;
+    }
+
+    public function setHidden(bool $hidden): static
+    {
+        $this->hidden = $hidden;
         return $this;
     }
 }

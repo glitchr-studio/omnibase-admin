@@ -2,6 +2,7 @@
 
 namespace Base\Admin\Config;
 
+use Base\Enum\UserRole;
 use InvalidArgumentException;
 
 use function Symfony\Component\Translation\t;
@@ -24,8 +25,26 @@ class Actions
     /** @var array<string, string[]> page => disabled action names */
     protected array $disabledActions = [];
 
-    /** @var array<string, string> action name => required permission */
+    /** @var array<string, ?string> action name => required permission (explicit null = opted out of the blanket default) */
     protected array $permissions = [];
+
+    /**
+     * Blanket default: every mutating action requires ROLE_SUPERADMIN+ -
+     * plain ROLE_ADMIN (the moderator tier) is backend-accessible but
+     * read-only by default. Reassignable app-wide; per-controller opt-out
+     * via allowAnyoneTo().
+     *
+     * @var array<string, string>
+     */
+    public static array $defaultPermissions = [
+        Action::NEW => UserRole::SUPERADMIN,
+        Action::EDIT => UserRole::SUPERADMIN,
+        Action::DELETE => UserRole::SUPERADMIN,
+        Action::BATCH_DELETE => UserRole::SUPERADMIN,
+        Action::SAVE_AND_RETURN => UserRole::SUPERADMIN,
+        Action::SAVE_AND_CONTINUE => UserRole::SUPERADMIN,
+        Action::SAVE_AND_ADD_ANOTHER => UserRole::SUPERADMIN,
+    ];
 
     public static function new(): static
     {
@@ -86,7 +105,7 @@ class Actions
         return \in_array($actionName, $this->disabledActions[$pageName] ?? [], true);
     }
 
-    public function setPermission(string $actionName, string $permission): static
+    public function setPermission(string $actionName, ?string $permission): static
     {
         $this->permissions[$actionName] = $permission;
         return $this;
@@ -104,6 +123,39 @@ class Actions
     public function getPermission(string $actionName): ?string
     {
         return $this->permissions[$actionName] ?? null;
+    }
+
+    /**
+     * Explicit per-Action permission wins, then a per-Actions override
+     * (set via setPermission()/setPermissions() - an explicit null there
+     * means "opted out", NOT "fall through to the blanket default"), then
+     * the blanket default for that action name, if any.
+     */
+    public function getEffectivePermission(string $actionName, ?Action $action = null): ?string
+    {
+        if (null !== $action && null !== $action->getPermission()) {
+            return $action->getPermission();
+        }
+
+        if (\array_key_exists($actionName, $this->permissions)) {
+            return $this->permissions[$actionName];
+        }
+
+        return static::$defaultPermissions[$actionName] ?? null;
+    }
+
+    /**
+     * Documented per-controller opt-out from the blanket $defaultPermissions,
+     * e.g. ->allowAnyoneTo(Action::EDIT) lets any backend-authenticated user
+     * (including a plain-ROLE_ADMIN moderator) run that action on this CRUD.
+     */
+    public function allowAnyoneTo(string ...$actionNames): static
+    {
+        foreach ($actionNames as $actionName) {
+            $this->permissions[$actionName] = null;
+        }
+
+        return $this;
     }
 
     /**

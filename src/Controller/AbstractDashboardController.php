@@ -3,7 +3,9 @@
 namespace Base\Admin\Controller;
 
 use Base\Admin\Config\Menu\MenuItem;
+use Base\Admin\Config\MenuItem as MenuItemFactory;
 use Base\Admin\Context\AdminContext;
+use Base\Admin\Layout\LayoutScope;
 use Base\Admin\Menu\MenuBuilder;
 use Base\Admin\Router\AdminRouteRegistry;
 use Base\Admin\Router\AdminUrlGenerator;
@@ -49,7 +51,10 @@ abstract class AbstractDashboardController extends AbstractController
         $this->adminContext->setMainMenu($menu);
         $this->adminContext->setUserMenu($this->menuBuilder->resolve($this->toArray($this->configureUserMenu())));
 
-        $widgets = $this->menuBuilder->resolve($this->toArray($this->configureWidgetItems()));
+        $widgets = $this->menuBuilder->resolve(array_merge(
+            $this->toArray($this->configureWidgetItems()),
+            $this->toArray($this->configureDashboardBlockItems()),
+        ), LayoutScope::DASHBOARD);
 
         return $this->render('@Admin/dashboard.html.twig', [
             'admin_context' => $this->adminContext,
@@ -57,6 +62,7 @@ abstract class AbstractDashboardController extends AbstractController
             // flat one-card-per-CRUD fallback, only rendered when no
             // widget groups are configured
             'quick_access' => [] === $widgets ? $this->buildQuickAccess($menu) : [],
+            'customize_enabled' => $this->isGranted(\Base\Enum\UserRole::SUPERADMIN),
         ]);
     }
 
@@ -116,6 +122,37 @@ abstract class AbstractDashboardController extends AbstractController
         return [];
     }
 
+    /**
+     * Non-overridable-in-spirit hook (unlike configureWidgetItems()/
+     * configureMenuAfterItems() above, this one isn't meant to be
+     * reassigned by app subclasses): supplies the dashboard's built-in
+     * block-type widgets (currently just the analytics chart) independently
+     * of whatever the app yields from configureWidgetItems(). Both funnel
+     * through the same resolve(..., LayoutScope::DASHBOARD) call, so a
+     * block is just as orderable/hideable as an app-defined widget group -
+     * but an app whose configureWidgetItems() override doesn't call
+     * parent:: still gets the built-in blocks, because they never went
+     * through that override point to begin with.
+     *
+     * @return iterable<MenuItem>
+     */
+    public function configureDashboardBlockItems(): iterable
+    {
+        return [MenuItemFactory::block('analytics_card', 'dashboard.analytics_title', 'fa-solid fa-chart-line')];
+    }
+
+    /**
+     * Same non-overridable-in-spirit contract as configureDashboardBlockItems(),
+     * for the sidebar: the analytics stats block, rendered as a dropdown
+     * triggered from the sidebar's bottom icon row (see layout.html.twig).
+     *
+     * @return iterable<MenuItem>
+     */
+    public function configureSidebarBlockItems(): iterable
+    {
+        return [MenuItemFactory::block('analytics_widget')];
+    }
+
     // -----------------------------------------------------------------
     // menu / dashboard resolution
     // -----------------------------------------------------------------
@@ -142,7 +179,8 @@ abstract class AbstractDashboardController extends AbstractController
             $this->toArray($this->configureMenuBeforeItems()),
             $this->toArray($this->configureMenuItems()),
             $this->toArray($this->configureMenuAfterItems()),
-        ));
+            $this->toArray($this->configureSidebarBlockItems()),
+        ), LayoutScope::SIDEBAR);
     }
 
     /**

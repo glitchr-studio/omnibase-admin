@@ -95,6 +95,39 @@
         .admin-menu .selected > a { border-left-color: var(--admin-accent); color: var(--admin-accent); font-weight: 600; }
         .admin-menu a i { width: 1.1rem; text-align: center; margin-right: .3rem; }
         .admin-menu .sub a { padding-left: 2.75rem; font-size: .92rem; }
+        .admin-menu li.is-hidden, .widget-group.is-hidden, .widget-block.is-hidden { display: none; }
+        body.is-customizing .admin-menu li.is-hidden, body.is-customizing .widget-group.is-hidden, body.is-customizing .widget-block.is-hidden {
+            display: block; opacity: .45;
+        }
+        {# Handle/toggle controls: invisible and inert outside customize
+           mode (not just hidden - the drag handle must not intercept
+           clicks or show a grab cursor on a normal page). #}
+        #admin-customize-toggle.is-active { color: var(--admin-accent); border-color: var(--admin-accent); background: var(--admin-surface); }
+        .item-controls { display: none; align-items: center; gap: .3rem; }
+        body.is-customizing .item-controls { display: inline-flex; }
+        .admin-menu li { display: flex; align-items: center; justify-content: space-between; }
+        .admin-menu li a { flex: 1; }
+        .item-handle, .item-toggle { display: flex; align-items: center; justify-content: center; width: 1.6rem; height: 1.6rem; border: 0; border-radius: 6px;
+            background: none; color: var(--admin-muted); cursor: pointer; font-size: .78rem; flex-shrink: 0; }
+        .item-handle:hover, .item-toggle:hover { background: var(--admin-bg); color: var(--admin-text); }
+        .item-handle { cursor: grab; touch-action: none; }
+        body.is-customizing [data-sortable-item] { cursor: default; }
+        .is-dragging { opacity: .85; box-shadow: 0 8px 20px rgba(0,0,0,.18); border-radius: 6px; background: var(--admin-surface); }
+        .is-sortable-placeholder { border: 2px dashed var(--admin-border); border-radius: 6px; margin: .15rem 0; }
+        .widget-controls { position: absolute; top: .6rem; right: .6rem; }
+        .widget-group, .widget-block { position: relative; }
+        #admin-customize-done { display: none; }
+        body.is-customizing #admin-customize-done { display: inline-flex; }
+        .admin-sidebar-footer { display: flex; align-items: center; justify-content: center; gap: .5rem; padding: .9rem 1.25rem; border-top: 1px solid var(--admin-border); }
+        {# Bottom-anchored trigger: the dropdown must open UPWARD (bottom:
+           100%, not top: 100% like the topbar's identical-looking dropdowns)
+           or it would render off the bottom of the viewport. #}
+        .admin-sidebar-footer .admin-dropdown-menu { top: auto; bottom: calc(100% + .3rem); left: 50%; right: auto; transform: translateX(-50%); }
+        .admin-dropdown-menu-analytics { min-width: 220px; padding: .75rem .9rem; }
+        .admin-dropdown-menu-analytics .admin-analytics { font-size: .8rem; color: var(--admin-muted); }
+        .admin-dropdown-menu-analytics .analytics-window { font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; margin: .5rem 0 .2rem; }
+        .admin-dropdown-menu-analytics .analytics-window:first-child { margin-top: 0; }
+        .admin-dropdown-menu-analytics .row { margin: .1rem 0; }
         .admin-account { position: relative; }
         .admin-aside .brand[role=button] { cursor: pointer; }
         .admin-aside .brand[role=button]:hover { background: var(--admin-bg); }
@@ -102,10 +135,6 @@
         .admin-account.is-open .brand .account-caret { transform: rotate(180deg); }
         .admin-account .admin-dropdown-menu { left: 1.25rem; right: 1.25rem; top: calc(100% - .3rem); }
         .admin-usermenu a i { width: 1.1rem; text-align: center; }
-        .admin-analytics { padding: .75rem 1.25rem; border-top: 1px solid var(--admin-border); font-size: .8rem; color: var(--admin-muted); }
-        .admin-analytics .analytics-window { font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; margin: .5rem 0 .2rem; }
-        .admin-analytics .analytics-window:first-child { margin-top: 0; }
-        .admin-analytics .row { margin: .1rem 0; }
         .admin-main { flex: 1; padding: 1.5rem 2rem; min-width: 0; }
         {# sticks right under the topbar (itself sticky at top:0) so the
            title/entity-actions stay reachable while scrolling a long form
@@ -449,6 +478,10 @@
         <link rel="stylesheet" href="{{ asset('bundles/admin/css/transparent.css') }}">
         <script src="{{ asset('bundles/admin/js/jquery.min.js') }}"></script>
         <script src="{{ asset('bundles/admin/js/transparent.js') }}"></script>
+        {% if customize_enabled is defined and customize_enabled %}
+            {# Superadmin-only download - moderators/admins never fetch this. #}
+            <script src="{{ asset('bundles/admin/js/sticky-sortable.js') }}"></script>
+        {% endif %}
         <script>
             // Transparent.ready() was NEVER being called here - meaning
             // `isReady` stayed false forever, and __main__'s early-return
@@ -680,13 +713,29 @@
         </div>
         {% block main_menu %}
             {% if admin_context is defined and admin_context.mainMenu is not empty %}
-            <ul class="admin-menu">
+            <ul class="admin-menu" data-sortable="sidebar">
                 {% for item in admin_context.mainMenu %}
-                    {% if item.section %}
-                        <li class="section">{{ item.label|trans({}, 'admin') }}</li>
+                    {% if item.type == 'block' %}
+                        {# rendered separately, in the bottom icon row below - not a navigable link #}
+                    {% elseif item.section %}
+                        <li class="section {{ item.hidden ? 'is-hidden' }}" data-sortable-item data-sortable-key="{{ item.key }}">
+                            {{ item.label|trans({}, 'admin') }}
+                            {% if customize_enabled is defined and customize_enabled %}
+                                <span class="item-controls">
+                                    <button type="button" class="item-handle" data-sortable-handle title="{{ 'customize.reorder'|trans({}, 'admin') }}"><i class="fa-solid fa-grip-vertical"></i></button>
+                                    <button type="button" class="item-toggle" data-toggle-hidden title="{{ 'customize.toggle_visibility'|trans({}, 'admin') }}"><i class="fa-solid fa-eye{{ item.hidden ? '-slash' }}"></i></button>
+                                </span>
+                            {% endif %}
+                        </li>
                     {% else %}
-                        <li class="{{ item.selected ? 'selected' }}">
+                        <li class="{{ item.selected ? 'selected' }} {{ item.hidden ? 'is-hidden' }}" data-sortable-item data-sortable-key="{{ item.key }}">
                             <a href="{{ item.linkUrl ?? '#' }}"{% if item.linkTarget %} target="{{ item.linkTarget }}"{% endif %}>{% if item.icon %}<i class="{{ item.icon }}"></i> {% endif %}{{ item.label|trans({}, 'admin') }}</a>
+                            {% if customize_enabled is defined and customize_enabled %}
+                                <span class="item-controls">
+                                    <button type="button" class="item-handle" data-sortable-handle title="{{ 'customize.reorder'|trans({}, 'admin') }}"><i class="fa-solid fa-grip-vertical"></i></button>
+                                    <button type="button" class="item-toggle" data-toggle-hidden title="{{ 'customize.toggle_visibility'|trans({}, 'admin') }}"><i class="fa-solid fa-eye{{ item.hidden ? '-slash' }}"></i></button>
+                                </span>
+                            {% endif %}
                         </li>
                         {% for subItem in item.subItems %}
                             <li class="{{ subItem.selected ? 'selected' }} sub"><a href="{{ subItem.linkUrl ?? '#' }}">{% if subItem.icon %}<i class="{{ subItem.icon }}"></i> {% endif %}{{ subItem.label|trans({}, 'admin') }}</a></li>
@@ -696,24 +745,49 @@
             </ul>
             {% endif %}
         {% endblock %}
-        {# Base\Service\Analytics's page-view/visitor/user counters, via the
-           Twig functions base-bundle's AnalyticsTwigExtension exposes - a
-           single summary() call gets every window in one round trip. #}
-        {% block analytics_widget %}
-            {% set stats = analytics_summary() %}
-            <div class="admin-analytics">
-                <div class="analytics-window">{{ 'analytics.today'|trans({}, 'admin') }}</div>
-                <div class="row">{{ 'analytics.page_views'|trans({'%count%': stats.today.pageViews}, 'admin') }}</div>
-                <div class="row">{{ 'analytics.unique_visitors'|trans({'%count%': stats.today.uniqueVisitors}, 'admin') }}</div>
-                {% if stats.today.uniqueUsers > 0 %}
-                <div class="row">{{ 'analytics.unique_users'|trans({'%count%': stats.today.uniqueUsers}, 'admin') }}</div>
+        {% block sidebar_footer %}
+            {% set analyticsItem = admin_context is defined ? (admin_context.mainMenu|filter(i => i.type == 'block' and i.blockName == 'analytics_widget')|first) : null %}
+            <div class="admin-sidebar-footer">
+                <a class="admin-icon-btn" href="/" title="{{ 'sidebar.home'|trans({}, 'admin') }}">
+                    <i class="fa-solid fa-house"></i>
+                </a>
+                {% if analyticsItem and not analyticsItem.hidden %}
+                    <div class="admin-icon-dropdown" data-dropdown>
+                        <button type="button" class="admin-icon-btn" aria-haspopup="true" aria-expanded="false" title="{{ 'sidebar.stats'|trans({}, 'admin') }}">
+                            <i class="fa-solid fa-chart-simple"></i>
+                        </button>
+                        <div class="admin-dropdown-menu admin-dropdown-menu-analytics" role="menu">
+                            {# Base\Service\Analytics's page-view/visitor/user counters, via
+                               the Twig functions base-bundle's AnalyticsTwigExtension exposes -
+                               a single summary() call gets every window in one round trip.
+                               Named block (still overridable/reusable by FQCN) defined here,
+                               inside its one actual render point (the stats dropdown), rather
+                               than as a standalone block that would render inline unconditionally -
+                               matches production's layout (home/exit icon row at the sidebar's
+                               bottom-left, no permanently-expanded stats block). #}
+                            {% block analytics_widget %}
+                                {% set stats = analytics_summary() %}
+                                <div class="admin-analytics">
+                                    <div class="analytics-window">{{ 'analytics.today'|trans({}, 'admin') }}</div>
+                                    <div class="row">{{ 'analytics.page_views'|trans({'%count%': stats.today.pageViews}, 'admin') }}</div>
+                                    <div class="row">{{ 'analytics.unique_visitors'|trans({'%count%': stats.today.uniqueVisitors}, 'admin') }}</div>
+                                    {% if stats.today.uniqueUsers > 0 %}
+                                    <div class="row">{{ 'analytics.unique_users'|trans({'%count%': stats.today.uniqueUsers}, 'admin') }}</div>
+                                    {% endif %}
+                                    <div class="analytics-window">{{ 'analytics.last_7_days'|trans({}, 'admin') }}</div>
+                                    <div class="row">{{ 'analytics.page_views'|trans({'%count%': stats['7d'].pageViews}, 'admin') }}</div>
+                                    <div class="row">{{ 'analytics.unique_visitors'|trans({'%count%': stats['7d'].uniqueVisitors}, 'admin') }}</div>
+                                    {% if stats['7d'].uniqueUsers > 0 %}
+                                    <div class="row">{{ 'analytics.unique_users'|trans({'%count%': stats['7d'].uniqueUsers}, 'admin') }}</div>
+                                    {% endif %}
+                                </div>
+                            {% endblock %}
+                        </div>
+                    </div>
                 {% endif %}
-                <div class="analytics-window">{{ 'analytics.last_7_days'|trans({}, 'admin') }}</div>
-                <div class="row">{{ 'analytics.page_views'|trans({'%count%': stats['7d'].pageViews}, 'admin') }}</div>
-                <div class="row">{{ 'analytics.unique_visitors'|trans({'%count%': stats['7d'].uniqueVisitors}, 'admin') }}</div>
-                {% if stats['7d'].uniqueUsers > 0 %}
-                <div class="row">{{ 'analytics.unique_users'|trans({'%count%': stats['7d'].uniqueUsers}, 'admin') }}</div>
-                {% endif %}
+                <a class="admin-icon-btn" href="{{ path('security_logout') }}" title="{{ 'sidebar.exit'|trans({}, 'admin') }}">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                </a>
             </div>
         {% endblock %}
     </aside>
@@ -758,6 +832,12 @@
                                 {% endfor %}
                             </div>
                         </div>
+                    {% endif %}
+                    {% if is_granted('ROLE_SUPERADMIN') %}
+                        <button type="button" class="admin-icon-btn" id="admin-customize-toggle" title="{{ 'topbar.customize'|trans({}, 'admin') }}" aria-pressed="false">
+                            <i class="fa-solid fa-arrows-up-down-left-right"></i>
+                        </button>
+                        <button type="button" class="btn btn-primary" id="admin-customize-done" data-csrf-token="{{ csrf_token('admin-layout') }}">{{ 'customize.done'|trans({}, 'admin') }}</button>
                     {% endif %}
                 </div>
             </div>
@@ -818,6 +898,101 @@
         });
     })();
 </script>
+{% if customize_enabled is defined and customize_enabled %}
+<script>
+    (function () {
+        var STORAGE_KEY = 'admin-customizing';
+        var body = document.body;
+        var toggleBtn = document.getElementById('admin-customize-toggle');
+        var doneBtn = document.getElementById('admin-customize-done');
+        var sortablesInitialized = false;
+
+        function setCustomizing(on) {
+            body.classList.toggle('is-customizing', on);
+            if (toggleBtn) toggleBtn.classList.toggle('is-active', on);
+            if (toggleBtn) toggleBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+            try { localStorage.setItem(STORAGE_KEY, on ? '1' : '0'); } catch (e) {}
+            if (on) initSortables();
+        }
+
+        function initSortables() {
+            if (sortablesInitialized || typeof window.StickySortable === 'undefined' || typeof $ === 'undefined') return;
+            sortablesInitialized = true;
+            $('[data-sortable]').stickySortable({ handle: '[data-sortable-handle]' });
+        }
+
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', function () {
+                setCustomizing(!body.classList.contains('is-customizing'));
+            });
+        }
+
+        // hide/show toggle - flips the class + icon only, batched to the
+        // server on "Done" (SettingBag::set() invalidates the whole
+        // compiled settings snapshot per call - one save, not one per click).
+        document.addEventListener('click', function (e) {
+            var toggle = e.target.closest('[data-toggle-hidden]');
+            if (!toggle || !body.classList.contains('is-customizing')) return;
+            var item = toggle.closest('[data-sortable-item]');
+            if (!item) return;
+            item.classList.toggle('is-hidden');
+            var icon = toggle.querySelector('i');
+            if (icon) icon.classList.toggle('fa-eye-slash', item.classList.contains('is-hidden'));
+            if (icon) icon.classList.toggle('fa-eye', !item.classList.contains('is-hidden'));
+        });
+
+        function captureLevel(container) {
+            var items = [];
+            container.querySelectorAll(':scope > [data-sortable-item]').forEach(function (el) {
+                var childContainer = el.querySelector(':scope > [data-sortable]');
+                items.push({
+                    key: el.dataset.sortableKey,
+                    visible: !el.classList.contains('is-hidden'),
+                    children: childContainer ? captureLevel(childContainer) : [],
+                });
+            });
+            return items;
+        }
+
+        // path() validates route requirements (scope: sidebar|dashboard) at
+        // render time - a placeholder value wouldn't match the pattern and
+        // would throw, so both real URLs are generated server-side and
+        // looked up by scope name client-side, rather than building one
+        // templated URL string and substituting into it.
+        var LAYOUT_SAVE_URLS = {
+            sidebar: '{{ path("admin_layout_save", {scope: "sidebar"}) }}',
+            dashboard: '{{ path("admin_layout_save", {scope: "dashboard"}) }}',
+        };
+
+        function saveScope(scope, container) {
+            return fetch(LAYOUT_SAVE_URLS[scope], {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': doneBtn.dataset.csrfToken },
+                body: JSON.stringify({ version: 1, items: captureLevel(container) }),
+            });
+        }
+
+        if (doneBtn) {
+            doneBtn.addEventListener('click', function () {
+                var saves = [];
+                document.querySelectorAll('[data-sortable="sidebar"]').forEach(function (el) { saves.push(saveScope('sidebar', el)); });
+                document.querySelectorAll('[data-sortable="dashboard"]').forEach(function (el) { saves.push(saveScope('dashboard', el)); });
+
+                Promise.all(saves).then(function () {
+                    setCustomizing(false);
+                    window.location.reload();
+                }).catch(function () {
+                    // leave customize mode open so nothing is silently lost
+                });
+            });
+        }
+
+        var wasCustomizing = false;
+        try { wasCustomizing = localStorage.getItem(STORAGE_KEY) === '1'; } catch (e) {}
+        if (wasCustomizing) setCustomizing(true);
+    })();
+</script>
+{% endif %}
 {% block body_javascript %}{% endblock %}
 {# NOT calling parent.Transparent.notifyNestReady() here (tried it,
    reverted - see git history / transparent.js's mount()). A plain

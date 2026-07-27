@@ -5,10 +5,14 @@ namespace Base\Admin\Menu;
 use Base\Admin\Config\Menu\MenuItem;
 use Base\Admin\Config\MenuItem as MenuItemFactory;
 use Base\Admin\Controller\CrudControllerInterface;
+use Base\Admin\Layout\LayoutArranger;
+use Base\Admin\Layout\LayoutScope;
+use Base\Admin\Layout\LayoutStore;
 use Base\Admin\Router\AdminRouteRegistry;
 use Base\Admin\Router\AdminUrlGenerator;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
+use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
@@ -27,6 +31,9 @@ class MenuBuilder
         protected readonly UrlGeneratorInterface $urlGenerator,
         protected readonly RequestStack $requestStack,
         protected readonly TranslatorInterface $translator,
+        protected readonly AuthorizationCheckerInterface $authorizationChecker,
+        protected readonly LayoutStore $layoutStore,
+        protected readonly LayoutArranger $layoutArranger,
         protected readonly iterable $dashboardControllers = [],
     ) {
     }
@@ -56,7 +63,7 @@ class MenuBuilder
             }
         }
 
-        return $this->resolve($items);
+        return $this->resolve($items, LayoutScope::SIDEBAR);
     }
 
     /**
@@ -84,15 +91,61 @@ class MenuBuilder
      * @param iterable<MenuItem> $items
      * @return MenuItem[]
      */
-    public function resolve(iterable $items): array
+    /**
+     * @param iterable<MenuItem> $items
+     * @param string|null $layoutScope pass a LayoutScope::* constant to
+     *        apply the superadmin-customized order/visibility on top of the
+     *        code-defined items (see the customizable dashboard/sidebar
+     *        feature) - null (the default) skips this entirely, so every
+     *        pre-existing caller of resolve() is unaffected.
+     * @return MenuItem[]
+     */
+    public function resolve(iterable $items, ?string $layoutScope = null): array
     {
         $items = is_array($items) ? $items : iterator_to_array($items, false);
+        $items = $this->filterGranted($items);
         foreach ($items as $item) {
             $this->resolveUrl($item);
+        }
+        if (null !== $layoutScope) {
+            $items = $this->layoutArranger->apply($items, $this->layoutStore->get($layoutScope));
         }
         $this->markSelected($items);
 
         return $items;
+    }
+
+    /**
+     * Drops items whose declared permission isn't granted to the current
+     * user, recursing into sub-items first - a section/submenu left with
+     * nothing after its children are filtered is dropped too, rather than
+     * showing an orphaned header.
+     *
+     * @param MenuItem[] $items
+     * @return MenuItem[]
+     */
+    protected function filterGranted(array $items): array
+    {
+        $result = [];
+        foreach ($items as $item) {
+            $permission = $item->getPermission();
+            if (null !== $permission && !$this->authorizationChecker->isGranted($permission)) {
+                continue;
+            }
+
+            $subItems = $item->getSubItems();
+            if ([] !== $subItems) {
+                $subItems = $this->filterGranted($subItems);
+                if ([] === $subItems && ($item->isSection() || $item->isSubMenu())) {
+                    continue;
+                }
+                $item->setSubItems($subItems);
+            }
+
+            $result[] = $item;
+        }
+
+        return $result;
     }
 
     protected function resolveUrl(MenuItem $item): void
