@@ -58,15 +58,29 @@ class MenuItem
     }
 
     /**
-     * Renders a Twig block (by name, resolved in the current template
-     * inheritance chain) rather than a link - used for widgets that aren't
-     * navigation, like the analytics chart/stats. Auto-keyed under
-     * "core.<blockName>" so it's orderable/hideable like everything else.
+     * References a registered DashboardWidgetTypeInterface (by name) rather
+     * than a link - used for widgets that aren't navigation, like the
+     * analytics chart/stats. Auto-keyed under "core.<blockName>" so it's
+     * orderable/hideable like everything else.
+     *
+     * $instanceKey lets the SAME widget type be used more than once with
+     * independent hide/order/size state - e.g. two analytics_card
+     * instances showing different windows via $params:
+     *   MenuItem::block('analytics_card', 'dashboard.analytics_title', 'fa-solid fa-chart-line')
+     *   MenuItem::block('analytics_card', 'Last 30 days', 'fa-solid fa-chart-line', '30d', ['days' => 30])
+     * Left null, the key is byte-for-byte "core.<blockName>" exactly as
+     * before - every existing call site is unaffected.
      */
-    public static function block(string $blockName, TranslatableInterface|string|null $label = null, ?string $icon = null): Item
-    {
+    public static function block(
+        string $blockName,
+        TranslatableInterface|string|null $label = null,
+        ?string $icon = null,
+        ?string $instanceKey = null,
+        array $params = [],
+    ): Item {
         return (new Item(Item::TYPE_BLOCK, $label, $icon))
             ->setBlockName($blockName)
-            ->setKey('core.' . $blockName);
+            ->setParams($params)
+            ->setKey('core.' . $blockName . (null !== $instanceKey ? '.' . $instanceKey : ''));
     }
 }

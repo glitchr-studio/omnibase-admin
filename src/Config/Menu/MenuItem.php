@@ -19,7 +19,7 @@ class MenuItem
     public const TYPE_URL = 'url';
     public const TYPE_SECTION = 'section';
     public const TYPE_SUBMENU = 'submenu';
-    /** References a Twig block name, rendered via {{ block(item.blockName) }} - no URL. */
+    /** References a registered DashboardWidgetTypeInterface by name - no URL. See Base\Admin\Widget\DashboardWidgetTypeRegistry. */
     public const TYPE_BLOCK = 'block';
 
     protected string $type;
@@ -40,6 +40,15 @@ class MenuItem
     protected ?string $url = null;
 
     protected ?string $blockName = null;
+
+    /**
+     * Instance-specific config for a block-type widget (e.g. which metric/
+     * window a given analytics_card instance shows) - passed straight
+     * through to DashboardWidgetTypeInterface::getTemplateVars(). Not
+     * persisted by LayoutConfig: this is code-defined content, same
+     * category as label/icon, not superadmin-customizable state.
+     */
+    protected array $params = [];
 
     /** @var MenuItem[] */
     protected array $subItems = [];
@@ -213,6 +222,17 @@ class MenuItem
     public function setBlockName(?string $blockName): static
     {
         $this->blockName = $blockName;
+        return $this;
+    }
+
+    public function getParams(): array
+    {
+        return $this->params;
+    }
+
+    public function setParams(array $params): static
+    {
+        $this->params = $params;
         return $this;
     }
 

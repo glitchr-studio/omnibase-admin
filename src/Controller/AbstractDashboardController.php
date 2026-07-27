@@ -115,6 +115,18 @@ abstract class AbstractDashboardController extends AbstractController
      *         MenuItem::linkToCrud(Article::class, 'menu.item.articles', 'fa-solid fa-plus-circle')->setCrudAction('new'),
      *     ]);
      *
+     * MenuItem::block() also works here - not just in
+     * configureDashboardBlockItems() - so an app can add MORE block-type
+     * widgets alongside its link-list groups: another instance of a
+     * built-in type (e.g. a second analytics_card with different params),
+     * or an app-defined DashboardWidgetTypeInterface implementation
+     * (register it as a normal autoconfigured service, no Twig changes
+     * needed - see Base\Admin\Widget\DashboardWidgetTypeRegistry). The
+     * $instanceKey argument keeps each instance's hide/order/size state
+     * independent:
+     *
+     *     yield MenuItem::block('analytics_card', 'Last 30 days', 'fa-solid fa-chart-line', '30d', ['days' => 30]);
+     *
      * @return iterable<MenuItem>
      */
     public function configureWidgetItems(): iterable

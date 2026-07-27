@@ -1,0 +1,55 @@
+{# Rendered via Base\Admin\Widget\AnalyticsCardWidgetType - 'series'/'change'
+   arrive as template vars (getTemplateVars()), not fetched here, so this
+   template stays agnostic of the data source and reusable across multiple
+   analytics_card instances with different params (see MenuItem::block()'s
+   $instanceKey/$params). #}
+{% set labels = {
+    pageViews: 'analytics.label.page_views'|trans({}, 'admin'),
+    uniqueVisitors: 'analytics.label.unique_visitors'|trans({}, 'admin'),
+    uniqueUsers: 'analytics.label.unique_users'|trans({}, 'admin'),
+} %}
+{% set colors = { pageViews: '#2563eb', uniqueVisitors: '#16a34a', uniqueUsers: '#dc2626' } %}
+<div class="card analytics-card">
+    <div class="analytics-card-header">
+        <h2>{{ widget.label|trans({}, 'admin') }}</h2>
+        <div class="analytics-stat-row">
+            {% for key in ['pageViews', 'uniqueVisitors', 'uniqueUsers'] %}
+                <div class="analytics-stat">
+                    <span class="analytics-stat-value">
+                        {{ series|reduce((carry, day) => carry + day[key], 0) }}
+                        {%- if change[key] is not null %}
+                            <span class="analytics-stat-change {{ change[key] >= 0 ? 'is-up' : 'is-down' }}">
+                                {{ change[key] >= 0 ? '+' : '' }}{{ change[key] }}%
+                            </span>
+                        {% endif %}
+                    </span>
+                    <span class="analytics-stat-label">{{ labels[key] }}</span>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+    {# Range picker only swaps the chart below - the stat row above stays
+       a fixed "this week vs last week" summary regardless of which window
+       the chart is showing, so the two never contradict each other. #}
+    <div class="analytics-range-picker" data-analytics-range-picker data-analytics-endpoints="{{ {
+        today: path('admin_analytics_breakdown', {range: 'today'}),
+        '7d': path('admin_analytics_breakdown', {range: '7d'}),
+        '14d': path('admin_analytics_breakdown', {range: '14d'}),
+        '30d': path('admin_analytics_breakdown', {range: '30d'}),
+        all: path('admin_analytics_breakdown', {range: 'all'}),
+    }|json_encode }}">
+        {% for range in ['today', '7d', '14d', '30d', 'all'] %}
+            <button type="button" class="analytics-range-btn {{ range == '14d' ? 'is-active' }}" data-range="{{ range }}" {% if range == 'all' %}data-since-prefix="{{ 'analytics.range.since_prefix'|trans({}, 'admin') }}"{% endif %}>{{ ('analytics.range.' ~ range)|trans({}, 'admin') }}</button>
+        {% endfor %}
+    </div>
+    <div class="analytics-chart-wrap">
+        <canvas data-admin-chart="{{ {
+            labels: series|map(day => day.date|date('d/m')),
+            datasets: ['pageViews', 'uniqueVisitors', 'uniqueUsers']|map(key => {
+                label: labels[key],
+                data: series|map(day => day[key]),
+                color: colors[key],
+            }),
+        }|json_encode }}"></canvas>
+    </div>
+</div>

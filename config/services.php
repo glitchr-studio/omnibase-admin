@@ -13,6 +13,7 @@ use Base\Admin\Router\AdminRouteLoader;
 use Base\Admin\Router\AdminRouteRegistry;
 use Base\Admin\Router\AdminUrlGenerator;
 use Base\Admin\Security\SecurityVoter;
+use Base\Admin\Widget\DashboardWidgetTypeRegistry;
 
 /*
  * This file is part of the Glitchr package.
@@ -91,6 +92,23 @@ return function (ContainerConfigurator $configurator) {
         ->call('setContainer', [service('service_container')])
         ->public(true)
         ->tag('controller.service_arguments');
+
+    // Built-in widget types registered here don't get auto-tagged by
+    // AdminBundle's registerForAutoconfiguration() - that's an
+    // autoconfigure-only mechanism and this file sets autoconfigure(false)
+    // file-wide (same gotcha class as LayoutController/AnalyticsController's
+    // setContainer() above). An app-defined widget type needs no such
+    // thing - its own autoconfigured services pick up the tag for free.
+    $services->set(\Base\Admin\Widget\AnalyticsCardWidgetType::class)
+        ->args([service(\Base\Service\Analytics::class)])
+        ->tag('base.admin.dashboard_widget_type');
+
+    $services->set(DashboardWidgetTypeRegistry::class)
+        ->args([tagged_iterator('base.admin.dashboard_widget_type')]);
+
+    $services->set(\Base\Admin\Twig\DashboardWidgetTwigExtension::class)
+        ->args([service(DashboardWidgetTypeRegistry::class)])
+        ->tag('twig.extension');
 
     $services->set(\Base\Admin\Menu\MenuBuilder::class)
         ->args([

@@ -4,6 +4,7 @@ namespace Base\Admin;
 
 use Base\Admin\Controller\CrudControllerInterface;
 use Base\Admin\DependencyInjection\Compiler\AdminRoutePass;
+use Base\Admin\Widget\DashboardWidgetTypeInterface;
 use Base\Bundle\AbstractBaseBundle;
 use Base\Traits\SingletonTrait;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -55,6 +56,13 @@ class AdminBundle extends AbstractBaseBundle
 
         $container->registerForAutoconfiguration(\Base\Admin\Controller\AbstractDashboardController::class)
             ->addTag('base.admin.dashboard_controller');
+
+        // No dedup compiler pass needed here unlike CrudControllerInterface's
+        // AdminRoutePass - each widget type is already explicitly named via
+        // getName(), so a plain tagged_iterator() in config/services.php is
+        // enough (same as MenuBuilder's own dashboard-controller argument).
+        $container->registerForAutoconfiguration(DashboardWidgetTypeInterface::class)
+            ->addTag('base.admin.dashboard_widget_type');
 
         $container->addCompilerPass(new AdminRoutePass());
     }
