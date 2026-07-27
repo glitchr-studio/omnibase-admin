@@ -54,7 +54,15 @@
            A real shadow gives it depth/definition regardless of what's
            behind/above it. #}
         .admin-topbar { display: flex; align-items: center; gap: 1rem; padding: .6rem .9rem; margin: -1.5rem -2rem 1.25rem; border-bottom: 1px solid var(--admin-border);
-                       position: sticky; top: 0; z-index: 15; background: var(--admin-bg); box-shadow: 0 2px 6px rgba(0,0,0,.1); }
+                       position: sticky; top: 0; z-index: 15; background: var(--admin-bg); box-shadow: 0 2px 6px rgba(0,0,0,.1); transition: transform .2s ease; }
+        {# Two sticky bars stacked (this one, then .admin-header right below
+           it) read as a doubled-up topbar. Scrolling down slides this one
+           (the search/appearance/language/customize row - "settings", not
+           the page identity) out of view entirely; scrolling back up even a
+           little brings it straight back. .admin-header - the page's own
+           icon+title - stays always visible either way, sliding up to take
+           over the vacated top spot rather than leaving a gap. #}
+        html.is-topbar-hidden .admin-topbar { transform: translateY(-100%); }
         .topbar-search { flex: 1; max-width: 420px; display: flex; align-items: center; gap: .5rem; padding: .4rem .8rem; border: 1px solid var(--admin-border);
                          border-radius: 999px; background: var(--admin-surface); color: var(--admin-muted); }
         .topbar-search i { flex: 0 0 auto; }
@@ -109,8 +117,8 @@
         .admin-menu .section { display: flex; align-items: center; justify-content: space-between;
             padding: .9rem 0 .3rem 1.25rem; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--admin-muted); }
         .admin-menu .section-group > ul { list-style: none; margin: 0; padding: 0; }
-        .admin-menu a { display: block; padding: .45rem 1.25rem; color: inherit; text-decoration: none; border-left: 3px solid transparent; }
-        .admin-menu a:hover { background: var(--admin-bg); }
+        .admin-menu a { display: flex; align-items: center; padding: .45rem 1.25rem; color: inherit; text-decoration: none; border-left: 3px solid transparent; }
+        .admin-menu li:hover > a { background: var(--admin-bg); }
         .admin-menu .selected > a { border-left-color: var(--admin-accent); color: var(--admin-accent); font-weight: 600; }
         .admin-menu a i { width: 1.1rem; text-align: center; margin-right: .3rem; }
         .admin-menu .sub a { padding-left: 2.75rem; font-size: .92rem; }
@@ -124,8 +132,17 @@
         #admin-customize-toggle.is-active { color: var(--admin-accent); border-color: var(--admin-accent); background: var(--admin-surface); }
         .item-controls { display: none; align-items: center; gap: .3rem; }
         body.is-customizing .item-controls { display: inline-flex; }
-        .admin-menu li { display: flex; align-items: center; justify-content: space-between; }
+        {# align-items:stretch (the flex default - overriding the old
+           explicit "center") + min-height together are what make a
+           single-line row and a wrapped two-line row hover/highlight as
+           the same consistent shape: the <a> now fills its <li>'s full
+           box (so the hover background - moved to li:hover > a above -
+           always covers the complete row, not just the link's own
+           intrinsic content height), and every row has the same floor
+           height regardless of how much text it holds. #}
+        .admin-menu li { display: flex; align-items: stretch; justify-content: space-between; min-height: 2.4rem; }
         .admin-menu li a { flex: 1; }
+        .admin-menu li .item-controls { align-self: center; }
         .item-handle, .item-toggle { display: flex; align-items: center; justify-content: center; width: 1.6rem; height: 1.6rem; border: 0; border-radius: 6px;
             background: none; color: var(--admin-muted); cursor: pointer; font-size: .78rem; flex-shrink: 0; }
         .item-handle:hover, .item-toggle:hover { background: var(--admin-bg); color: var(--admin-text); }
@@ -220,7 +237,8 @@
            or datagrid, matching production - top offset matches the
            topbar's own rendered height (icon buttons + vertical padding). #}
         .admin-header { display: flex; align-items: center; gap: 1rem; margin: 0 -2rem 1.25rem; padding: 1rem 2rem;
-                        position: sticky; top: 3.3rem; z-index: 14; background: var(--admin-bg); box-shadow: 0 2px 4px rgba(0,0,0,.05); }
+                        position: sticky; top: 3.3rem; z-index: 14; background: var(--admin-bg); box-shadow: 0 2px 4px rgba(0,0,0,.05); transition: top .2s ease; }
+        html.is-topbar-hidden .admin-header { top: 0; }
         .admin-header h1 { margin: 0; font-size: 1.35rem; }
         .admin-header-titles { min-width: 0; }
         .admin-header-subtitle { font-size: .82rem; color: var(--admin-muted); margin-top: .2rem; }
@@ -801,6 +819,34 @@
                 toggle.addEventListener('click', function () {
                     setCollapsed(!document.documentElement.classList.contains('is-sidebar-collapsed'));
                 });
+            })();
+
+            // Topbar hide-on-scroll-down / reveal-on-scroll-up (.admin-header,
+            // the page identity, stays always visible via the CSS above -
+            // this only ever toggles .admin-topbar's own settings row).
+            // rAF-throttled so the actual class toggle runs at most once per
+            // frame no matter how many scroll events fire in between.
+            (function () {
+                var lastY = window.scrollY;
+                var ticking = false;
+                var REST_ZONE = 80; // px from the top where the topbar always stays put, however you scroll
+                function onScroll() {
+                    var y = window.scrollY;
+                    if (y <= REST_ZONE) {
+                        document.documentElement.classList.remove('is-topbar-hidden');
+                    } else if (y > lastY) {
+                        document.documentElement.classList.add('is-topbar-hidden');
+                    } else if (y < lastY) {
+                        document.documentElement.classList.remove('is-topbar-hidden');
+                    }
+                    lastY = y;
+                    ticking = false;
+                }
+                window.addEventListener('scroll', function () {
+                    if (ticking) return;
+                    ticking = true;
+                    requestAnimationFrame(onScroll);
+                }, { passive: true });
             })();
         </script>
     {% endblock %}
