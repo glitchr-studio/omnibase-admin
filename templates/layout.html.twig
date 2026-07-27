@@ -57,15 +57,7 @@
            .brand, which this is deliberately kept in sync with (same
            3.3rem) so both bars' bottom borders land on the same line. #}
         .admin-topbar { display: flex; align-items: center; gap: 1rem; height: 3.3rem; padding: 0 .9rem; margin: -1.5rem -2rem 1.25rem; border-bottom: 1px solid var(--admin-border);
-                       position: sticky; top: 0; z-index: 15; background: var(--admin-bg); box-shadow: 0 2px 6px rgba(0,0,0,.1); transition: transform .2s ease; }
-        {# Two sticky bars stacked (this one, then .admin-header right below
-           it) read as a doubled-up topbar. Scrolling down slides this one
-           (the search/appearance/language/customize row - "settings", not
-           the page identity) out of view entirely; scrolling back up even a
-           little brings it straight back. .admin-header - the page's own
-           icon+title - stays always visible either way, sliding up to take
-           over the vacated top spot rather than leaving a gap. #}
-        html.is-topbar-hidden .admin-topbar { transform: translateY(-100%); }
+                       position: sticky; top: 0; z-index: 15; background: var(--admin-bg); box-shadow: 0 2px 6px rgba(0,0,0,.1); }
         .topbar-search { flex: 1; max-width: 420px; display: flex; align-items: center; gap: .5rem; padding: .4rem .8rem; border: 1px solid var(--admin-border);
                          border-radius: 999px; background: var(--admin-surface); color: var(--admin-muted); }
         .topbar-search i { flex: 0 0 auto; }
@@ -292,6 +284,16 @@
         .admin-aside .brand .account-caret { flex-shrink: 0; font-size: .75rem; color: var(--admin-muted); transition: transform .15s; }
         .admin-account.is-open .brand .account-caret { transform: rotate(180deg); }
         .admin-account .admin-dropdown-menu { left: 1.25rem; right: 1.25rem; top: calc(100% - .3rem); }
+        {# left/right:1.25rem resolves against .admin-account's OWN width -
+           fine at 260px, but at the collapsed rail's 4.5rem it computes to
+           a near-zero box with nothing to actually constrain the menu's
+           real content (account/settings/logout labels), which just
+           overflowed it and bled into the main content area next to the
+           sidebar. Same "pop out to the right" treatment as the section
+           flyout instead of trying to fit inside the rail at all. #}
+        html.is-sidebar-collapsed .admin-account .admin-dropdown-menu {
+            left: 100%; right: auto; top: 0; margin-left: .5rem; min-width: 13rem;
+        }
         .admin-usermenu a i { width: 1.1rem; text-align: center; }
         .admin-main { flex: 1; padding: 1.5rem 2rem; min-width: 0; }
         {# sticks right under the topbar (itself sticky at top:0) so the
@@ -302,8 +304,7 @@
            one, and the two sitting flush against each other doubled up
            into a visibly darker band right at the seam between them. #}
         .admin-header { display: flex; align-items: center; gap: 1rem; margin: 0 -2rem 1.25rem; padding: 1rem 2rem;
-                        position: sticky; top: 3.3rem; z-index: 14; background: var(--admin-bg); transition: top .2s ease; }
-        html.is-topbar-hidden .admin-header { top: 0; }
+                        position: sticky; top: 3.3rem; z-index: 14; background: var(--admin-bg); }
         .admin-header h1 { margin: 0; font-size: 1.35rem; }
         .admin-header-titles { min-width: 0; }
         .admin-header-subtitle { font-size: .82rem; color: var(--admin-muted); margin-top: .2rem; }
@@ -915,33 +916,6 @@
                 if (open) panel.scrollIntoView({ block: 'nearest' });
             });
 
-            // Topbar hide-on-scroll-down / reveal-on-scroll-up (.admin-header,
-            // the page identity, stays always visible via the CSS above -
-            // this only ever toggles .admin-topbar's own settings row).
-            // rAF-throttled so the actual class toggle runs at most once per
-            // frame no matter how many scroll events fire in between.
-            (function () {
-                var lastY = window.scrollY;
-                var ticking = false;
-                var REST_ZONE = 80; // px from the top where the topbar always stays put, however you scroll
-                function onScroll() {
-                    var y = window.scrollY;
-                    if (y <= REST_ZONE) {
-                        document.documentElement.classList.remove('is-topbar-hidden');
-                    } else if (y > lastY) {
-                        document.documentElement.classList.add('is-topbar-hidden');
-                    } else if (y < lastY) {
-                        document.documentElement.classList.remove('is-topbar-hidden');
-                    }
-                    lastY = y;
-                    ticking = false;
-                }
-                window.addEventListener('scroll', function () {
-                    if (ticking) return;
-                    ticking = true;
-                    requestAnimationFrame(onScroll);
-                }, { passive: true });
-            })();
         </script>
     {% endblock %}
 </head>
