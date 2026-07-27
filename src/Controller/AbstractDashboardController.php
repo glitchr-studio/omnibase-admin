@@ -178,12 +178,14 @@ abstract class AbstractDashboardController extends AbstractController
      */
     protected function resolveMenu(): array
     {
-        return $this->menuBuilder->resolve(array_merge(
+        $items = $this->menuBuilder->groupIntoSections(array_merge(
             $this->toArray($this->configureMenuBeforeItems()),
             $this->toArray($this->configureMenuItems()),
             $this->toArray($this->configureMenuAfterItems()),
             $this->toArray($this->configureSidebarBlockItems()),
-        ), LayoutScope::SIDEBAR);
+        ));
+
+        return $this->menuBuilder->resolve($items, LayoutScope::SIDEBAR);
     }
 
     /**

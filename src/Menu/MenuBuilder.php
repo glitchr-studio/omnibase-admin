@@ -88,6 +88,50 @@ class MenuBuilder
     }
 
     /**
+     * Nests each section's directly-following items under it as subItems,
+     * turning configureMenuItems()'s flat "section, item, item, section,
+     * item" authoring convention (the same flat/marker style EasyAdmin
+     * uses, kept deliberately unchanged so it stays familiar) into the tree
+     * filterGranted()/resolveUrl()/markSelected()/LayoutArranger already
+     * all recurse into via getSubItems() - none of those needed a single
+     * change to support this.
+     *
+     * The practical effect: a section and its members become one DOM
+     * subtree in the sidebar (an outer <li> containing a nested
+     * data-sortable <ul>), so dragging the section by its own handle
+     * carries its members along for free, while members are still
+     * independently reorderable/hideable within their section. Items
+     * before the first section, and TYPE_BLOCK items (rendered separately
+     * in the sidebar footer, never part of the scrollable menu list), stay
+     * top-level and ungrouped.
+     *
+     * @param MenuItem[] $items
+     * @return MenuItem[]
+     */
+    public function groupIntoSections(array $items): array
+    {
+        $result = [];
+        $currentSection = null;
+
+        foreach ($items as $item) {
+            if ($item->isSection()) {
+                $currentSection = $item;
+                $result[] = $item;
+                continue;
+            }
+
+            if (null !== $currentSection && MenuItem::TYPE_BLOCK !== $item->getType()) {
+                $currentSection->setSubItems([...$currentSection->getSubItems(), $item]);
+                continue;
+            }
+
+            $result[] = $item;
+        }
+
+        return $result;
+    }
+
+    /**
      * @param iterable<MenuItem> $items
      * @return MenuItem[]
      */
