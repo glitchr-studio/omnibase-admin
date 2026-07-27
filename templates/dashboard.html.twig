@@ -68,6 +68,20 @@
                                         {% endfor %}
                                     </div>
                                 </div>
+                                {# Range picker only swaps the chart below - the stat row above stays
+                                   a fixed "this week vs last week" summary regardless of which window
+                                   the chart is showing, so the two never contradict each other. #}
+                                <div class="analytics-range-picker" data-analytics-range-picker data-analytics-endpoints="{{ {
+                                    today: path('admin_analytics_breakdown', {range: 'today'}),
+                                    '7d': path('admin_analytics_breakdown', {range: '7d'}),
+                                    '14d': path('admin_analytics_breakdown', {range: '14d'}),
+                                    '30d': path('admin_analytics_breakdown', {range: '30d'}),
+                                    all: path('admin_analytics_breakdown', {range: 'all'}),
+                                }|json_encode }}">
+                                    {% for range in ['today', '7d', '14d', '30d', 'all'] %}
+                                        <button type="button" class="analytics-range-btn {{ range == '14d' ? 'is-active' }}" data-range="{{ range }}">{{ ('analytics.range.' ~ range)|trans({}, 'admin') }}</button>
+                                    {% endfor %}
+                                </div>
                                 <div class="analytics-chart-wrap">
                                     <canvas data-admin-chart="{{ {
                                         labels: series|map(day => day.date|date('d/m')),

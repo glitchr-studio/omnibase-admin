@@ -1,7 +1,7 @@
 dashboard:
     title: Tableau de bord
     welcome: Bienvenue dans votre administration. Choisissez une section dans le menu pour gérer vos contenus.
-    analytics_title: Trafic (14 derniers jours)
+    analytics_title: Trafic
 
 topbar:
     appearance: Apparence
@@ -112,3 +112,9 @@ analytics:
         page_views: Vues
         unique_visitors: Visiteurs
         unique_users: Utilisateurs
+    range:
+        today: Aujourd'hui
+        7d: 7 jours
+        14d: 14 jours
+        30d: 30 jours
+        all: Depuis toujours

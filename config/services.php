@@ -5,6 +5,7 @@ namespace Symfony\Component\DependencyInjection\Loader\Configurator;
 use Base\Admin\Context\AdminContext;
 use Base\Admin\Field\FieldValueResolver;
 use Base\Admin\Form\FieldFormBuilder;
+use Base\Admin\Controller\AnalyticsController;
 use Base\Admin\Controller\LayoutController;
 use Base\Admin\Layout\LayoutArranger;
 use Base\Admin\Layout\LayoutStore;
@@ -69,8 +70,25 @@ return function (ContainerConfigurator $configurator) {
 
     $services->set(LayoutArranger::class);
 
+    // ->call('setContainer', ...) below is a manual stand-in for what
+    // autoconfigure() would normally wire for any AbstractController
+    // subclass (the #[Required] setContainer() setter + the
+    // container.service_subscriber tag) - both are autoconfigure-only
+    // mechanisms, so with autoconfigure(false) set file-wide above, a
+    // controller registered here never gets its container set and 500s
+    // the instant it calls $this->isGranted()/$this->json()/etc. Found
+    // live via curl against beta while wiring AnalyticsController - the
+    // exact same gap was already latent in LayoutController, just never
+    // exercised end-to-end before now.
     $services->set(LayoutController::class)
         ->args([service(LayoutStore::class)])
+        ->call('setContainer', [service('service_container')])
+        ->public(true)
+        ->tag('controller.service_arguments');
+
+    $services->set(AnalyticsController::class)
+        ->args([service(\Base\Service\Analytics::class), service('translator')])
+        ->call('setContainer', [service('service_container')])
         ->public(true)
         ->tag('controller.service_arguments');
 

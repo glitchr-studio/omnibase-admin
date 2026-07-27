@@ -66,6 +66,7 @@ class AdminRouteLoader extends Loader
 
         $this->addDashboardRoute($routes, $prefix);
         $this->addLayoutRoute($routes, $prefix);
+        $this->addAnalyticsRoute($routes, $prefix);
 
         return $routes;
     }
@@ -86,6 +87,24 @@ class AdminRouteLoader extends Loader
             '',
             [],
             ['POST']
+        ));
+    }
+
+    /**
+     * Dashboard analytics card's range picker - see AnalyticsController.
+     * GET + no CSRF (read-only), one route for every supported range like
+     * addLayoutRoute()'s single route for every scope.
+     */
+    private function addAnalyticsRoute(RouteCollection $routes, string $prefix): void
+    {
+        $routes->add('admin_analytics_breakdown', new Route(
+            $prefix . '/analytics/breakdown/{range}',
+            ['_controller' => \Base\Admin\Controller\AnalyticsController::class . '::breakdown'],
+            ['range' => 'today|7d|14d|30d|all'],
+            [],
+            '',
+            [],
+            ['GET']
         ));
     }
 
