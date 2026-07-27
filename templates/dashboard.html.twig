@@ -10,13 +10,12 @@
     <div>
         <h1>{{ app.site.title ?? 'dashboard.title'|trans({}, 'admin') }}</h1>
         {% if app.site.slogan is defined and app.site.slogan %}<div class="dashboard-slogan">{{ app.site.slogan }}</div>{% endif %}
+        <p class="dashboard-welcome">{{ 'dashboard.welcome'|trans({}, 'admin') }}</p>
     </div>
 </div>
 {% endblock %}
 
 {% block content %}
-<p class="dashboard-welcome">{{ 'dashboard.welcome'|trans({}, 'admin') }}</p>
-
 {% if widgets is defined and widgets is not empty %}
 {# .widget-grid is a plain grid, not a .card itself - every widget below
    supplies its OWN single .card (either analytics_card's, or the

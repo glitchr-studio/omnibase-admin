@@ -136,6 +136,11 @@
            actually sitting in. #}
         .admin-menu .section { display: flex; align-items: center; justify-content: space-between;
             padding: .9rem 0 .3rem 1.25rem; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--admin-muted); }
+        {# flex:1 so this - not the trailing item-controls - is what
+           absorbs the row's leftover space; keeps icon+label pinned left
+           regardless of whether item-controls is even present. #}
+        .admin-menu .section-label { display: flex; align-items: center; flex: 1; min-width: 0; gap: .3rem; }
+        .admin-menu .section-label i { width: 1.1rem; text-align: center; }
         .admin-menu .section-group > ul { list-style: none; margin: 0; padding: 0; }
         .admin-menu a { display: flex; align-items: center; padding: .45rem 1.25rem; color: inherit; text-decoration: none; border-left: 3px solid transparent; }
         .admin-menu li:hover > a { background: var(--admin-bg); }
@@ -183,6 +188,11 @@
            center) - only the collapsed rail needs it centered on its icon. #}
         html.is-sidebar-collapsed .admin-menu a { display: flex; align-items: center; justify-content: center; padding-left: 0; padding-right: 0; }
         html.is-sidebar-collapsed .admin-menu .section { justify-content: center; padding-left: 0; padding-right: 0; }
+        {# Without this, .section-label's flex:1 (needed in expanded mode to
+           keep item-controls pinned right) stretches it across the whole
+           collapsed row, leaving its own content (just the icon, once
+           .label-text hides) sitting at flex-start instead of centered. #}
+        html.is-sidebar-collapsed .admin-menu .section-label { flex: none; justify-content: center; }
         html.is-sidebar-collapsed .admin-menu a i { margin-right: 0; }
         html.is-sidebar-collapsed .admin-menu .label-text, html.is-sidebar-collapsed .admin-menu .sub { display: none; }
         html.is-sidebar-collapsed .admin-menu .item-controls, html.is-sidebar-collapsed .item-resize-handle { display: none !important; }
@@ -257,11 +267,11 @@
         #admin-customize-done { display: none; }
         body.is-customizing #admin-customize-done { display: inline-flex; }
         .admin-sidebar-footer { display: flex; align-items: center; justify-content: center; gap: .5rem; padding: .9rem 1.25rem; border-top: 1px solid var(--admin-border); flex-shrink: 0; }
-        {# Real in-flow content below the icon row, not a dropdown: revealed
-           by scrolling .admin-aside itself (it's already overflow-y:auto),
-           the same way the menu above it scrolls if it ever runs long. The
-           footer's #admin-sidebar-stats anchor link just jumps here. #}
-        .admin-sidebar-stats { flex-shrink: 0; padding: .9rem 1.25rem 1.1rem; border-top: 1px solid var(--admin-border); scroll-margin-top: .5rem; }
+        {# Hidden until explicitly toggled open (data-stats-toggle) - see the
+           delegated click handler in the script below. #}
+        .admin-sidebar-stats { display: none; flex-shrink: 0; padding: .9rem 1.25rem 1.1rem; border-top: 1px solid var(--admin-border); }
+        .admin-sidebar-stats.is-open { display: block; }
+        [data-stats-toggle][aria-expanded="true"] { color: var(--admin-accent); border-color: var(--admin-accent); background: var(--admin-surface); }
         .admin-sidebar-stats .admin-analytics { font-size: .8rem; color: var(--admin-muted); }
         .admin-sidebar-stats .analytics-window { font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; margin: .5rem 0 .2rem; }
         .admin-sidebar-stats .analytics-window:first-child { margin-top: 0; }
@@ -496,7 +506,12 @@
         .dashboard-brand-icon { width: 3.5rem; height: 3.5rem; display: flex; align-items: center; justify-content: center;
                                 font-size: 1.6rem; border: 1px solid var(--admin-border); border-radius: 12px; background: var(--admin-surface); }
         .dashboard-slogan { color: var(--admin-muted); }
-        .dashboard-welcome { margin: 0 0 1.25rem 4.5rem; }
+        {# Now a sibling of the h1/slogan inside the title stack (moved into
+           .admin-header, kept always visible instead of scrolling away with
+           the rest of .content) - the old margin-left:4.5rem was compensating
+           for sitting OUTSIDE that stack, offsetting past the brand icon;
+           inside it, that would double up as an extra, wrong indent. #}
+        .dashboard-welcome { margin: .3rem 0 0; color: var(--admin-muted); font-size: .92rem; }
         .widget-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1.5rem; }
         {# Widgets span 1-3 auto-fill tracks (superadmin-adjustable via the
            resize control in customize mode, persisted like everything else
@@ -852,19 +867,43 @@
             // Sidebar collapse toggle - persisted the same way as the theme
             // choice, applied pre-paint above so there's no flash of the
             // wrong width on load.
-            (function () {
-                var toggle = document.getElementById('admin-sidebar-collapse-toggle');
+            //
+            // Event-delegated (document-level click, matched by ID at CLICK
+            // time via closest()), like the dropdown/theme-choice handlers
+            // above - NOT document.getElementById() + a direct listener.
+            // This whole script block runs in <head>, before the button
+            // (way down in <body>) has been parsed into the DOM yet -
+            // getElementById() found nothing, so the click listener never
+            // attached to anything, silently. Delegation sidesteps that
+            // entirely: the lookup only ever happens later, at actual click
+            // time, by which point the button obviously exists.
+            document.addEventListener('click', function (e) {
+                var toggle = e.target.closest('#admin-sidebar-collapse-toggle');
                 if (!toggle) return;
-                function setCollapsed(on) {
-                    document.documentElement.classList.toggle('is-sidebar-collapsed', on);
-                    toggle.setAttribute('aria-pressed', on ? 'true' : 'false');
-                    try { localStorage.setItem('admin-sidebar-collapsed', on ? '1' : '0'); } catch (e) {}
-                }
-                toggle.setAttribute('aria-pressed', document.documentElement.classList.contains('is-sidebar-collapsed') ? 'true' : 'false');
-                toggle.addEventListener('click', function () {
-                    setCollapsed(!document.documentElement.classList.contains('is-sidebar-collapsed'));
-                });
-            })();
+                var on = !document.documentElement.classList.contains('is-sidebar-collapsed');
+                document.documentElement.classList.toggle('is-sidebar-collapsed', on);
+                toggle.setAttribute('aria-pressed', on ? 'true' : 'false');
+                try { localStorage.setItem('admin-sidebar-collapsed', on ? '1' : '0'); } catch (err) {}
+            });
+            // One-time aria-pressed sync on load - deferred to DOMContentLoaded
+            // for the same reason (the button doesn't exist yet up here).
+            document.addEventListener('DOMContentLoaded', function () {
+                var toggle = document.getElementById('admin-sidebar-collapse-toggle');
+                if (toggle) toggle.setAttribute('aria-pressed', document.documentElement.classList.contains('is-sidebar-collapsed') ? 'true' : 'false');
+            });
+
+            // Sidebar stats panel: click-to-toggle (event-delegated, same
+            // reasoning as the collapse toggle right above).
+            document.addEventListener('click', function (e) {
+                var toggle = e.target.closest('[data-stats-toggle]');
+                if (!toggle) return;
+                var panel = document.getElementById('admin-sidebar-stats');
+                if (!panel) return;
+                var open = !panel.classList.contains('is-open');
+                panel.classList.toggle('is-open', open);
+                toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+                if (open) panel.scrollIntoView({ block: 'nearest' });
+            });
 
             // Topbar hide-on-scroll-down / reveal-on-scroll-up (.admin-header,
             // the page identity, stays always visible via the CSS above -
@@ -947,9 +986,17 @@
                            repeated as a flyout-only heading (hidden in normal expanded
                            mode, where the inline .section label already shows it). #}
                         <li class="section-group {{ item.hidden ? 'is-hidden' }}" data-sortable-item data-sortable-key="{{ item.key }}">
+                            {# icon + label-text share ONE flex slot (like a regular item's
+                               <a> does) rather than being two independent children of
+                               .section's own justify-content:space-between row - otherwise,
+                               with item-controls absent outside customize mode, space-between
+                               had exactly two visible children (icon, label) and pushed the
+                               LAST one - the label - all the way to the right edge. #}
                             <div class="section" title="{{ item.label|trans({}, 'admin') }}">
-                                {% if item.icon %}<i class="{{ item.icon }}"></i>{% endif %}
-                                <span class="label-text">{{ item.label|trans({}, 'admin') }}</span>
+                                <span class="section-label">
+                                    {% if item.icon %}<i class="{{ item.icon }}"></i>{% endif %}
+                                    <span class="label-text">{{ item.label|trans({}, 'admin') }}</span>
+                                </span>
                                 {% if customize_enabled is defined and customize_enabled %}
                                     <span class="item-controls">
                                         <button type="button" class="item-handle" data-sortable-handle title="{{ 'customize.reorder'|trans({}, 'admin') }}"><i class="fa-solid fa-grip-vertical"></i></button>
@@ -1002,21 +1049,14 @@
                     <i class="fa-solid fa-house"></i>
                 </a>
                 {% if analyticsItem and not analyticsItem.hidden %}
-                    {# Not a click-to-open dropdown anymore: the stats panel is real,
-                       in-flow content placed right below this footer, inside the
-                       same scrollable .admin-aside - scrolling the sidebar down
-                       past the icon row reveals it directly. This anchor link is
-                       just a shortcut (native in-container anchor scroll, no JS)
-                       for anyone who'd rather click than scroll. #}
-                    {# data-skip-hash: belt-and-suspenders alongside transparent.js's
-                       own currentPathname()/currentSearch() fix - stops
-                       Transparent.scrollToHash()'s callback from ever writing
-                       window.location.hash on the nested (opaque-origin) document
-                       at all, so there's nothing for a stray hashchange to
-                       mis-resolve regardless. #}
-                    <a class="admin-icon-btn" href="#admin-sidebar-stats" data-skip-hash="true" title="{{ 'sidebar.stats'|trans({}, 'admin') }}">
+                    {# Click-to-toggle, not scroll-to-reveal: the stats panel is
+                       hidden by default and only shown while explicitly opened
+                       (data-stats-toggle, see the delegated click handler in the
+                       script below) - per explicit request, twice, in favor of
+                       the earlier scroll-reveal design. #}
+                    <button type="button" class="admin-icon-btn" data-stats-toggle aria-expanded="false" title="{{ 'sidebar.stats'|trans({}, 'admin') }}">
                         <i class="fa-solid fa-chart-simple"></i>
-                    </a>
+                    </button>
                 {% endif %}
                 <a class="admin-icon-btn" href="{{ path('security_logout') }}" title="{{ 'sidebar.exit'|trans({}, 'admin') }}">
                     <i class="fa-solid fa-arrow-right-from-bracket"></i>
