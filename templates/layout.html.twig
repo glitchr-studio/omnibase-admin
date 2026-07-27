@@ -53,7 +53,10 @@
            part of whatever sits above the page rather than page content.
            A real shadow gives it depth/definition regardless of what's
            behind/above it. #}
-        .admin-topbar { display: flex; align-items: center; gap: 1rem; padding: .6rem .9rem; margin: -1.5rem -2rem 1.25rem; border-bottom: 1px solid var(--admin-border);
+        {# height, not padding - see the matching comment on .admin-aside
+           .brand, which this is deliberately kept in sync with (same
+           3.3rem) so both bars' bottom borders land on the same line. #}
+        .admin-topbar { display: flex; align-items: center; gap: 1rem; height: 3.3rem; padding: 0 .9rem; margin: -1.5rem -2rem 1.25rem; border-bottom: 1px solid var(--admin-border);
                        position: sticky; top: 0; z-index: 15; background: var(--admin-bg); box-shadow: 0 2px 6px rgba(0,0,0,.1); transition: transform .2s ease; }
         {# Two sticky bars stacked (this one, then .admin-header right below
            it) read as a doubled-up topbar. Scrolling down slides this one
@@ -90,9 +93,20 @@
            than the viewport (basically every dashboard/CRUD page) the whole
            sidebar - including the bottom Système/Rôles/Documentation
            sections - scrolls away with the page instead of staying put. #}
-        .admin-aside { width: 230px; flex-shrink: 0; display: flex; flex-direction: column; background: var(--admin-surface); border-right: 1px solid var(--admin-border); padding: 1rem 0;
+        {# No top padding here (moved to bottom-only) - it used to push the
+           brand row down 1rem before it even started, while .admin-topbar
+           sits flush at the very top of the viewport (sticky, top:0, no
+           equivalent offset) - the single biggest contributor to the two
+           bars' borders not lining up. #}
+        .admin-aside { width: 230px; flex-shrink: 0; display: flex; flex-direction: column; background: var(--admin-surface); border-right: 1px solid var(--admin-border); padding: 0 0 1rem;
                       position: sticky; top: 0; height: 100vh; overflow-y: auto; scroll-behavior: smooth; }
-        .admin-aside .brand { display: flex; align-items: center; gap: .6rem; padding: 0 1.25rem .9rem; border-bottom: 1px solid var(--admin-border); }
+        {# Fixed height (matching .admin-topbar's own, below) instead of
+           content-driven padding, so the brand row's bottom border and the
+           topbar's bottom border land at the exact same Y regardless of
+           either one's actual content (logo vs. icon buttons are
+           different sizes) - align-items:center on both handles the
+           vertical centering that the removed padding used to. #}
+        .admin-aside .brand { display: flex; align-items: center; gap: .6rem; height: 3.3rem; padding: 0 1.25rem; border-bottom: 1px solid var(--admin-border); }
         .admin-aside .brand-logo { width: 2.25rem; height: 2.25rem; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
         .admin-aside .brand-text { display: flex; flex-direction: column; min-width: 0; }
         .admin-aside .brand-title { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -203,15 +217,31 @@
         html.is-sidebar-collapsed .section-group > ul li.flyout-heading { display: block; }
         #admin-sidebar-collapse-toggle i { transition: transform .15s; }
         html.is-sidebar-collapsed #admin-sidebar-collapse-toggle i { transform: rotate(180deg); }
-        {# Bottom-right corner grab point, dragged horizontally to grow/shrink
-           a widget's grid-column span - see the resize drag handler in the
-           customize-mode script below for how drag distance maps to size. #}
+        {# Bottom-right corner grab point - drag horizontally to grow/shrink
+           a widget's grid-column span, with a live ghost-outline preview
+           (see the pointerdown/move/up handlers + .admin-resize-ghost
+           below) rather than resizing the real widget mid-drag. A real
+           <button> (tab-reachable, ArrowLeft/Right fallback - see the
+           keydown handler), reset back to a plain box since buttons carry
+           their own default border/padding/font. Only ever rendered
+           (dashboard.html.twig) on widget types whose content actually
+           adapts to size - the analytics card's own @container rules -
+           never on a plain link-group card, which would look identical at
+           any size regardless of how it's dragged. #}
         .item-resize-handle { display: none; position: absolute; bottom: 0; right: 0; width: 1.9rem; height: 1.9rem; z-index: 2;
             align-items: center; justify-content: center; color: var(--admin-muted); cursor: ew-resize; touch-action: none;
-            background: var(--admin-bg); border-radius: 8px 0 8px 0; border-top: 1px solid var(--admin-border); border-left: 1px solid var(--admin-border); }
+            background: var(--admin-bg); border: 0; border-top: 1px solid var(--admin-border); border-left: 1px solid var(--admin-border);
+            border-radius: 8px 0 8px 0; padding: 0; font: inherit; }
         body.is-customizing .item-resize-handle { display: flex; }
         .item-resize-handle:hover, .item-resize-handle.is-resizing { color: var(--admin-accent); border-color: var(--admin-accent); }
         .item-resize-handle i { font-size: .8rem; }
+        .admin-resize-ghost { position: fixed; border: 2px dashed var(--admin-accent); border-radius: var(--admin-radius);
+            background: rgba(37,99,235,.08); pointer-events: none; z-index: 1000; }
+        @supports (background: color-mix(in srgb, red 8%, transparent)) {
+            .admin-resize-ghost { background: color-mix(in srgb, var(--admin-accent) 8%, transparent); }
+        }
+        .admin-resize-ghost-badge { position: absolute; top: .5rem; right: .5rem; background: var(--admin-accent); color: #fff;
+            font-size: .75rem; font-weight: 600; padding: .2rem .6rem; border-radius: 999px; }
         .item-handle { cursor: grab; touch-action: none; }
         body.is-customizing [data-sortable-item] { cursor: default; }
         .is-dragging { opacity: .85; box-shadow: 0 8px 20px rgba(0,0,0,.18); border-radius: 6px; background: var(--admin-surface); }
@@ -1165,16 +1195,24 @@
             if (icon) icon.classList.toggle('fa-eye', !item.classList.contains('is-hidden'));
         });
 
-        // resize drag - grabbing the bottom-right corner and dragging
-        // horizontally grows/shrinks a widget's grid-column span (1-3).
-        // Snapped to the grid's ACTUAL column-track width, measured live
-        // (not assumed) since minmax(240px,1fr) tracks resize with the
-        // viewport - a fixed px-per-size constant would drift out of sync
-        // on any screen width other than whatever it was tuned against.
-        // Live-updates the class while dragging (so the widget visibly
-        // grows/shrinks and its @container content reflows as you drag),
-        // then batches into the same "Done" save as reorder/hide.
+        // resize drag, with an explicit live preview: dragging the corner
+        // does NOT touch the real widget/grid at all while the pointer is
+        // down - it moves/resizes a separate dashed-outline ghost (fixed-
+        // positioned off getBoundingClientRect(), so it's immune to any
+        // ancestor's overflow/clipping and never fights the grid's own
+        // reflow) with a size badge, snapped to whichever grid-column
+        // count the pointer is currently over. The actual widget-size-N
+        // class - and the real reflow - only ever gets applied once, on
+        // release, to whatever size the ghost was last showing.
         var resizing = null;
+
+        function paintResizeGhost(ghost, badge, rect, columnWidth, size) {
+            ghost.style.left = rect.left + 'px';
+            ghost.style.top = rect.top + 'px';
+            ghost.style.width = (columnWidth * size) + 'px';
+            ghost.style.height = rect.height + 'px';
+            badge.textContent = size + ' / 3';
+        }
 
         document.addEventListener('pointerdown', function (e) {
             var handle = e.target.closest('[data-resize-handle]');
@@ -1185,20 +1223,27 @@
             e.preventDefault();
             handle.setPointerCapture(e.pointerId);
             handle.classList.add('is-resizing');
+
             var startSize = parseInt(item.dataset.widgetSize || '1', 10);
-            // Measured from the widget's OWN current rendered width divided
-            // by how many columns it currently spans, rather than parsing
-            // the grid's computed gridTemplateColumns string - fewer ways
-            // for this to silently come back wrong (e.g. an empty/
-            // unparsed value would previously make every drag a no-op).
-            var columnWidth = item.getBoundingClientRect().width / startSize;
+            var rect = item.getBoundingClientRect();
+            // The widget's OWN current rendered width divided by how many
+            // columns it currently spans, rather than parsing the grid's
+            // computed gridTemplateColumns string - fewer ways for this to
+            // silently come back wrong.
+            var columnWidth = (rect.width / startSize) || 240;
+
+            var ghost = document.createElement('div');
+            ghost.className = 'admin-resize-ghost';
+            var badge = document.createElement('span');
+            badge.className = 'admin-resize-ghost-badge';
+            ghost.appendChild(badge);
+            document.body.appendChild(ghost);
+            paintResizeGhost(ghost, badge, rect, columnWidth, startSize);
+
             resizing = {
-                item: item,
-                handle: handle,
-                pointerId: e.pointerId,
-                startX: e.clientX,
-                startSize: startSize,
-                columnWidth: columnWidth || 240,
+                item: item, handle: handle, ghost: ghost, badge: badge, rect: rect,
+                pointerId: e.pointerId, startX: e.clientX, startSize: startSize,
+                columnWidth: columnWidth, target: startSize,
             };
         });
 
@@ -1206,26 +1251,55 @@
             if (!resizing || e.pointerId !== resizing.pointerId) return;
             var deltaColumns = Math.round((e.clientX - resizing.startX) / resizing.columnWidth);
             var next = Math.max(1, Math.min(3, resizing.startSize + deltaColumns));
-            if (parseInt(resizing.item.dataset.widgetSize, 10) !== next) {
-                resizing.item.className = resizing.item.className.replace(/\bwidget-size-\d\b/, 'widget-size-' + next);
-                resizing.item.dataset.widgetSize = next;
+            if (next !== resizing.target) {
+                resizing.target = next;
+                paintResizeGhost(resizing.ghost, resizing.badge, resizing.rect, resizing.columnWidth, next);
             }
         });
 
+        function commitResize() {
+            if (!resizing) return;
+            resizing.ghost.remove();
+            resizing.handle.classList.remove('is-resizing');
+            var item = resizing.item;
+            var next = resizing.target;
+            if (parseInt(item.dataset.widgetSize, 10) !== next) {
+                item.className = item.className.replace(/\bwidget-size-\d\b/, 'widget-size-' + next);
+                item.dataset.widgetSize = next;
+            }
+            resizing = null;
+        }
+
         document.addEventListener('pointerup', function (e) {
             if (!resizing || e.pointerId !== resizing.pointerId) return;
-            // A plain click (negligible movement, size never changed
-            // mid-drag) still cycles the size by one step - so the handle
-            // visibly does SOMETHING on the simplest possible interaction,
-            // not just a drag past the first column-width threshold.
-            if (Math.abs(e.clientX - resizing.startX) < 5 && parseInt(resizing.item.dataset.widgetSize, 10) === resizing.startSize) {
-                var next = (resizing.startSize % 3) + 1;
-                resizing.item.className = resizing.item.className.replace(/\bwidget-size-\d\b/, 'widget-size-' + next);
-                resizing.item.dataset.widgetSize = next;
-            }
-            resizing.handle.classList.remove('is-resizing');
             resizing.handle.releasePointerCapture(e.pointerId);
-            resizing = null;
+            commitResize();
+        });
+        // A capture lost mid-drag (e.g. Esc, an OS-level gesture stealing
+        // the pointer) must still commit whatever the ghost was last
+        // showing, not strand it - pointercancel is the signal for that.
+        document.addEventListener('pointercancel', function (e) {
+            if (!resizing || e.pointerId !== resizing.pointerId) return;
+            commitResize();
+        });
+
+        // Keyboard fallback: focus the handle (it's a real button, tab-
+        // reachable), ArrowLeft/ArrowRight cycles the size by one step -
+        // same parity with a pointer drag as StickySortable's own arrow-
+        // key fallback gives its drag handles.
+        document.addEventListener('keydown', function (e) {
+            if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+            var handle = e.target.closest && e.target.closest('[data-resize-handle]');
+            if (!handle) return;
+            var item = handle.closest('[data-sortable-item]');
+            if (!item) return;
+            e.preventDefault();
+            var current = parseInt(item.dataset.widgetSize || '1', 10);
+            var next = Math.max(1, Math.min(3, current + (e.key === 'ArrowRight' ? 1 : -1)));
+            if (next !== current) {
+                item.className = item.className.replace(/\bwidget-size-\d\b/, 'widget-size-' + next);
+                item.dataset.widgetSize = next;
+            }
         });
 
         function captureLevel(container) {
