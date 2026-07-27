@@ -104,8 +104,18 @@
            customize-mode handle/eye icons eating further into the same
            width - reads as a cramped sidebar regardless of how much room
            the surrounding page/nest panel actually has. #}
+        {# z-index matters here for more than just its own stacking: .admin-
+           aside has none of its own positioned descendants poking outside
+           its bounds UNTIL the collapsed-rail flyout (further down) needs
+           to. Without an explicit z-index on .admin-aside ITSELF, it and
+           .admin-main are both "auto"-stacked siblings, resolved by plain
+           DOM order - .admin-main comes second, so it paints on top
+           regardless of any z-index set on something nested inside .admin-
+           aside; the flyout's own z-index:30 only ever wins within THIS
+           element's local stacking context, never against .admin-main's
+           content sitting in a different one entirely. #}
         .admin-aside { width: 260px; flex-shrink: 0; display: flex; flex-direction: column; background: var(--admin-surface); border-right: 1px solid var(--admin-border); padding: 0 0 1rem;
-                      position: sticky; top: 0; height: 100vh; overflow-y: auto; scroll-behavior: smooth; }
+                      position: sticky; top: 0; height: 100vh; overflow-y: auto; scroll-behavior: smooth; z-index: 20; }
         {# Fixed height (matching .admin-topbar's own, below) instead of
            content-driven padding, so the brand row's bottom border and the
            topbar's bottom border land at the exact same Y regardless of
@@ -1273,6 +1283,14 @@
             var item = handle.closest('[data-sortable-item]');
             if (!item) return;
 
+            // A previous drag's pointerup/pointercancel can be lost entirely
+            // in ways this page has no way to observe (the window losing
+            // focus mid-drag, a trackpad gesture producing an inconsistent
+            // event sequence, etc.) - leaving its ghost permanently stuck,
+            // fixed-positioned on top of everything. Starting a new resize
+            // is the next guaranteed opportunity to notice and clean that up.
+            if (resizing) commitResize();
+
             e.preventDefault();
             handle.setPointerCapture(e.pointerId);
             handle.classList.add('is-resizing');
@@ -1314,6 +1332,11 @@
             if (!resizing) return;
             resizing.ghost.remove();
             resizing.handle.classList.remove('is-resizing');
+            // Pointer capture can already be invalid by the time this runs
+            // (that's exactly the kind of lost/out-of-order event this
+            // function exists to recover from) - releasing it is a courtesy,
+            // never a precondition for cleaning up the ghost/committing.
+            try { resizing.handle.releasePointerCapture(resizing.pointerId); } catch (err) {}
             var item = resizing.item;
             var next = resizing.target;
             if (parseInt(item.dataset.widgetSize, 10) !== next) {
@@ -1323,17 +1346,23 @@
             resizing = null;
         }
 
-        document.addEventListener('pointerup', function (e) {
-            if (!resizing || e.pointerId !== resizing.pointerId) return;
-            resizing.handle.releasePointerCapture(e.pointerId);
-            commitResize();
-        });
-        // A capture lost mid-drag (e.g. Esc, an OS-level gesture stealing
-        // the pointer) must still commit whatever the ghost was last
-        // showing, not strand it - pointercancel is the signal for that.
-        document.addEventListener('pointercancel', function (e) {
-            if (!resizing || e.pointerId !== resizing.pointerId) return;
-            commitResize();
+        // Deliberately NOT gated on e.pointerId matching resizing.pointerId:
+        // only one resize is ever in flight at a time (one ghost, one
+        // handle with capture), so there's nothing genuinely ambiguous to
+        // disambiguate - and requiring an exact match is that much more
+        // surface for a lost/mismatched event to leave the ghost stuck
+        // forever, which is exactly the failure this whole function exists
+        // to prevent.
+        document.addEventListener('pointerup', function () { commitResize(); });
+        document.addEventListener('pointercancel', function () { commitResize(); });
+        // Last-resort safety nets: the window losing focus or the tab being
+        // hidden mid-drag (alt-tab, switching apps, a trackpad gesture that
+        // hands control to the OS) can lose the pointerup/pointercancel
+        // event entirely - these fire regardless and guarantee the ghost
+        // never survives past the interaction that created it.
+        window.addEventListener('blur', function () { commitResize(); });
+        document.addEventListener('visibilitychange', function () {
+            if (document.hidden) commitResize();
         });
 
         // Keyboard fallback: focus the handle (it's a real button, tab-
