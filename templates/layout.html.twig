@@ -98,7 +98,13 @@
            sits flush at the very top of the viewport (sticky, top:0, no
            equivalent offset) - the single biggest contributor to the two
            bars' borders not lining up. #}
-        .admin-aside { width: 230px; flex-shrink: 0; display: flex; flex-direction: column; background: var(--admin-surface); border-right: 1px solid var(--admin-border); padding: 0 0 1rem;
+        {# 230px was tight enough that routine French labels ("Réponses aux
+           commentaires", "Super administrateurs", "Paramètres du site")
+           wrapped to two lines by default, before even accounting for the
+           customize-mode handle/eye icons eating further into the same
+           width - reads as a cramped sidebar regardless of how much room
+           the surrounding page/nest panel actually has. #}
+        .admin-aside { width: 260px; flex-shrink: 0; display: flex; flex-direction: column; background: var(--admin-surface); border-right: 1px solid var(--admin-border); padding: 0 0 1rem;
                       position: sticky; top: 0; height: 100vh; overflow-y: auto; scroll-behavior: smooth; }
         {# Fixed height (matching .admin-topbar's own, below) instead of
            content-driven padding, so the brand row's bottom border and the
@@ -272,8 +278,11 @@
            title/entity-actions stay reachable while scrolling a long form
            or datagrid, matching production - top offset matches the
            topbar's own rendered height (icon buttons + vertical padding). #}
+        {# No shadow of its own - .admin-topbar directly above already casts
+           one, and the two sitting flush against each other doubled up
+           into a visibly darker band right at the seam between them. #}
         .admin-header { display: flex; align-items: center; gap: 1rem; margin: 0 -2rem 1.25rem; padding: 1rem 2rem;
-                        position: sticky; top: 3.3rem; z-index: 14; background: var(--admin-bg); box-shadow: 0 2px 4px rgba(0,0,0,.05); transition: top .2s ease; }
+                        position: sticky; top: 3.3rem; z-index: 14; background: var(--admin-bg); transition: top .2s ease; }
         html.is-topbar-hidden .admin-header { top: 0; }
         .admin-header h1 { margin: 0; font-size: 1.35rem; }
         .admin-header-titles { min-width: 0; }
@@ -1012,6 +1021,13 @@
                 <a class="admin-icon-btn" href="{{ path('security_logout') }}" title="{{ 'sidebar.exit'|trans({}, 'admin') }}">
                     <i class="fa-solid fa-arrow-right-from-bracket"></i>
                 </a>
+                {# In the sidebar itself, not the topbar on the opposite side
+                   of the screen - this row is already icon-only regardless
+                   of collapsed state, so it needs no separate collapsed-mode
+                   positioning of its own, unlike the brand row above. #}
+                <button type="button" class="admin-icon-btn" id="admin-sidebar-collapse-toggle" title="{{ 'topbar.collapse_sidebar'|trans({}, 'admin') }}" aria-pressed="false">
+                    <i class="fa-solid fa-angles-left"></i>
+                </button>
             </div>
             {% if analyticsItem and not analyticsItem.hidden %}
                 <div class="admin-sidebar-stats" id="admin-sidebar-stats">
@@ -1058,9 +1074,6 @@
                     <span></span>
                 {% endif %}
                 <div class="admin-topbar-icons">
-                    <button type="button" class="admin-icon-btn" id="admin-sidebar-collapse-toggle" title="{{ 'topbar.collapse_sidebar'|trans({}, 'admin') }}" aria-pressed="false">
-                        <i class="fa-solid fa-angles-left"></i>
-                    </button>
                     <div class="admin-icon-dropdown" data-dropdown>
                         <button type="button" class="admin-icon-btn" aria-haspopup="true" aria-expanded="false" title="{{ 'topbar.appearance'|trans({}, 'admin') }}">
                             <i class="fa-solid fa-circle-half-stroke"></i>
