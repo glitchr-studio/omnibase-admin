@@ -11,6 +11,9 @@ topbar:
     language: Langue
     customize: Personnaliser la mise en page
     collapse_sidebar: Réduire le menu latéral
+    active_admins: "%count% admin(s) actif(s)"
+    online: En ligne
+    recently_active: Actif récemment
 
 sidebar:
     home: Retour au site

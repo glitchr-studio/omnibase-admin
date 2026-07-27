@@ -11,6 +11,9 @@ topbar:
     language: Language
     customize: Customize layout
     collapse_sidebar: Collapse sidebar
+    active_admins: "%count% admin(s) active"
+    online: Online now
+    recently_active: Recently active
 
 sidebar:
     home: Back to site

@@ -77,6 +77,22 @@
         .admin-dropdown-menu button.is-active, .admin-dropdown-menu a.is-active { color: var(--admin-accent); font-weight: 600; }
         .admin-dropdown-menu i { width: 1rem; text-align: center; }
         .admin-locale-flag { width: 1.15rem; height: .85rem; object-fit: cover; border-radius: 2px; flex-shrink: 0; }
+        {# The avatar cluster IS the "shown by default" summary (not hidden
+           behind opening the dropdown) - the dropdown itself is purely the
+           "expand to a full list" part. #}
+        .admin-active-users-trigger { width: auto; padding: 0 .5rem 0 .3rem; border-radius: 999px; gap: .25rem; }
+        .admin-active-avatars { display: flex; }
+        .admin-avatar-initial { display: flex; align-items: center; justify-content: center; width: 1.6rem; height: 1.6rem; border-radius: 50%;
+            background: var(--admin-accent); color: #fff; font-size: .7rem; font-weight: 700; border: 2px solid var(--admin-surface); flex-shrink: 0; }
+        .admin-active-avatars .admin-avatar-initial + .admin-avatar-initial { margin-left: -.5rem; }
+        .admin-active-count { font-size: .72rem; color: var(--admin-muted); font-weight: 600; }
+        .admin-active-users-list { min-width: 220px; }
+        .dropdown-heading { padding: .5rem .8rem .3rem; font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; color: var(--admin-muted); }
+        .admin-active-user-row { display: flex; align-items: center; gap: .5rem; padding: .4rem .8rem; font-size: .85rem; }
+        .admin-active-user-row .admin-avatar-initial { border: 0; }
+        .admin-active-user-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .admin-active-dot { width: .5rem; height: .5rem; border-radius: 50%; background: var(--admin-muted); flex-shrink: 0; }
+        .admin-active-dot.is-online { background: var(--admin-success); }
         * { box-sizing: border-box; }
         body { margin: 0; font: 15px/1.5 system-ui, -apple-system, sans-serif; background: var(--admin-bg); color: var(--admin-text); }
         .admin-shell { display: flex; min-height: 100vh; }
@@ -1098,6 +1114,32 @@
                     <span></span>
                 {% endif %}
                 <div class="admin-topbar-icons">
+                    {% if admin_active_users is defined and admin_active_users is not empty %}
+                        {# Shown by default (the avatar cluster itself, not
+                           hidden behind a click) - expandable to the full
+                           list, which is short in practice (a handful of
+                           real admin accounts, not hundreds). #}
+                        <div class="admin-icon-dropdown" data-dropdown>
+                            <button type="button" class="admin-icon-btn admin-active-users-trigger" aria-haspopup="true" aria-expanded="false" title="{{ 'topbar.active_admins'|trans({'%count%': admin_active_users|length}, 'admin') }}">
+                                <span class="admin-active-avatars">
+                                    {% for activeUser in admin_active_users|slice(0, 3) %}
+                                        <span class="admin-avatar-initial">{{ (activeUser ~ '')|slice(0, 1)|upper }}</span>
+                                    {% endfor %}
+                                </span>
+                                {% if admin_active_users|length > 3 %}<span class="admin-active-count">+{{ admin_active_users|length - 3 }}</span>{% endif %}
+                            </button>
+                            <div class="admin-dropdown-menu admin-active-users-list" role="menu">
+                                <div class="dropdown-heading">{{ 'topbar.active_admins'|trans({'%count%': admin_active_users|length}, 'admin') }}</div>
+                                {% for activeUser in admin_active_users %}
+                                    <div class="admin-active-user-row">
+                                        <span class="admin-avatar-initial">{{ (activeUser ~ '')|slice(0, 1)|upper }}</span>
+                                        <span class="admin-active-user-name">{{ activeUser }}</span>
+                                        <span class="admin-active-dot {{ activeUser.isOnline ? 'is-online' : '' }}" title="{{ (activeUser.isOnline ? 'topbar.online' : 'topbar.recently_active')|trans({}, 'admin') }}"></span>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endif %}
                     <div class="admin-icon-dropdown" data-dropdown>
                         <button type="button" class="admin-icon-btn" aria-haspopup="true" aria-expanded="false" title="{{ 'topbar.appearance'|trans({}, 'admin') }}">
                             <i class="fa-solid fa-circle-half-stroke"></i>

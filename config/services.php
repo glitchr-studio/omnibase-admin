@@ -60,6 +60,10 @@ return function (ContainerConfigurator $configurator) {
     $services->set(\Base\Admin\EventSubscriber\NestHeaderSubscriber::class)
         ->tag('kernel.event_subscriber');
 
+    $services->set(\Base\Admin\EventSubscriber\ActiveAdminsSubscriber::class)
+        ->args([service(\App\Repository\UserRepository::class), service('twig'), service('security.helper')])
+        ->tag('kernel.event_subscriber');
+
     $services->set(LayoutStore::class)
         ->args([service('setting_bag')]);
 
