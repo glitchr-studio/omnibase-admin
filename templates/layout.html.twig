@@ -231,6 +231,15 @@
             background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: var(--admin-radius);
             box-shadow: 0 8px 24px rgba(0,0,0,.15); padding: .4rem 0; z-index: 30;
         }
+        {# .flyout-open-upward is set per-hover by JS (see the mouseover/
+           focusin handlers) whenever a downward flyout from this section
+           would run past the bottom of the viewport - anchoring from the
+           trigger's own bottom edge instead keeps the whole panel on
+           screen regardless of how low the section sits in the menu. #}
+        html.is-sidebar-collapsed .section-group.flyout-open-upward:hover > ul,
+        html.is-sidebar-collapsed .section-group.flyout-open-upward:focus-within > ul {
+            top: auto; bottom: 0;
+        }
         html.is-sidebar-collapsed .section-group:hover > ul .label-text,
         html.is-sidebar-collapsed .section-group:focus-within > ul .label-text { display: inline; }
         {# Higher specificity than the blanket ".admin-menu .sub { display:none }"
@@ -262,13 +271,20 @@
            adapts to size - the analytics card's own @container rules -
            never on a plain link-group card, which would look identical at
            any size regardless of how it's dragged. #}
-        .item-resize-handle { display: none; position: absolute; bottom: 0; right: 0; width: 1.9rem; height: 1.9rem; z-index: 2;
-            align-items: center; justify-content: center; color: var(--admin-muted); cursor: ew-resize; touch-action: none;
-            background: var(--admin-bg); border: 0; border-top: 1px solid var(--admin-border); border-left: 1px solid var(--admin-border);
-            border-radius: 8px 0 8px 0; padding: 0; font: inherit; }
+        {# Solid accent fill at rest, not just on hover - the previous
+           muted-on-admin-bg treatment blended into the card's own border/
+           surface almost completely (both dark-theme tones sit within a
+           couple percent of each other), making the handle nearly
+           impossible to notice unprompted. This needs to read as an
+           obviously-interactive control the instant customize mode turns
+           on, not something you find by accident. #}
+        .item-resize-handle { display: none; position: absolute; bottom: 0; right: 0; width: 2.2rem; height: 2.2rem; z-index: 2;
+            align-items: center; justify-content: center; color: #fff; cursor: ew-resize; touch-action: none;
+            background: var(--admin-accent); border: 0; border-radius: 8px 0 8px 0; padding: 0; font: inherit;
+            box-shadow: 0 2px 8px rgba(0,0,0,.25); }
         body.is-customizing .item-resize-handle { display: flex; }
-        .item-resize-handle:hover, .item-resize-handle.is-resizing { color: var(--admin-accent); border-color: var(--admin-accent); }
-        .item-resize-handle i { font-size: .8rem; }
+        .item-resize-handle:hover, .item-resize-handle.is-resizing { filter: brightness(1.12); }
+        .item-resize-handle i { font-size: 1rem; }
         .admin-resize-ghost { position: fixed; border: 2px dashed var(--admin-accent); border-radius: var(--admin-radius);
             background: rgba(37,99,235,.08); pointer-events: none; z-index: 1000; }
         @supports (background: color-mix(in srgb, red 8%, transparent)) {
@@ -936,6 +952,36 @@
                 panel.classList.toggle('is-open', open);
                 toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
                 if (open) panel.scrollIntoView({ block: 'nearest' });
+            });
+
+            // Collapsed-rail section flyout: opens downward from the
+            // trigger's own top edge by default (see the CSS), which runs
+            // straight off the bottom of the viewport for any section low
+            // enough in the menu - a section doesn't have to be the LAST
+            // one for this to happen, just low enough that its own flyout
+            // height overflows what's left below it. Measured per-hover
+            // (not cached) since the flyout's height varies per section and
+            // the viewport can change between hovers; the group is briefly
+            // made visible-but-hidden to get a real layout height, since
+            // display:none elements report zero for everything.
+            function positionFlyout(group) {
+                if (!document.documentElement.classList.contains('is-sidebar-collapsed')) return;
+                var flyout = group.querySelector(':scope > ul');
+                if (!flyout) return;
+                var triggerTop = group.getBoundingClientRect().top;
+                var wasHidden = getComputedStyle(flyout).display === 'none';
+                if (wasHidden) { flyout.style.visibility = 'hidden'; flyout.style.display = 'block'; }
+                var flyoutHeight = flyout.getBoundingClientRect().height;
+                if (wasHidden) { flyout.style.removeProperty('visibility'); flyout.style.removeProperty('display'); }
+                group.classList.toggle('flyout-open-upward', triggerTop + flyoutHeight > window.innerHeight - 16);
+            }
+            document.addEventListener('mouseover', function (e) {
+                var group = e.target.closest('.section-group');
+                if (group) positionFlyout(group);
+            });
+            document.addEventListener('focusin', function (e) {
+                var group = e.target.closest('.section-group');
+                if (group) positionFlyout(group);
             });
 
         </script>
