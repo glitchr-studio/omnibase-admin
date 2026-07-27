@@ -19,7 +19,7 @@ sidebar:
 customize:
     reorder: Drag to reorder
     toggle_visibility: Show/hide
-    resize: Click to resize
+    resize: Drag to resize
     done: Done
     saved: Layout saved.
 

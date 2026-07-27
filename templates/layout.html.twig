@@ -94,8 +94,13 @@
            ".admin-menu li { display:flex }" row layout below, which is
            for individual nav items, not this section-plus-members group. #}
         .admin-menu li.section-group { display: block; }
+        {# No right padding here - .item-controls supplies its own right
+           margin (below) so a section's icon pair and a regular item's
+           icon pair land at the exact same inset regardless of which
+           container (a padded .section div vs an unpadded <li>) they're
+           actually sitting in. #}
         .admin-menu .section { display: flex; align-items: center; justify-content: space-between;
-            padding: .9rem 1.25rem .3rem; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--admin-muted); }
+            padding: .9rem 0 .3rem 1.25rem; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--admin-muted); }
         .admin-menu .section-group > ul { list-style: none; margin: 0; padding: 0; }
         .admin-menu a { display: block; padding: .45rem 1.25rem; color: inherit; text-decoration: none; border-left: 3px solid transparent; }
         .admin-menu a:hover { background: var(--admin-bg); }
@@ -114,9 +119,18 @@
         body.is-customizing .item-controls { display: inline-flex; }
         .admin-menu li { display: flex; align-items: center; justify-content: space-between; }
         .admin-menu li a { flex: 1; }
-        .item-handle, .item-toggle, .item-resize { display: flex; align-items: center; justify-content: center; width: 1.6rem; height: 1.6rem; border: 0; border-radius: 6px;
+        .item-handle, .item-toggle { display: flex; align-items: center; justify-content: center; width: 1.6rem; height: 1.6rem; border: 0; border-radius: 6px;
             background: none; color: var(--admin-muted); cursor: pointer; font-size: .78rem; flex-shrink: 0; }
-        .item-handle:hover, .item-toggle:hover, .item-resize:hover { background: var(--admin-bg); color: var(--admin-text); }
+        .item-handle:hover, .item-toggle:hover { background: var(--admin-bg); color: var(--admin-text); }
+        {# Bottom-right corner grab point, dragged horizontally to grow/shrink
+           a widget's grid-column span - see the resize drag handler in the
+           customize-mode script below for how drag distance maps to size. #}
+        .item-resize-handle { display: none; position: absolute; bottom: 0; right: 0; width: 1.4rem; height: 1.4rem;
+            align-items: center; justify-content: center; color: var(--admin-muted); cursor: ew-resize; touch-action: none;
+            border-radius: 6px 0 6px 0; }
+        body.is-customizing .item-resize-handle { display: flex; }
+        .item-resize-handle:hover, .item-resize-handle.is-resizing { background: var(--admin-bg); color: var(--admin-accent); }
+        .item-resize-handle i { font-size: .7rem; }
         .item-handle { cursor: grab; touch-action: none; }
         body.is-customizing [data-sortable-item] { cursor: default; }
         .is-dragging { opacity: .85; box-shadow: 0 8px 20px rgba(0,0,0,.18); border-radius: 6px; background: var(--admin-surface); }
@@ -384,6 +398,12 @@
         .widget-group li a .fa-circle-plus { color: var(--admin-accent); }
         .analytics-card { padding: 1.5rem; }
         .analytics-card-header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 1.5rem; margin-bottom: 1.25rem; }
+        {# .widget-controls floats absolutely over the card's top-right
+           corner - without this, a wide stat row's own right-aligned
+           content (e.g. the last stat's change badge) runs right up
+           against the handle/resize/toggle icons. Only needed while
+           they're actually visible. #}
+        body.is-customizing .analytics-card-header { padding-right: 6rem; }
         .analytics-card-header h2 { margin: 0; font-size: 1.1rem; }
         .analytics-stat-row { display: flex; gap: 1.75rem; flex-wrap: wrap; }
         .analytics-stat { min-width: 6rem; }
@@ -1001,20 +1021,58 @@
             if (icon) icon.classList.toggle('fa-eye', !item.classList.contains('is-hidden'));
         });
 
-        // resize cycle - 1 -> 2 -> 3 -> 1 grid-column span, batched the same
-        // way as visibility. A free-drag resize handle would need to measure
-        // the grid's actual track width to snap sensibly; a click-to-cycle
-        // button is the simpler, always-correct alternative and the widget
-        // itself already adapts its content to whatever size it lands on
-        // (see the analytics_card @container rules in the CSS above).
-        document.addEventListener('click', function (e) {
-            var resize = e.target.closest('[data-cycle-size]');
-            if (!resize || !body.classList.contains('is-customizing')) return;
-            var item = resize.closest('[data-sortable-item]');
-            if (!item) return;
-            var next = (parseInt(item.dataset.widgetSize || '1', 10) % 3) + 1;
-            item.className = item.className.replace(/\bwidget-size-\d\b/, 'widget-size-' + next);
-            item.dataset.widgetSize = next;
+        // resize drag - grabbing the bottom-right corner and dragging
+        // horizontally grows/shrinks a widget's grid-column span (1-3).
+        // Snapped to the grid's ACTUAL column-track width, measured live
+        // (not assumed) since minmax(240px,1fr) tracks resize with the
+        // viewport - a fixed px-per-size constant would drift out of sync
+        // on any screen width other than whatever it was tuned against.
+        // Live-updates the class while dragging (so the widget visibly
+        // grows/shrinks and its @container content reflows as you drag),
+        // then batches into the same "Done" save as reorder/hide.
+        var resizing = null;
+
+        function gridColumnWidth(grid) {
+            var cols = getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean);
+            var gap = parseFloat(getComputedStyle(grid).columnGap) || 0;
+            return cols.length ? parseFloat(cols[0]) + gap : grid.clientWidth;
+        }
+
+        document.addEventListener('pointerdown', function (e) {
+            var handle = e.target.closest('[data-resize-handle]');
+            if (!handle || !body.classList.contains('is-customizing')) return;
+            var item = handle.closest('[data-sortable-item]');
+            var grid = item && item.closest('[data-sortable]');
+            if (!item || !grid) return;
+
+            e.preventDefault();
+            handle.setPointerCapture(e.pointerId);
+            handle.classList.add('is-resizing');
+            resizing = {
+                item: item,
+                handle: handle,
+                pointerId: e.pointerId,
+                startX: e.clientX,
+                startSize: parseInt(item.dataset.widgetSize || '1', 10),
+                columnWidth: gridColumnWidth(grid),
+            };
+        });
+
+        document.addEventListener('pointermove', function (e) {
+            if (!resizing || e.pointerId !== resizing.pointerId) return;
+            var deltaColumns = Math.round((e.clientX - resizing.startX) / resizing.columnWidth);
+            var next = Math.max(1, Math.min(3, resizing.startSize + deltaColumns));
+            if (parseInt(resizing.item.dataset.widgetSize, 10) !== next) {
+                resizing.item.className = resizing.item.className.replace(/\bwidget-size-\d\b/, 'widget-size-' + next);
+                resizing.item.dataset.widgetSize = next;
+            }
+        });
+
+        document.addEventListener('pointerup', function (e) {
+            if (!resizing || e.pointerId !== resizing.pointerId) return;
+            resizing.handle.classList.remove('is-resizing');
+            resizing.handle.releasePointerCapture(e.pointerId);
+            resizing = null;
         });
 
         function captureLevel(container) {

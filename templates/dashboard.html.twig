@@ -36,9 +36,9 @@
                     {% if customize_enabled is defined and customize_enabled %}
                         <div class="item-controls widget-controls">
                             <button type="button" class="item-handle" data-sortable-handle title="{{ 'customize.reorder'|trans({}, 'admin') }}"><i class="fa-solid fa-grip-vertical"></i></button>
-                            <button type="button" class="item-resize" data-cycle-size title="{{ 'customize.resize'|trans({}, 'admin') }}"><i class="fa-solid fa-up-right-and-down-left-from-center"></i></button>
                             <button type="button" class="item-toggle" data-toggle-hidden title="{{ 'customize.toggle_visibility'|trans({}, 'admin') }}"><i class="fa-solid fa-eye{{ widget.hidden ? '-slash' }}"></i></button>
                         </div>
+                        <span class="item-resize-handle" data-resize-handle title="{{ 'customize.resize'|trans({}, 'admin') }}"><i class="fa-solid fa-up-right-and-down-left-from-center"></i></span>
                     {% endif %}
                     {% if widget.blockName == 'analytics_card' %}
                         {% block analytics_card %}
@@ -88,9 +88,9 @@
                     {% if customize_enabled is defined and customize_enabled %}
                         <div class="item-controls widget-controls">
                             <button type="button" class="item-handle" data-sortable-handle title="{{ 'customize.reorder'|trans({}, 'admin') }}"><i class="fa-solid fa-grip-vertical"></i></button>
-                            <button type="button" class="item-resize" data-cycle-size title="{{ 'customize.resize'|trans({}, 'admin') }}"><i class="fa-solid fa-up-right-and-down-left-from-center"></i></button>
                             <button type="button" class="item-toggle" data-toggle-hidden title="{{ 'customize.toggle_visibility'|trans({}, 'admin') }}"><i class="fa-solid fa-eye{{ widget.hidden ? '-slash' }}"></i></button>
                         </div>
+                        <span class="item-resize-handle" data-resize-handle title="{{ 'customize.resize'|trans({}, 'admin') }}"><i class="fa-solid fa-up-right-and-down-left-from-center"></i></span>
                     {% endif %}
                     {% if widget.icon %}<div class="widget-icon"><i class="{{ widget.icon }}"></i></div>{% endif %}
                     <h2>{{ widget.label|trans({}, 'admin') }}</h2>
