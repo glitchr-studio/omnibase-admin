@@ -88,7 +88,7 @@ return function (ContainerConfigurator $configurator) {
         ->tag('controller.service_arguments');
 
     $services->set(AnalyticsController::class)
-        ->args([service(\Base\Service\Analytics::class), service('translator')])
+        ->args([service(\Base\Service\Analytics::class), service('translator'), service(\Base\Admin\Widget\TimelineEventRegistry::class)])
         ->call('setContainer', [service('service_container')])
         ->public(true)
         ->tag('controller.service_arguments');
@@ -100,11 +100,14 @@ return function (ContainerConfigurator $configurator) {
     // setContainer() above). An app-defined widget type needs no such
     // thing - its own autoconfigured services pick up the tag for free.
     $services->set(\Base\Admin\Widget\AnalyticsCardWidgetType::class)
-        ->args([service(\Base\Service\Analytics::class)])
+        ->args([service(\Base\Service\Analytics::class), service(\Base\Admin\Widget\TimelineEventRegistry::class)])
         ->tag('base.admin.dashboard_widget_type');
 
     $services->set(DashboardWidgetTypeRegistry::class)
         ->args([tagged_iterator('base.admin.dashboard_widget_type')]);
+
+    $services->set(\Base\Admin\Widget\TimelineEventRegistry::class)
+        ->args([tagged_iterator('base.admin.timeline_event_provider')]);
 
     $services->set(\Base\Admin\Twig\DashboardWidgetTwigExtension::class)
         ->args([service(DashboardWidgetTypeRegistry::class)])

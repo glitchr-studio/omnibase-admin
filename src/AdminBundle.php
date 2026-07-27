@@ -64,6 +64,12 @@ class AdminBundle extends AbstractBaseBundle
         $container->registerForAutoconfiguration(DashboardWidgetTypeInterface::class)
             ->addTag('base.admin.dashboard_widget_type');
 
+        // Legal across the bundle boundary even though the interface lives
+        // in base-bundle, not here - same admin-depends-on-base direction
+        // AnalyticsController already uses for Base\Service\Analytics.
+        $container->registerForAutoconfiguration(\Base\Service\TimelineEventProviderInterface::class)
+            ->addTag('base.admin.timeline_event_provider');
+
         $container->addCompilerPass(new AdminRoutePass());
     }
 }

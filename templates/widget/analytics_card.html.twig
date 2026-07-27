@@ -50,6 +50,7 @@
                 data: series|map(day => day[key]),
                 color: colors[key],
             }),
+            events: events|default([]),
         }|json_encode }}"></canvas>
     </div>
 </div>

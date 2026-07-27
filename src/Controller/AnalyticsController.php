@@ -2,6 +2,7 @@
 
 namespace Base\Admin\Controller;
 
+use Base\Admin\Widget\TimelineEventRegistry;
 use Base\Service\Analytics;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -27,6 +28,7 @@ class AnalyticsController extends AbstractController
     public function __construct(
         private readonly Analytics $analytics,
         private readonly TranslatorInterface $translator,
+        private readonly TimelineEventRegistry $timelineEvents,
     ) {
     }
 
@@ -50,11 +52,13 @@ class AnalyticsController extends AbstractController
         // spanning years needs the year to actually mean anything.
         $dateFormat = \count($series) > 366 ? 'M Y' : 'd/m';
 
+        $formattedLabels = \array_map(
+            fn (array $day) => (new \DateTimeImmutable($day['date']))->format($dateFormat),
+            $series,
+        );
+
         return $this->json([
-            'labels' => \array_map(
-                fn (array $day) => (new \DateTimeImmutable($day['date']))->format($dateFormat),
-                $series,
-            ),
+            'labels' => $formattedLabels,
             'datasets' => \array_map(
                 fn (string $key) => [
                     'label' => $labels[$key],
@@ -63,6 +67,7 @@ class AnalyticsController extends AbstractController
                 ],
                 ['pageViews', 'uniqueVisitors', 'uniqueUsers'],
             ),
+            'events' => $this->timelineEvents->getFormattedEvents($series, $formattedLabels, $dateFormat),
         ]);
     }
 }

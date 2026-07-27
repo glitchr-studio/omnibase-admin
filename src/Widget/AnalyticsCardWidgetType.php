@@ -16,6 +16,7 @@ final class AnalyticsCardWidgetType implements DashboardWidgetTypeInterface
 {
     public function __construct(
         private readonly Analytics $analytics,
+        private readonly TimelineEventRegistry $timelineEvents,
     ) {
     }
 
@@ -32,10 +33,21 @@ final class AnalyticsCardWidgetType implements DashboardWidgetTypeInterface
     public function getTemplateVars(MenuItem $widget): array
     {
         $days = $widget->getParams()['days'] ?? 14;
+        $series = $this->analytics->dailyBreakdown($days);
+
+        // Same 'd/m' format the template's own canvas JSON uses for its
+        // labels - kept in lockstep here (rather than importing
+        // AnalyticsController's >366-days check) since this path never
+        // sees an "all time" multi-year series at initial paint; the
+        // picker's own live fetch is what handles that case, through
+        // AnalyticsController::breakdown() instead.
+        $dateFormat = 'd/m';
+        $labels = \array_map(fn (array $day) => (new \DateTimeImmutable($day['date']))->format($dateFormat), $series);
 
         return [
-            'series' => $this->analytics->dailyBreakdown($days),
+            'series' => $series,
             'change' => $this->analytics->weekOverWeekChange(),
+            'events' => $this->timelineEvents->getFormattedEvents($series, $labels, $dateFormat),
         ];
     }
 }
