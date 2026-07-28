@@ -120,20 +120,66 @@
         item.parentElement.insertBefore(this.placeholder, item.nextSibling);
 
         var rect = item.getBoundingClientRect();
+        this.offsetX = e.clientX - rect.left;
         this.offsetY = e.clientY - rect.top;
         item.style.position = 'fixed';
         item.style.width = rect.width + 'px';
         item.style.zIndex = 1000;
         item.style.pointerEvents = 'none';
-        this.moveItemTo(e.clientY);
+        this.moveItemTo(e.clientX, e.clientY);
 
         document.addEventListener('pointermove', this.onPointerMove);
         document.addEventListener('pointerup', this.onPointerUp);
     };
 
-    StickySortable.prototype.moveItemTo = function (clientY) {
+    // axis:'y' locks left to wherever the drag started (a single-column
+    // list has nothing to gain from tracking x, and this keeps that case's
+    // behavior byte-for-byte unchanged) - any other axis value follows the
+    // pointer on both axes, needed for a multi-column grid like the
+    // dashboard's widget grid.
+    StickySortable.prototype.moveItemTo = function (clientX, clientY) {
         this.dragging.style.top = (clientY - this.offsetY) + 'px';
-        this.dragging.style.left = this.dragging.getBoundingClientRect().left + 'px';
+        this.dragging.style.left = 'y' === this.options.axis
+            ? this.dragging.getBoundingClientRect().left + 'px'
+            : (clientX - this.offsetX) + 'px';
+    };
+
+    // Single-column mode (axis:'y'): unchanged from before - compare only
+    // vertical midpoints, in DOM order. Free/grid mode: "nearest sibling
+    // wins" alone doesn't say which SIDE to drop on (a grid has more than
+    // one neighbor at similar distance), so whichever axis has the larger
+    // offset from that sibling's center decides before-vs-after.
+    StickySortable.prototype.findDropTarget = function (siblings, x, y) {
+        if ('y' === this.options.axis) {
+            for (var i = 0; i < siblings.length; i++) {
+                var rect = siblings[i].getBoundingClientRect();
+                if (y < rect.top + rect.height / 2) {
+                    return { el: siblings[i], before: true };
+                }
+            }
+            return null;
+        }
+
+        var closest = null;
+        var closestDist = Infinity;
+        siblings.forEach(function (el) {
+            var r = el.getBoundingClientRect();
+            var cx = r.left + r.width / 2;
+            var cy = r.top + r.height / 2;
+            var dist = Math.pow(x - cx, 2) + Math.pow(y - cy, 2);
+            if (dist < closestDist) {
+                closestDist = dist;
+                closest = { el: el, cx: cx, cy: cy };
+            }
+        });
+        if (!closest) {
+            return null;
+        }
+
+        var dx = x - closest.cx;
+        var dy = y - closest.cy;
+        var before = Math.abs(dx) > Math.abs(dy) ? dx < 0 : dy < 0;
+        return { el: closest.el, before: before };
     };
 
     StickySortable.prototype.onPointerMove = function (e) {
@@ -141,23 +187,17 @@
             return;
         }
 
-        this.moveItemTo(e.clientY);
+        this.moveItemTo(e.clientX, e.clientY);
 
-        var midY = e.clientY;
         var siblings = Array.prototype.slice.call(this.container.children).filter(function (el) {
             return el !== this.dragging && el !== this.placeholder && el.matches(this.options.items);
         }.bind(this));
 
-        for (var i = 0; i < siblings.length; i++) {
-            var rect = siblings[i].getBoundingClientRect();
-            var siblingMid = rect.top + rect.height / 2;
-            if (midY < siblingMid) {
-                this.container.insertBefore(this.placeholder, siblings[i]);
-                break;
-            }
-            if (i === siblings.length - 1) {
-                this.container.insertBefore(this.placeholder, siblings[i].nextSibling);
-            }
+        var target = this.findDropTarget(siblings, e.clientX, e.clientY);
+        if (target) {
+            this.container.insertBefore(this.placeholder, target.before ? target.el : target.el.nextSibling);
+        } else if (siblings.length) {
+            this.container.insertBefore(this.placeholder, null);
         }
 
         if (this.options.autoscroll) {

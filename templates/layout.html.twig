@@ -1303,7 +1303,14 @@
         function initSortables() {
             if (sortablesInitialized || typeof window.StickySortable === 'undefined' || typeof $ === 'undefined') return;
             sortablesInitialized = true;
-            $('[data-sortable]').stickySortable({ handle: '[data-sortable-handle]' });
+            // The dashboard widget grid is multi-column - axis:'y' (every
+            // other list here: sidebar menu, a section's members, a
+            // widget-group's own items) would lock horizontal position and
+            // only ever let a widget move up/down within its own column.
+            $('[data-sortable]').each(function () {
+                var axis = 'dashboard' === this.dataset.sortable ? null : 'y';
+                $(this).stickySortable({ handle: '[data-sortable-handle]', axis: axis });
+            });
         }
 
         if (toggleBtn) {
