@@ -260,31 +260,29 @@
         html.is-sidebar-collapsed .section-group > ul li.flyout-heading { display: block; }
         #admin-sidebar-collapse-toggle i { transition: transform .15s; }
         html.is-sidebar-collapsed #admin-sidebar-collapse-toggle i { transform: rotate(180deg); }
-        {# Bottom-right corner grab point - drag horizontally to grow/shrink
-           a widget's grid-column span, with a live ghost-outline preview
-           (see the pointerdown/move/up handlers + .admin-resize-ghost
-           below) rather than resizing the real widget mid-drag. A real
-           <button> (tab-reachable, ArrowLeft/Right fallback - see the
-           keydown handler), reset back to a plain box since buttons carry
-           their own default border/padding/font. Only ever rendered
+        {# Drag horizontally to grow/shrink a widget's grid-column span,
+           with a live ghost-outline preview (see the pointerdown/move/up
+           handlers + .admin-resize-ghost below) rather than resizing the
+           real widget mid-drag. A real <button> (tab-reachable, ArrowLeft/
+           Right fallback - see the keydown handler). Only ever rendered
            (dashboard.html.twig) on widget types whose content actually
            adapts to size - the analytics card's own @container rules -
            never on a plain link-group card, which would look identical at
-           any size regardless of how it's dragged. #}
-        {# Solid accent fill at rest, not just on hover - the previous
-           muted-on-admin-bg treatment blended into the card's own border/
-           surface almost completely (both dark-theme tones sit within a
-           couple percent of each other), making the handle nearly
-           impossible to notice unprompted. This needs to read as an
-           obviously-interactive control the instant customize mode turns
-           on, not something you find by accident. #}
-        .item-resize-handle { display: none; position: absolute; bottom: 0; right: 0; width: 2.2rem; height: 2.2rem; z-index: 2;
+           any size regardless of how it's dragged.
+
+           Lives in the SAME top-right .item-controls row as the grip/eye
+           buttons, not a separate bottom-right corner tab - a corner tab's
+           visibility depends on the card's own height and how far you've
+           scrolled (worse inside the nest overlay's own constrained iframe
+           height), and was repeatedly reported as invisible despite
+           genuinely working once found. Solid accent fill (not just on
+           hover) keeps it obviously distinct from its two plain siblings. #}
+        .item-resize-handle { display: none; width: 1.6rem; height: 1.6rem; border: 0; border-radius: 6px;
             align-items: center; justify-content: center; color: #fff; cursor: ew-resize; touch-action: none;
-            background: var(--admin-accent); border: 0; border-radius: 8px 0 8px 0; padding: 0; font: inherit;
-            box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+            background: var(--admin-accent); padding: 0; font: inherit; flex-shrink: 0; }
         body.is-customizing .item-resize-handle { display: flex; }
         .item-resize-handle:hover, .item-resize-handle.is-resizing { filter: brightness(1.12); }
-        .item-resize-handle i { font-size: 1rem; }
+        .item-resize-handle i { font-size: .75rem; }
         .admin-resize-ghost { position: fixed; border: 2px dashed var(--admin-accent); border-radius: var(--admin-radius);
             background: rgba(37,99,235,.08); pointer-events: none; z-index: 1000; }
         @supports (background: color-mix(in srgb, red 8%, transparent)) {
@@ -581,8 +579,11 @@
            corner - without this, a wide stat row's own right-aligned
            content (e.g. the last stat's change badge) runs right up
            against the handle/resize/toggle icons. Only needed while
-           they're actually visible. #}
-        body.is-customizing .analytics-card-header { padding-right: 6rem; }
+           they're actually visible. Sized for 3 buttons now that resize
+           joined the same row as handle/toggle (3 * 1.6rem + 2 * .3rem
+           gap + the .6rem right offset = 6rem, rounded up for breathing
+           room). #}
+        body.is-customizing .analytics-card-header { padding-right: 6.5rem; }
         .analytics-card-header h2 { margin: 0; font-size: 1.1rem; }
         .analytics-stat-row { display: flex; gap: 1.75rem; flex-wrap: wrap; }
         .analytics-stat { min-width: 6rem; }

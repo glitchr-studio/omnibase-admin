@@ -33,11 +33,20 @@
                    blockNames render an empty shell, same as before. #}
                 <div class="widget-block widget-size-{{ widget.size }} {{ widget.hidden ? 'is-hidden' }}" data-sortable-item data-sortable-key="{{ widget.key }}" data-widget-size="{{ widget.size }}">
                     {% if customize_enabled is defined and customize_enabled %}
+                        {# Resize sits in the SAME always-visible top-right control
+                           row as the grip/eye buttons - not a separate bottom-right
+                           corner tab anymore. A corner tab depends on the card's
+                           own height and scroll position to ever come into view
+                           (worse still inside the nest overlay's own constrained
+                           iframe height); reported repeatedly as "no handler
+                           visible" despite the control genuinely working when
+                           found. This row is the one spot on the card already
+                           confirmed visible in every report. #}
                         <div class="item-controls widget-controls">
                             <button type="button" class="item-handle" data-sortable-handle title="{{ 'customize.reorder'|trans({}, 'admin') }}"><i class="fa-solid fa-grip-vertical"></i></button>
+                            <button type="button" class="item-resize-handle" data-resize-handle title="{{ 'customize.resize'|trans({}, 'admin') }}"><i class="fa-solid fa-up-right-and-down-left-from-center"></i></button>
                             <button type="button" class="item-toggle" data-toggle-hidden title="{{ 'customize.toggle_visibility'|trans({}, 'admin') }}"><i class="fa-solid fa-eye{{ widget.hidden ? '-slash' }}"></i></button>
                         </div>
-                        <button type="button" class="item-resize-handle" data-resize-handle title="{{ 'customize.resize'|trans({}, 'admin') }}"><i class="fa-solid fa-up-right-and-down-left-from-center"></i></button>
                     {% endif %}
                     {% set widgetType = widget.blockName ? dashboard_widget_type(widget.blockName) : null %}
                     {% if widgetType %}
