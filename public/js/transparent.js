@@ -280,7 +280,19 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
         // confirm() prompt shown before ESC closes an open nest overlay -
         // overridable via Transparent.ready({nest_esc_confirm: '...'}) for
         // localization, same as any other consumer-facing string here.
-        "nest_esc_confirm": "Close this panel? Any unsaved changes may be lost."
+        "nest_esc_confirm": "Close this panel? Any unsaved changes may be lost.",
+
+        // The response cache (sessionStorage + the in-memory live-DOM
+        // cache) has no built-in freshness check - it's keyed purely by
+        // page path/uuid, so a deploy that changes server-rendered HTML/
+        // CSS leaves any tab that had a page cached replaying that stale
+        // copy indefinitely (sessionStorage survives normal reloads).
+        // Passing a value here that changes on every real deploy (a git
+        // commit SHA, a build id, ...) makes checkCacheVersion() purge
+        // the whole cache on mismatch. null (the default) skips the
+        // check entirely - existing consumers who never opt in see no
+        // behavior change.
+        "cache_version": null
     };
 
     const State = Transparent.state = {
@@ -691,6 +703,33 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
         return false;
     }
 
+    // Purges every cached page (targeted per-key removal, same as the
+    // quota-eviction path above - never a blanket sessionStorage.clear(),
+    // which would also wipe unrelated app state) plus the in-memory
+    // live-DOM cache, whenever Settings["cache_version"] doesn't match
+    // what was stored on a previous visit. A no-op if cache_version was
+    // never configured. Called once per page load from ready()'s
+    // first-run path, before anything else touches the cache.
+    function checkCacheVersion() {
+        var version = Settings["cache_version"];
+        if (null === version || undefined === version) return;
+        if (!isLocalStorageNameSupported()) return;
+
+        if (sessionStorage.getItem('transparent[version]') === String(version)) return;
+
+        try {
+            var array = JSON.parse(sessionStorage.getItem('transparent')) || [];
+            array.forEach(removeResponseEntry);
+            sessionStorage.removeItem('transparent');
+        } catch (e) {}
+
+        Transparent.clearLiveResponse();
+
+        try {
+            sessionStorage.setItem('transparent[version]', String(version));
+        } catch (e) {}
+    }
+
     Transparent.configure = function (options) {
 
         var key, value;
@@ -720,7 +759,10 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
             else console.debug("Transparent is running..");
         }
 
-        if(!isReady) dispatchEvent(new Event('transparent:'+Transparent.state.FIRST));
+        if(!isReady) {
+            checkCacheVersion();
+            dispatchEvent(new Event('transparent:'+Transparent.state.FIRST));
+        }
 
         isReady = true;
 
@@ -2194,6 +2236,23 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
         try { return parent.location.origin; } catch (e) { return location.origin; }
     }
 
+    // Same opaque-srcdoc problem as currentOrigin(), for pathname/search
+    // instead of origin - and NOT fixable the same way (parent.location is
+    // the HOST page's own URL, e.g. the public site's "/", not the nested
+    // admin page's real path; Transparent.nest deliberately never commits
+    // the address bar to it - see fetchNested's own comment). document.
+    // baseURI is the right source instead: it's exactly "what URL does
+    // this document consider itself to be at", and defaults to location.
+    // href when no <base> tag is present - so this is a no-op everywhere
+    // except inside a nest iframe, where mount() injects a <base href>
+    // pointing at the page's real URL specifically so this resolves
+    // correctly. Without this, "is this link just a same-page #hash
+    // scroll" (__main__) always compared the real resolved pathname
+    // against the opaque "srcdoc" and never matched - falling through to
+    // a real fetch-and-remount of the SAME page on every single click.
+    function currentPathname() { return new URL(document.baseURI).pathname; }
+    function currentSearch() { return new URL(document.baseURI).search; }
+
     // Shared by Settings.exceptions (__main__) and Settings.nest
     // (Transparent.nest) - both are lists of RegExp objects or wildcard
     // strings ('*' matches any sequence, everything else literal), tested
@@ -2305,12 +2364,35 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
         // Unsecure url
         if (url.origin != currentOrigin()) return;
 
+        // Inside a nest iframe (Transparent.nest's overlay), a link whose
+        // target falls OUTSIDE the nest's own configured scope
+        // (Settings.nest, e.g. "/admin*") isn't a page the nest should ever
+        // render itself - it's the user leaving the nested app back toward
+        // the host site. Close the overlay and let the HOST page navigate
+        // there for real, instead of AJAX-swapping the iframe's own content
+        // to something it was never scoped for (previously: a link back to
+        // "/" rendered the public homepage INSIDE the admin overlay).
+        if (location.origin === 'null' && Settings.nest && Settings.nest.length && !matchesPatternList(url.pathname, Settings.nest)) {
+            e.preventDefault();
+            try {
+                if (parent.Transparent && parent.Transparent.nest) {
+                    parent.Transparent.nest.close(false);
+                    parent.window.location.href = url.href;
+                } else {
+                    window.top.location.href = url.href;
+                }
+            } catch (err) {
+                window.top.location.href = url.href;
+            }
+            return;
+        }
+
         e.preventDefault();
 
         if (ajaxSemaphore) return;
         if (url == location) return;
 
-        if((e.type == Transparent.state.CLICK || e.type == Transparent.state.HASHCHANGE) && url.pathname == location.pathname && url.search == location.search && type != "POST") {
+        if((e.type == Transparent.state.CLICK || e.type == Transparent.state.HASHCHANGE) && url.pathname == currentPathname() && url.search == currentSearch() && type != "POST") {
 
             if(!url.hash) return;
             Transparent.scrollToHash(url.hash ?? "", {easing:Settings["smoothscroll_easing"], duration:Settings["smoothscroll_duration"], speed:Settings["smoothscroll_speed"]}, function() {
@@ -2465,6 +2547,28 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                     history.pushState({uuid: uuid, status:status, method: method, data: {}, href: responseURL}, '', responseURL);
                 } catch (e) {
                     if (Settings.debug) console.error('Transparent: pushState failed (likely a srcdoc iframe) - continuing without it', e);
+                }
+
+                // The srcdoc iframe's own history (immediately above) is a
+                // dead end either way - it has no visible address bar of its
+                // own to drive Back/Forward through even on engines where
+                // the pushState() doesn't outright throw. Redirect internal
+                // nest-scope navigation onto the HOST's real, addressable
+                // history instead: each admin page visited while the
+                // overlay is open gets its own entry there. The host-side
+                // popstate listener (Transparent.nest) re-fetches and
+                // re-mounts the matching href when Back/Forward lands on
+                // one of these - see its own comment for why a fresh fetch
+                // rather than a cheaper client-side restore.
+                if (location.origin === 'null') {
+                    try {
+                        var stillWithinNestScope = !Settings.nest || !Settings.nest.length || matchesPatternList(new URL(responseURL).pathname, Settings.nest);
+                        if (parent.Transparent && parent.Transparent.nest && parent.Transparent.nest.isOpen() && stillWithinNestScope) {
+                            parent.history.pushState({ nest: { href: responseURL } }, '', parent.location.href);
+                        }
+                    } catch (err) {
+                        if (Settings.debug) console.error('Transparent: parent.history.pushState failed from inside nest', err);
+                    }
                 }
             }
 
@@ -3409,7 +3513,32 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
             return container;
         }
 
+        // Gives the nested document a real base URL. A srcdoc document's own
+        // location.href is otherwise the opaque "about:srcdoc" - EXACTLY the
+        // same quirk currentOrigin() exists to work around for origin checks
+        // (see its comment), except this half of it isn't fixable from the
+        // OUTSIDE: the browser's own href-resolution algorithm (what a bare
+        // `<a href="#stats">`'s .href property resolves to, what a relative
+        // form action posts to, etc.) runs INSIDE the nested document and
+        // has no notion of currentOrigin(). Without a <base> tag, a bare-
+        // fragment link resolves against "about:srcdoc" instead of the real
+        // admin page - clicking it fell through every "is this just a
+        // same-page scroll" check and reached a real, broken navigation
+        // instead. A <base href> is the standard fix for embedding arbitrary
+        // HTML via srcdoc while keeping normal relative-URL semantics; only
+        // path-relative and fragment-only references were ever affected
+        // (absolute `/...` paths, which this app uses almost everywhere,
+        // resolve identically with or without one).
+        function injectBaseTag(html, href) {
+            var baseTag = '<base href="' + String(href).replace(/"/g, '&quot;') + '">';
+            if (/<head[^>]*>/i.test(html)) return html.replace(/<head[^>]*>/i, function (m) { return m + baseTag; });
+            if (/<html[^>]*>/i.test(html)) return html.replace(/<html[^>]*>/i, function (m) { return m + baseTag; });
+            return baseTag + html;
+        }
+
         function mount(html, href, fresh) {
+
+            html = injectBaseTag(html, href);
 
             var container = api.getContainer();
 
@@ -3931,6 +4060,22 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
             if (api.isOpen()) {
                 if (!(e.state && e.state.nest)) {
                     api.close(false);                  // back onto the host entry
+                    return;
+                }
+                // Back/Forward landed on a DIFFERENT internal nest page
+                // (pushed by the iframe-side xhr success handler above) -
+                // re-fetch and re-mount it. A fresh fetch rather than
+                // restoring some cached DOM: srcdoc replaces the whole
+                // inner Document on every mount anyway (nothing durable to
+                // restore across that), and the target page may have
+                // changed server-side since it was last shown regardless.
+                // fetchNested's own settle() naturally skips re-pushing a
+                // duplicate entry here (fresh=false, and history.state.nest
+                // is already this exact entry).
+                var container = api.getContainer();
+                var target = e.state.nest.href;
+                if (container && container._currentHref !== target) {
+                    fetchNested(target, function () { window.location.href = target; });
                 }
                 return;
             }

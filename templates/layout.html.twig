@@ -747,7 +747,12 @@
                     // article) should be a plain navigation, not an
                     // attempt to AJAX-swap the whole unrelated page into
                     // this frame.
-                    exceptions: [/^(?!\/admin(\/|$)).*/]
+                    exceptions: [/^(?!\/admin(\/|$)).*/],
+                    // Changes on every real deploy, so a tab with an admin
+                    // page cached from before a deploy purges its whole
+                    // Transparent cache instead of replaying stale HTML
+                    // forever - see transparent.js's own cache_version doc.
+                    cache_version: '{{ deploy_version() }}'
                 });
             }, { once: true });
         </script>
