@@ -299,6 +299,12 @@
         #admin-customize-done { display: none; }
         body.is-customizing #admin-customize-done { display: inline-flex; }
         .admin-sidebar-footer { display: flex; align-items: center; justify-content: center; gap: .5rem; padding: .9rem 1.25rem; border-top: 1px solid var(--admin-border); flex-shrink: 0; }
+        {# Collapsed rail is ~4.5rem wide - a horizontal row of up to 4
+           icon buttons (home/stats/exit/collapse-toggle) doesn't fit that
+           width and either overflows or crowds together. Stacked as a
+           column instead, matching how the main menu itself is already
+           one icon per row once collapsed. #}
+        html.is-sidebar-collapsed .admin-sidebar-footer { flex-direction: column; padding: .9rem .5rem; gap: .6rem; }
         {# Hidden until explicitly toggled open (data-stats-toggle) - see the
            delegated click handler in the script below. #}
         .admin-sidebar-stats { display: none; flex-shrink: 0; padding: .9rem 1.25rem 1.1rem; border-top: 1px solid var(--admin-border); }
@@ -1045,7 +1051,17 @@
                                with item-controls absent outside customize mode, space-between
                                had exactly two visible children (icon, label) and pushed the
                                LAST one - the label - all the way to the right edge. #}
-                            <div class="section" title="{{ item.label|trans({}, 'admin') }}">
+                            {# No title="" here - the native browser tooltip and the
+                               custom flyout panel below both trigger on the same
+                               hover, so with one it'd pop up floating and
+                               disconnected right alongside the flyout (reported
+                               live via screenshot: a small "Rôles" box detached
+                               from the actual panel). The flyout's own heading
+                               (.flyout-heading, collapsed-mode only) already
+                               shows this label - a plain link's title (below,
+                               in the expanded per-item .section-label) is the
+                               only other place a bare label ever needs one. #}
+                            <div class="section">
                                 <span class="section-label">
                                     {% if item.icon %}<i class="{{ item.icon }}"></i>{% endif %}
                                     <span class="label-text">{{ item.label|trans({}, 'admin') }}</span>
