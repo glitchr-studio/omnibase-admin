@@ -1202,6 +1202,16 @@
     <main class="admin-main">
         {% block topbar %}
             <div class="admin-topbar">
+                {% if is_granted('ROLE_SUPERADMIN') %}
+                    {# On the LEFT, not grouped with the always-visible icon
+                       cluster on the right - that cluster is right-anchored
+                       (margin-left: auto), so a button toggling display:none
+                       inside it shifts every other icon's position each time
+                       customize mode turns on/off. Nothing else on this side
+                       ever appears/disappears, so this can never displace
+                       anything else. #}
+                    <button type="button" class="btn btn-primary" id="admin-customize-done" data-csrf-token="{{ csrf_token('admin-layout') }}">{{ 'customize.done'|trans({}, 'admin') }}</button>
+                {% endif %}
                 {% if admin_context is defined and admin_context.crudControllerFqcn %}
                     {# persistent search, present on every page of a CRUD (index/
                        new/edit/detail) not just the index listing - always
@@ -1271,7 +1281,6 @@
                         <button type="button" class="admin-icon-btn" id="admin-customize-toggle" title="{{ 'topbar.customize'|trans({}, 'admin') }}" aria-pressed="false">
                             <i class="fa-solid fa-arrows-up-down-left-right"></i>
                         </button>
-                        <button type="button" class="btn btn-primary" id="admin-customize-done" data-csrf-token="{{ csrf_token('admin-layout') }}">{{ 'customize.done'|trans({}, 'admin') }}</button>
                     {% endif %}
                 </div>
             </div>
