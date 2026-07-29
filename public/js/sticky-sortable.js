@@ -160,16 +160,26 @@
             return null;
         }
 
+        // Distance to the nearest point ON EACH RECT (clamped to its
+        // edges), not to its center. A wide/tall item (e.g. a 3-of-5-
+        // column chart card) has empty grid space free in its OWN row -
+        // center-to-center distance made that empty space attract to
+        // whatever smaller item happened to sit directly above/below it
+        // in a different row instead, since a small item's center can be
+        // numerically closer than a big item's center even though the
+        // big item's actual edge is right there. Rect-distance is 0 for
+        // any point already alongside the item (same row, past its edge),
+        // so the item you're visually next to wins regardless of size.
         var closest = null;
         var closestDist = Infinity;
         siblings.forEach(function (el) {
             var r = el.getBoundingClientRect();
-            var cx = r.left + r.width / 2;
-            var cy = r.top + r.height / 2;
-            var dist = Math.pow(x - cx, 2) + Math.pow(y - cy, 2);
+            var nearestX = Math.max(r.left, Math.min(x, r.right));
+            var nearestY = Math.max(r.top, Math.min(y, r.bottom));
+            var dist = Math.pow(x - nearestX, 2) + Math.pow(y - nearestY, 2);
             if (dist < closestDist) {
                 closestDist = dist;
-                closest = { el: el, cx: cx, cy: cy };
+                closest = { el: el, cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
             }
         });
         if (!closest) {
