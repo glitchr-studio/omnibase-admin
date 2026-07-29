@@ -584,6 +584,27 @@
            given rather than just the viewport - see the analytics_card
            @container rules below for what that unlocks at size 1. #}
         .widget-block, .widget-group { container-type: inline-size; }
+        {# .widget-group IS its own visible card (one div, both the grid
+           item AND the bordered/backgrounded box) - CSS Grid's default
+           align-items:stretch already makes it fill its row's full height
+           (matched to the tallest sibling in the same row) with no extra
+           work. .widget-block is different: it's a plain wrapper around
+           whatever the resolved widget type actually renders (.analytics-
+           card, or composite's .card) - the WRAPPER stretches to the row
+           height by the same grid default, but its child does NOT, since
+           nothing tells it to. That left a real visible bug: a short
+           block-type card (e.g. a narrow analytics_card instance showing
+           just its stat row, chart/picker hidden by the @container rule
+           below) sitting next to a taller sibling in the same row shows
+           its own white card ending early, with the PAGE's grey
+           background visible underneath, all the way down to the row's
+           actual height - it looks broken because the visible box
+           doesn't fill the space it was actually given. flex:1 on the
+           child makes it stretch to fill instead, exactly matching how
+           .widget-group already behaves. A no-op whenever nothing in the
+           row is taller than this widget's own natural height. #}
+        .widget-block { display: flex; }
+        .widget-block > .analytics-card, .widget-block > .card { flex: 1 1 auto; min-height: 0; }
         .widget-size-2 { grid-column: span 2; }
         .widget-size-3 { grid-column: span 3; }
         @media (max-width: 720px) { .widget-size-2, .widget-size-3 { grid-column: span 1 !important; } }
