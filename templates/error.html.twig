@@ -1,0 +1,42 @@
+{% extends '@Admin/layout.html.twig' %}
+
+{# Renders admin-styled chrome for an exception occurring on an /admin/*
+   path - see Base\Controller\ErrorController::Main() (base-bundle), which
+   picks this template over the front-end's exception.html.twig based on
+   the request path, falling back to the front-end one if this bundle
+   isn't installed. No admin_context is set here (this is reached from an
+   error path, not AbstractDashboardController::index()) - layout.html.twig
+   already guards every sidebar/topbar block on "admin_context is defined",
+   so the chrome/branding still renders correctly with an empty menu; a
+   plain link back to the dashboard is what actually matters here, not a
+   full working nav. #}
+
+{# {% set %} inside a {% block %} is scoped to that block only in Twig -
+   computed once here, at template scope, so both content_header and
+   content (rendered independently) can read it. #}
+{% set knownExceptionTitle = ('@controllers.exception.' ~ flattenException.statusCode ~ '.title')|trans %}
+{% set knownException = knownExceptionTitle != flattenException.statusCode %}
+
+{% block page_title %}{{ flattenException.statusCode }}{% endblock %}
+
+{% block content_header %}
+<div class="admin-header dashboard-header">
+    <div class="dashboard-brand-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+    <div>
+        <h1>{{ flattenException.statusCode }} {{ knownException ? knownExceptionTitle : '@controllers.exception.unknown'|trans }}</h1>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="empty-state">
+        {% if knownException %}
+            <p>{{ ('@controllers.exception.' ~ flattenException.statusCode ~ '.message')|trans }}</p>
+        {% else %}
+            <p>{{ '@controllers.exception.message'|trans([setting_bag.mail._self|default(app.bag('base.notifier.technical_support'))])|raw }}</p>
+        {% endif %}
+        <p><a href="{{ path('admin') }}" class="btn btn-primary">{{ 'menu.dashboard'|trans({}, 'admin') }}</a></p>
+    </div>
+</div>
+{% endblock %}
