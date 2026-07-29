@@ -3,6 +3,7 @@
 namespace Base\Admin\Widget;
 
 use Base\Admin\Config\Menu\MenuItem;
+use Base\Admin\Config\MenuItem as MenuItemFacade;
 
 /**
  * "Dual-width card" fusion: one shared .card holding two (or more) other
@@ -15,11 +16,16 @@ use Base\Admin\Config\Menu\MenuItem;
  *
  * Deliberately implements DashboardWidgetTypeInterface ONLY (not
  * PaletteDashboardWidgetTypeInterface) - that's what excludes it from the
- * "+ Add widget" palette, no separate opt-out flag needed. Composing a
- * composite (which two types, which params) is a code-level/app-developer
- * decision in v1, not something a superadmin assembles at runtime through
- * the UI - the composite ITSELF is still fully hide/resize/reorder-able as
- * one unit through the existing customize UI either way.
+ * "+ Add widget" palette, no separate opt-out flag needed. The composite
+ * ITSELF is still fully hide/resize/reorder-able as one unit through the
+ * existing customize UI either way.
+ *
+ * Two ways a pane gets into params.panes[]: a 'type' key (a code-defined
+ * block widget, e.g. analytics_card, wired by an app developer via
+ * configureWidgetItems() as shown above) or a 'subItems' key (a plain
+ * link-list card, produced end-to-end by the superadmin dragging one
+ * dashboard card onto another - see DashboardWidgetController::merge()).
+ * Both shapes render through the same @Admin/widget/composite.html.twig.
  */
 final class CompositeWidgetType implements DashboardWidgetTypeInterface
 {
@@ -39,18 +45,51 @@ final class CompositeWidgetType implements DashboardWidgetTypeInterface
         $paneWidgets = [];
 
         foreach ($panes as $pane) {
-            $type = $pane['type'] ?? null;
-            // Malformed, or a pane referencing 'composite' itself - the one
-            // defensive guard needed against a misconfigured composite-
-            // inside-composite recursing until PHP's own call-stack limit
-            // takes down the whole dashboard with a fatal error.
-            if (!\is_string($type) || '' === $type || self::getName() === $type) {
+            if (!\is_array($pane)) {
                 continue;
             }
 
-            $paneWidgets[] = (new MenuItem(MenuItem::TYPE_BLOCK, $pane['label'] ?? null, $pane['icon'] ?? null))
-                ->setBlockName($type)
-                ->setParams($pane['params'] ?? []);
+            $type = $pane['type'] ?? null;
+            if (\is_string($type) && '' !== $type) {
+                // A pane referencing 'composite' itself - the one
+                // defensive guard needed against a misconfigured
+                // composite-inside-composite recursing until PHP's own
+                // call-stack limit takes down the whole dashboard with a
+                // fatal error.
+                if (self::getName() === $type) {
+                    continue;
+                }
+
+                $paneWidgets[] = (new MenuItem(MenuItem::TYPE_BLOCK, $pane['label'] ?? null, $pane['icon'] ?? null))
+                    ->setBlockName($type)
+                    ->setParams(\is_array($pane['params'] ?? null) ? $pane['params'] : []);
+                continue;
+            }
+
+            // No 'type' - a link-list ("widget-group") pane instead, the
+            // shape the drag-to-merge feature produces when you drop one
+            // card onto another (see DashboardWidgetController::merge()).
+            // Built as a real TYPE_SECTION MenuItem with subItems so
+            // composite.html.twig's group-pane branch can render it with
+            // the EXACT same markup/twig-property access
+            // (item.linkUrl/item.label/item.icon) as dashboard.html.twig's
+            // own top-level group branch, rather than inventing a second
+            // template shape for what is otherwise identical content.
+            $subItems = \is_array($pane['subItems'] ?? null) ? $pane['subItems'] : [];
+            $paneSubItems = [];
+            foreach ($subItems as $subItem) {
+                if (!\is_array($subItem) || !\is_string($subItem['label'] ?? null) || !\is_string($subItem['url'] ?? null) || '' === $subItem['url']) {
+                    continue;
+                }
+                $icon = \is_string($subItem['icon'] ?? null) ? $subItem['icon'] : null;
+                $paneSubItems[] = MenuItemFacade::linkToUrl($subItem['label'], $icon, $subItem['url'])->setLinkUrl($subItem['url']);
+            }
+            if ([] === $paneSubItems) {
+                continue;
+            }
+
+            $paneWidgets[] = (new MenuItem(MenuItem::TYPE_SECTION, $pane['label'] ?? null, $pane['icon'] ?? null))
+                ->setSubItems($paneSubItems);
         }
 
         return ['panes' => $paneWidgets];

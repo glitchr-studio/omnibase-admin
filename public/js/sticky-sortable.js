@@ -27,6 +27,11 @@
         draggingClass: 'is-dragging',
         placeholderClass: 'is-sortable-placeholder',
         onChange: null,        // function(order, container) - fires once, on drop, if the order changed
+        mergeable: false,      // opt-in: dropping in the INNER zone of another item fires onMerge instead of reordering
+        mergeInset: 28,        // px inset from an item's edges that counts as its "merge zone" rather than its "reorder edge"
+        mergeTargetClass: 'is-merge-target',
+        isMergeable: null,     // function(el): bool - which items can be a merge target/source; null = all of them
+        onMerge: null,         // function(draggedEl, targetEl, container) - fires on drop instead of onChange, only when armed
     };
 
     function closestScrollable(el) {
@@ -53,6 +58,7 @@
         this.pointerId = null;
         this.autoscrollFrame = null;
         this.autoscrollDirection = 0;
+        this.mergeTarget = null;
 
         this.onPointerDown = this.onPointerDown.bind(this);
         this.onPointerMove = this.onPointerMove.bind(this);
@@ -192,6 +198,28 @@
         return { el: closest.el, before: before };
     };
 
+    // Only relevant when options.mergeable - an inset "inner zone" of a
+    // sibling's own rect, distinct from findDropTarget()'s reorder logic
+    // above (which reacts to nearest EDGE/point, not containment). A
+    // point can be simultaneously "nearest" a sibling for reorder purposes
+    // and inside its merge zone; onPointerMove checks merge FIRST and
+    // short-circuits reorder entirely while a merge target is armed, so
+    // there's never a conflict between the two at drop time.
+    StickySortable.prototype.findMergeTarget = function (siblings, x, y) {
+        var inset = this.options.mergeInset;
+        for (var i = 0; i < siblings.length; i++) {
+            var el = siblings[i];
+            if (this.options.isMergeable && !this.options.isMergeable(el)) {
+                continue;
+            }
+            var r = el.getBoundingClientRect();
+            if (x >= r.left + inset && x <= r.right - inset && y >= r.top + inset && y <= r.bottom - inset) {
+                return el;
+            }
+        }
+        return null;
+    };
+
     StickySortable.prototype.onPointerMove = function (e) {
         if (!this.dragging || e.pointerId !== this.pointerId) {
             return;
@@ -202,6 +230,30 @@
         var siblings = Array.prototype.slice.call(this.container.children).filter(function (el) {
             return el !== this.dragging && el !== this.placeholder && el.matches(this.options.items);
         }.bind(this));
+
+        if (this.options.mergeable) {
+            var mergeCandidate = this.options.isMergeable && !this.options.isMergeable(this.dragging)
+                ? null // the item being dragged isn't itself a valid merge source (e.g. a composite) - never arm a merge for it, only allow it to reorder
+                : this.findMergeTarget(siblings, e.clientX, e.clientY);
+            if (mergeCandidate !== this.mergeTarget) {
+                if (this.mergeTarget) {
+                    this.mergeTarget.classList.remove(this.options.mergeTargetClass);
+                }
+                this.mergeTarget = mergeCandidate;
+                if (this.mergeTarget) {
+                    this.mergeTarget.classList.add(this.options.mergeTargetClass);
+                }
+            }
+            if (this.mergeTarget) {
+                // Armed: leave the placeholder exactly where it is - the
+                // dragged item's eventual REORDER position is moot, it's
+                // about to be replaced (along with the target) by onMerge.
+                if (this.options.autoscroll) {
+                    this.updateAutoscroll(e.clientY);
+                }
+                return;
+            }
+        }
 
         var target = this.findDropTarget(siblings, e.clientX, e.clientY);
         if (target) {
@@ -271,9 +323,22 @@
         document.removeEventListener('pointermove', this.onPointerMove);
         document.removeEventListener('pointerup', this.onPointerUp);
 
+        var mergeTarget = this.mergeTarget;
+        if (mergeTarget) {
+            mergeTarget.classList.remove(this.options.mergeTargetClass);
+            this.mergeTarget = null;
+        }
+
         var newIndex = this.items().indexOf(item);
         this.dragging = null;
         this.pointerId = null;
+
+        if (mergeTarget) {
+            if (typeof this.options.onMerge === 'function') {
+                this.options.onMerge(item, mergeTarget, this.container);
+            }
+            return;
+        }
 
         if (newIndex !== this.startIndex && typeof this.options.onChange === 'function') {
             this.options.onChange(this.items(), this.container);

@@ -83,15 +83,18 @@ class LayoutConfigTest extends TestCase
 
     public function testDeeplyNestedParamsAreCappedNotThrown(): void
     {
-        $deep = ['a' => ['b' => ['c' => ['d' => ['e' => 'too deep']]]]];
+        $deep = ['a' => ['b' => ['c' => ['d' => ['e' => ['f' => 'too deep']]]]]];
         $config = LayoutConfig::fromArray(['items' => [
             ['key' => 'a', 'visible' => true, 'blockName' => 'analytics_card', 'params' => $deep],
         ]]);
 
         // Same depthRemaining<0 recursion pattern as sanitizeItems() -
-        // MAX_PARAMS_DEPTH=3 allows keys 4 levels deep (a/b/c/d), the 5th
-        // level (e) is what gets dropped to [].
-        $this->assertSame(['a' => ['b' => ['c' => ['d' => []]]]], $config->getItems()[0]['params']);
+        // MAX_PARAMS_DEPTH=4 allows keys 5 levels deep (a/b/c/d/e - needed
+        // so a merged composite widget's params.panes[n].subItems[n].url
+        // shape, itself 3 array levels under the top-level params array,
+        // survives sanitization), the 6th level (f) is what gets dropped
+        // to [].
+        $this->assertSame(['a' => ['b' => ['c' => ['d' => ['e' => []]]]]], $config->getItems()[0]['params']);
     }
 
     public function testOversizedParamCountIsCapped(): void

@@ -133,6 +133,15 @@ class AdminRouteLoader extends Loader
             [],
             ['GET']
         ));
+        $routes->add('admin_dashboard_widget_merge', new Route(
+            $prefix . '/dashboard/widget/merge',
+            ['_controller' => \Base\Admin\Controller\DashboardWidgetController::class . '::merge'],
+            [],
+            [],
+            '',
+            [],
+            ['GET']
+        ));
     }
 
     /**

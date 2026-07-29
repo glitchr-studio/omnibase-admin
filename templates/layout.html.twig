@@ -269,11 +269,11 @@
            with a live ghost-outline preview (see the pointerdown/move/up
            handlers + .admin-resize-ghost below) rather than resizing the
            real widget mid-drag. A real <button> (tab-reachable, ArrowLeft/
-           Right fallback - see the keydown handler). Only ever rendered
-           (dashboard.html.twig) on widget types whose content actually
-           adapts to size - the analytics card's own @container rules -
-           never on a plain link-group card, which would look identical at
-           any size regardless of how it's dragged.
+           Right fallback - see the keydown handler). Rendered on every
+           card, including a plain link-group one whose own content
+           doesn't visually adapt to size - sizing is still useful there
+           purely for layout purposes (e.g. leaving room beside a merged
+           composite card in the same row).
 
            Lives in the SAME top-right .item-controls row as the grip/eye
            buttons, not a separate bottom-right corner tab - a corner tab's
@@ -295,6 +295,16 @@
         }
         .admin-resize-ghost-badge { position: absolute; top: .5rem; right: .5rem; background: var(--admin-accent); color: #fff;
             font-size: .75rem; font-weight: 600; padding: .2rem .6rem; border-radius: 999px; }
+        {# Armed while dragging one dashboard card over the INNER zone of
+           another (see sticky-sortable.js's mergeable/findMergeTarget) -
+           dropping here fuses the two into a composite instead of
+           reordering. Solid accent outline (not dashed, unlike the resize
+           ghost) so it reads as "land HERE, on this exact card" rather
+           than the resize ghost's "resize to roughly this size" preview. #}
+        .is-merge-target { outline: 3px solid var(--admin-accent); outline-offset: -3px; background: rgba(37,99,235,.08); }
+        @supports (background: color-mix(in srgb, red 8%, transparent)) {
+            .is-merge-target { background: color-mix(in srgb, var(--admin-accent) 8%, transparent); }
+        }
         .item-handle { cursor: grab; touch-action: none; }
         body.is-customizing [data-sortable-item] { cursor: default; }
         .is-dragging { opacity: .85; box-shadow: 0 8px 20px rgba(0,0,0,.18); border-radius: 6px; background: var(--admin-surface); }
@@ -1366,9 +1376,54 @@
             // widget-group's own items) would lock horizontal position and
             // only ever let a widget move up/down within its own column.
             $('[data-sortable]').each(function () {
-                var axis = 'dashboard' === this.dataset.sortable ? null : 'y';
-                $(this).stickySortable({ handle: '[data-sortable-handle]', axis: axis });
+                var isDashboard = 'dashboard' === this.dataset.sortable;
+                var opts = { handle: '[data-sortable-handle]', axis: isDashboard ? null : 'y' };
+                if (isDashboard) {
+                    // Only a card carrying its own data-merge-def can be a
+                    // merge source or target - a composite never does (see
+                    // _block.html.twig), so dragging one onto/off another
+                    // card always just reorders, never fuses.
+                    opts.mergeable = true;
+                    opts.isMergeable = function (el) { return !!el.dataset.mergeDef; };
+                    opts.onMerge = handleMerge;
+                }
+                $(this).stickySortable(opts);
             });
+        }
+
+        // Reads a card's self-contained definition (see _block.html.twig
+        // and dashboard.html.twig's own data-merge-def comments) so it can
+        // be sent to admin_dashboard_widget_merge as-is - the server
+        // trusts nothing in it beyond shape-validating it the same way
+        // LayoutConfig::fromArray() already treats any client input.
+        function captureMergeDefinition(el) {
+            try {
+                return JSON.parse(el.dataset.mergeDef || '');
+            } catch (err) {
+                return null;
+            }
+        }
+
+        function handleMerge(draggedEl, targetEl) {
+            var dragged = captureMergeDefinition(draggedEl);
+            var target = captureMergeDefinition(targetEl);
+            if (!dragged || !target) return; // isMergeable() already guards this - defensive only
+
+            var url = '{{ path("admin_dashboard_widget_merge") }}'
+                + '?target=' + encodeURIComponent(JSON.stringify(target))
+                + '&dragged=' + encodeURIComponent(JSON.stringify(dragged));
+
+            fetch(url)
+                .then(function (r) { return r.text(); })
+                .then(function (html) {
+                    targetEl.insertAdjacentHTML('beforebegin', html);
+                    targetEl.remove();
+                    draggedEl.remove();
+                    // Same reasoning as the palette's own insert flow just
+                    // below: a plain DOM insertion never triggers either of
+                    // admin-charts.js's own init paths.
+                    if (window.AdminCharts && window.AdminCharts.init) window.AdminCharts.init();
+                });
         }
 
         if (toggleBtn) {

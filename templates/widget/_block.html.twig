@@ -9,7 +9,19 @@
    can render one widget's markup standalone, exactly matching what the
    dashboard's own loop produces - same wrapper, same controls, same
    dispatch, no duplicated logic between the two render paths. #}
-<div class="widget-block widget-size-{{ widget.size }} {{ widget.hidden ? 'is-hidden' }}" data-sortable-item data-sortable-key="{{ widget.key }}" data-widget-size="{{ widget.size }}"{% if widget.adHoc %} data-block-name="{{ widget.blockName }}" data-widget-label="{{ widget.label }}" data-widget-icon="{{ widget.icon }}" data-widget-params="{{ widget.params|json_encode }}"{% endif %}>
+{# data-merge-def carries this widget's own full definition (independent
+   of the adHoc-only data-block-name/... attributes above, which only
+   exist so an ad-hoc widget's STORAGE shape round-trips through
+   LayoutConfig - a code-defined widget like analytics_card deliberately
+   stays out of storage, matched by key against configureWidgetItems()
+   again on every request). Merging needs a code-defined widget's
+   definition too (you can drag the built-in analytics_card onto another
+   card), so it's rendered unconditionally here rather than reusing the
+   adHoc-gated attributes. Omitted for the composite type itself - v1
+   doesn't support merging a composite into/onto another card, so it's
+   simply invisible to the merge JS (drag/reorder/resize/hide are
+   unaffected, only merge-drop detection skips it). #}
+<div class="widget-block widget-size-{{ widget.size }} {{ widget.hidden ? 'is-hidden' }}" data-sortable-item data-sortable-key="{{ widget.key }}" data-widget-size="{{ widget.size }}"{% if widget.adHoc %} data-block-name="{{ widget.blockName }}" data-widget-label="{{ widget.label }}" data-widget-icon="{{ widget.icon }}" data-widget-params="{{ widget.params|json_encode }}"{% endif %}{% if widget.blockName and widget.blockName != 'composite' %} data-merge-def="{{ {blockName: widget.blockName, label: (widget.label ? widget.label|trans({}, 'admin') : ''), icon: widget.icon, params: widget.params}|json_encode|e('html_attr') }}"{% endif %}>
     {% if customize_enabled is defined and customize_enabled %}
         {# Resize sits in the SAME always-visible top-right control
            row as the grip/eye buttons - not a separate bottom-right

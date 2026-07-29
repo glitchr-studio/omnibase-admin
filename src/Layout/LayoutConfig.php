@@ -26,7 +26,12 @@ class LayoutConfig
     private const MAX_ICON_LENGTH = 100;
     private const MAX_BLOCK_NAME_LENGTH = 100;
     private const MAX_PARAM_KEYS = 50;
-    private const MAX_PARAMS_DEPTH = 3;
+    // 4, not 3: a merged composite widget's group-type pane nests
+    // params.panes[n].subItems[n].{label,icon,url} - 3 array levels below
+    // the top-level params array itself - and needs to survive
+    // sanitization intact for the merge feature to round-trip through a
+    // save/reload. See LayoutConfigTest::testDeeplyNestedParamsAreCappedNotThrown.
+    private const MAX_PARAMS_DEPTH = 4;
 
     protected int $version = 1;
 
