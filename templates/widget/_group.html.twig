@@ -15,7 +15,7 @@
         {% set mergeSubItems = mergeSubItems|merge([{label: (item.label ? item.label|trans({}, 'admin') : ''), icon: item.icon, url: item.linkUrl}]) %}
     {% endif %}
 {% endfor %}
-<div class="widget-group card {{ widget.hidden ? 'is-hidden' }}" style="grid-column: span {{ widget.size }}" data-sortable-item data-sortable-key="{{ widget.key }}" data-widget-size="{{ widget.size }}" data-merge-def="{{ {label: (widget.label ? widget.label|trans({}, 'admin') : ''), icon: widget.icon, subItems: mergeSubItems}|json_encode|e('html_attr') }}">
+<div class="widget-group card {{ widget.hidden ? 'is-hidden' }}" style="grid-column: span {{ widget.size }}{% if widget.height %}; min-height: {{ widget.height }}px{% endif %}" data-sortable-item data-sortable-key="{{ widget.key }}" data-widget-size="{{ widget.size }}"{% if widget.height %} data-widget-height="{{ widget.height }}"{% endif %} data-merge-def="{{ {label: (widget.label ? widget.label|trans({}, 'admin') : ''), icon: widget.icon, subItems: mergeSubItems}|json_encode|e('html_attr') }}">
     {% if customize_enabled is defined and customize_enabled %}
         <div class="item-controls widget-controls">
             <button type="button" class="item-handle" data-sortable-handle title="{{ 'customize.reorder'|trans({}, 'admin') }}"><i class="fa-solid fa-grip-vertical"></i></button>

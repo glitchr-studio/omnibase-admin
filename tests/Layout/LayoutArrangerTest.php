@@ -191,4 +191,82 @@ class LayoutArrangerTest extends TestCase
 
         $this->assertSame([], $result);
     }
+
+    public function testAppliesAStoredHeight(): void
+    {
+        $a = MenuItem::linkToUrl('A', null, '/a')->setKey('a');
+
+        $config = LayoutConfig::fromArray(['items' => [['key' => 'a', 'visible' => true, 'height' => 350]]]);
+        $result = $this->arranger->apply([$a], $config);
+
+        $this->assertSame(350, $result[0]->getHeight());
+    }
+
+    public function testStoredNullHeightResetsACodeDefaultBackToAuto(): void
+    {
+        $a = MenuItem::linkToUrl('A', null, '/a')->setKey('a')->setHeight(500);
+
+        // 'height' key present but null - not the same as the key being
+        // absent entirely (which would fall back to the code default).
+        $config = LayoutConfig::fromArray(['items' => [['key' => 'a', 'visible' => true, 'height' => null]]]);
+        $result = $this->arranger->apply([$a], $config);
+
+        $this->assertNull($result[0]->getHeight());
+    }
+
+    public function testCaptureThenApplyRoundTripsTheHeight(): void
+    {
+        $a = MenuItem::linkToUrl('A', null, '/a')->setKey('a')->setHeight(420);
+
+        $captured = $this->arranger->capture([$a]);
+        $result = $this->arranger->apply([$a], $captured);
+
+        $this->assertSame(420, $result[0]->getHeight());
+    }
+
+    public function testConsumedSourceKeyIsNotReappendedAsStandaloneItem(): void
+    {
+        // A code-defined widget merged into a composite (see
+        // DashboardWidgetController::sanitizePaneDefinition()'s
+        // 'sourceKey' pane field) must not ALSO reappear as its own
+        // standalone card via the "unmentioned code item" pass below -
+        // configureWidgetItems() still yields it every request regardless
+        // (nothing removes a code-defined item from the app's own PHP
+        // config just because a superadmin merged it in the UI).
+        $a = MenuItem::linkToUrl('A', null, '/a')->setKey('a');
+        $b = MenuItem::linkToUrl('B', null, '/b')->setKey('b');
+
+        $config = LayoutConfig::fromArray(['items' => [
+            ['key' => 'adhoc.composite', 'visible' => true, 'blockName' => 'composite', 'params' => [
+                'panes' => [
+                    ['type' => 'x', 'sourceKey' => 'a'],
+                    ['type' => 'y', 'sourceKey' => 'b'],
+                ],
+            ]],
+        ]]);
+
+        $result = $this->arranger->apply([$a, $b], $config);
+
+        $this->assertSame(['adhoc.composite'], array_map(fn ($i) => $i->getKey(), $result));
+    }
+
+    public function testACodeItemNotConsumedByAnyCompositeStillReappearsNormally(): void
+    {
+        // Regression guard: the consumed-keys check must be scoped to
+        // keys ACTUALLY referenced by a composite's own panes, not
+        // accidentally suppress every code item just because SOME
+        // composite exists in storage.
+        $a = MenuItem::linkToUrl('A', null, '/a')->setKey('a');
+        $b = MenuItem::linkToUrl('B', null, '/b')->setKey('b');
+
+        $config = LayoutConfig::fromArray(['items' => [
+            ['key' => 'adhoc.composite', 'visible' => true, 'blockName' => 'composite', 'params' => [
+                'panes' => [['type' => 'x', 'sourceKey' => 'a']],
+            ]],
+        ]]);
+
+        $result = $this->arranger->apply([$a, $b], $config);
+
+        $this->assertSame(['adhoc.composite', 'b'], array_map(fn ($i) => $i->getKey(), $result));
+    }
 }

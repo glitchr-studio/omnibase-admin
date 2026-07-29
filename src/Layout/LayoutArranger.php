@@ -39,6 +39,7 @@ class LayoutArranger
 
         $result = [];
         $seen = [];
+        $consumedKeys = $this->collectConsumedSourceKeys($stored);
 
         // stored keys, in stored order, each carrying its matching code item
         foreach ($stored as $entry) {
@@ -66,6 +67,7 @@ class LayoutArranger
             // re-clamping here against the CURRENT columns is what keeps
             // an old, now-too-wide stored size from overflowing the grid.
             $item->setSize(min($columns, $entry['size'] ?? $item->getSize()));
+            $item->setHeight(\array_key_exists('height', $entry) ? $entry['height'] : $item->getHeight());
             if ([] !== $item->getSubItems()) {
                 $item->setSubItems($this->applyLevel($item->getSubItems(), $entry['children'] ?? [], $columns));
             }
@@ -76,10 +78,18 @@ class LayoutArranger
 
         // anything the stored config never mentioned, appended in code
         // order at the end of the level (simpler and less surprising than
-        // splicing relative to a sibling; a superadmin drags it once)
+        // splicing relative to a sibling; a superadmin drags it once) -
+        // UNLESS this exact key was merged into a composite elsewhere in
+        // this same stored config (consumedKeys): the app's own
+        // configureWidgetItems() still yields it every request regardless
+        // (nothing removes a code-defined item from PHP just because a
+        // superadmin merged it), so without this check it would silently
+        // reappear as its own standalone card right alongside the
+        // composite it's now part of - reported live as "the dashboard is
+        // adding replicates on top of the merged one".
         foreach ($items as $item) {
             $key = $item->getKey();
-            if (isset($seen[$key])) {
+            if (isset($seen[$key]) || isset($consumedKeys[$key])) {
                 continue;
             }
 
@@ -94,6 +104,35 @@ class LayoutArranger
         }
 
         return $result;
+    }
+
+    /**
+     * Every source key recorded by a composite's own stored panes at this
+     * level (see DashboardWidgetController::merge()'s 'sourceKey' pane
+     * field, set when the pane's original widget was code-defined) - a
+     * code-defined item whose key shows up here has been absorbed into
+     * that composite and must not also be re-appended as its own
+     * standalone entry by the "unmentioned code items" pass above.
+     *
+     * @param array<int, array{blockName?: string, params?: array}> $stored
+     * @return array<string, true>
+     */
+    private function collectConsumedSourceKeys(array $stored): array
+    {
+        $consumed = [];
+        foreach ($stored as $entry) {
+            if ('composite' !== ($entry['blockName'] ?? null)) {
+                continue;
+            }
+
+            foreach ($entry['params']['panes'] ?? [] as $pane) {
+                if (\is_array($pane) && \is_string($pane['sourceKey'] ?? null) && '' !== $pane['sourceKey']) {
+                    $consumed[$pane['sourceKey']] = true;
+                }
+            }
+        }
+
+        return $consumed;
     }
 
     /**
@@ -136,6 +175,7 @@ class LayoutArranger
                 'key' => $item->getKey(),
                 'visible' => !$item->isHidden(),
                 'size' => $item->getSize(),
+                'height' => $item->getHeight(),
                 'children' => $this->captureLevel($item->getSubItems()),
             ];
         }

@@ -1541,7 +1541,15 @@
         // LayoutConfig::fromArray() already treats any client input.
         function captureMergeDefinition(el) {
             try {
-                return JSON.parse(el.dataset.mergeDef || '');
+                var def = JSON.parse(el.dataset.mergeDef || '');
+                // This widget's OWN sortable key, round-tripped through the
+                // server into the composite's stored pane data (see
+                // DashboardWidgetController::sanitizePaneDefinition()) so
+                // LayoutArranger can recognize "this code-defined key was
+                // merged into a composite" and skip re-appending it as a
+                // separate standalone card on the next save/reload.
+                def.sourceKey = el.dataset.sortableKey || null;
+                return def;
             } catch (err) {
                 return null;
             }
@@ -1695,12 +1703,29 @@
         // down - it moves/resizes a separate dashed-outline ghost (fixed-
         // positioned off getBoundingClientRect(), so it's immune to any
         // ancestor's overflow/clipping and never fights the grid's own
-        // reflow) with a size badge, snapped to whichever grid-column
-        // count the pointer is currently over. The real inline
-        // grid-column style - and the real reflow - only ever gets
-        // applied once, on release, to whatever size the ghost was last
-        // showing.
+        // reflow) with a size badge. Width snaps to whichever grid-column
+        // count the pointer is currently over (like before); height is
+        // free-form pixels, not quantized to anything - there's no "row
+        // grid" to snap to the way there's a column count. Both the real
+        // inline grid-column AND min-height styles - and the real reflow -
+        // only ever get applied once, on release, to whatever the ghost
+        // was last showing.
         var resizing = null;
+        // Below this, a card reads as broken (controls overlapping
+        // content) rather than just small - same floor
+        // LayoutConfig/MenuItem enforce server-side, kept in sync here so
+        // the live ghost preview never promises a height the save would
+        // silently clamp away from.
+        var MIN_WIDGET_HEIGHT = 80;
+        // Small vertical movement shouldn't retroactively pin a card's
+        // height to "whatever it happened to be" just because someone
+        // grabbed the corner to resize its WIDTH only - a purely
+        // horizontal drag must leave height exactly as auto/flex-driven
+        // as it always was. Only once the pointer has genuinely moved
+        // vertically past this does a resize start touching height at all
+        // (same dragThreshold-style guard sticky-sortable.js already uses
+        // for "is this a drag or just a click").
+        var HEIGHT_TOUCH_THRESHOLD = 4;
 
         // The dashboard's own configured column count (see
         // dashboard.html.twig's data-widget-columns) - the resize
@@ -1714,12 +1739,12 @@
             return n && n > 0 ? n : 5;
         }
 
-        function paintResizeGhost(ghost, badge, rect, columnWidth, size) {
+        function paintResizeGhost(ghost, badge, rect, columnWidth, size, height) {
             ghost.style.left = rect.left + 'px';
             ghost.style.top = rect.top + 'px';
             ghost.style.width = (columnWidth * size) + 'px';
-            ghost.style.height = rect.height + 'px';
-            badge.textContent = size + ' / ' + currentColumns();
+            ghost.style.height = height + 'px';
+            badge.textContent = size + ' / ' + currentColumns() + ' · ' + Math.round(height) + 'px';
         }
 
         document.addEventListener('pointerdown', function (e) {
@@ -1747,6 +1772,14 @@
             // computed gridTemplateColumns string - fewer ways for this to
             // silently come back wrong.
             var columnWidth = (rect.width / startSize) || 240;
+            // Prefer the STORED height (if this card was already given an
+            // explicit one) over the rendered rect - the rendered height
+            // can be taller than what was actually set, stretched to match
+            // a taller sibling in the same row (see .widget-block/.widget-
+            // group's own flex-fill rules) - starting a new drag from that
+            // inflated value would silently bake the stretch in as a new
+            // explicit height the instant you touched the corner at all.
+            var startHeight = parseInt(item.dataset.widgetHeight || '', 10) || rect.height;
 
             var ghost = document.createElement('div');
             ghost.className = 'admin-resize-ghost';
@@ -1754,12 +1787,13 @@
             badge.className = 'admin-resize-ghost-badge';
             ghost.appendChild(badge);
             document.body.appendChild(ghost);
-            paintResizeGhost(ghost, badge, rect, columnWidth, startSize);
+            paintResizeGhost(ghost, badge, rect, columnWidth, startSize, startHeight);
 
             resizing = {
                 item: item, handle: handle, ghost: ghost, badge: badge, rect: rect,
-                pointerId: e.pointerId, startX: e.clientX, startSize: startSize,
-                columnWidth: columnWidth, target: startSize,
+                pointerId: e.pointerId, startX: e.clientX, startY: e.clientY,
+                startSize: startSize, startHeight: startHeight, columnWidth: columnWidth,
+                target: startSize, targetHeight: startHeight, heightTouched: false,
             };
         });
 
@@ -1767,9 +1801,15 @@
             if (!resizing || e.pointerId !== resizing.pointerId) return;
             var deltaColumns = Math.round((e.clientX - resizing.startX) / resizing.columnWidth);
             var next = Math.max(1, Math.min(currentColumns(), resizing.startSize + deltaColumns));
-            if (next !== resizing.target) {
+
+            var deltaY = e.clientY - resizing.startY;
+            if (Math.abs(deltaY) > HEIGHT_TOUCH_THRESHOLD) resizing.heightTouched = true;
+            var nextHeight = Math.max(MIN_WIDGET_HEIGHT, Math.round(resizing.startHeight + deltaY));
+
+            if (next !== resizing.target || nextHeight !== resizing.targetHeight) {
                 resizing.target = next;
-                paintResizeGhost(resizing.ghost, resizing.badge, resizing.rect, resizing.columnWidth, next);
+                resizing.targetHeight = nextHeight;
+                paintResizeGhost(resizing.ghost, resizing.badge, resizing.rect, resizing.columnWidth, next, nextHeight);
             }
         });
 
@@ -1787,6 +1827,10 @@
             if (parseInt(item.dataset.widgetSize, 10) !== next) {
                 item.style.gridColumn = 'span ' + next;
                 item.dataset.widgetSize = next;
+            }
+            if (resizing.heightTouched) {
+                item.style.minHeight = resizing.targetHeight + 'px';
+                item.dataset.widgetHeight = resizing.targetHeight;
             }
             resizing = null;
         }
@@ -1811,21 +1855,38 @@
         });
 
         // Keyboard fallback: focus the handle (it's a real button, tab-
-        // reachable), ArrowLeft/ArrowRight cycles the size by one step -
-        // same parity with a pointer drag as StickySortable's own arrow-
-        // key fallback gives its drag handles.
+        // reachable) - ArrowLeft/ArrowRight cycles width by one column,
+        // ArrowUp/ArrowDown adjusts height by a fixed step. Same parity
+        // with a pointer drag as StickySortable's own arrow-key fallback
+        // gives its drag handles. Unlike a pointer drag's small-movement
+        // guard, a keyboard press is already a discrete, deliberate action
+        // - no threshold needed before it commits an explicit height.
+        var HEIGHT_KEY_STEP = 20;
         document.addEventListener('keydown', function (e) {
-            if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+            var isWidthKey = 'ArrowLeft' === e.key || 'ArrowRight' === e.key;
+            var isHeightKey = 'ArrowUp' === e.key || 'ArrowDown' === e.key;
+            if (!isWidthKey && !isHeightKey) return;
             var handle = e.target.closest && e.target.closest('[data-resize-handle]');
             if (!handle) return;
             var item = handle.closest('[data-sortable-item]');
             if (!item) return;
             e.preventDefault();
-            var current = parseInt(item.dataset.widgetSize || '1', 10);
-            var next = Math.max(1, Math.min(currentColumns(), current + (e.key === 'ArrowRight' ? 1 : -1)));
-            if (next !== current) {
-                item.style.gridColumn = 'span ' + next;
-                item.dataset.widgetSize = next;
+
+            if (isWidthKey) {
+                var current = parseInt(item.dataset.widgetSize || '1', 10);
+                var next = Math.max(1, Math.min(currentColumns(), current + (e.key === 'ArrowRight' ? 1 : -1)));
+                if (next !== current) {
+                    item.style.gridColumn = 'span ' + next;
+                    item.dataset.widgetSize = next;
+                }
+                return;
+            }
+
+            var currentHeight = parseInt(item.dataset.widgetHeight || '', 10) || item.getBoundingClientRect().height;
+            var nextHeight = Math.max(MIN_WIDGET_HEIGHT, Math.round(currentHeight + HEIGHT_KEY_STEP * (e.key === 'ArrowDown' ? 1 : -1)));
+            if (nextHeight !== currentHeight) {
+                item.style.minHeight = nextHeight + 'px';
+                item.dataset.widgetHeight = nextHeight;
             }
         });
 
@@ -1949,6 +2010,12 @@
                     key: el.dataset.sortableKey,
                     visible: !el.classList.contains('is-hidden'),
                     size: parseInt(el.dataset.widgetSize || '1', 10),
+                    // null (not omitted) when never explicitly resized -
+                    // matches LayoutConfig's own "height: ?int" shape, and
+                    // lets a later save correctly CLEAR a previously-set
+                    // height back to auto if that's ever wired up client-
+                    // side, rather than the key just silently vanishing.
+                    height: el.dataset.widgetHeight ? parseInt(el.dataset.widgetHeight, 10) : null,
                     children: childContainer ? captureLevel(childContainer) : [],
                 };
                 // Ad-hoc/palette-added widgets carry their own definition in

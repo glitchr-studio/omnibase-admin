@@ -174,7 +174,7 @@ class DashboardWidgetController extends AbstractController
      * ({label, icon, subItems}) shape. Same defensive style as
      * LayoutConfig::fromArray().
      *
-     * @return array{type: string, label: ?string, icon: ?string, params: array}|array{label: ?string, icon: ?string, subItems: array}|null
+     * @return array{type: string, label: ?string, icon: ?string, params: array, sourceKey: ?string}|array{label: ?string, icon: ?string, subItems: array, sourceKey: ?string}|null
      */
     private function sanitizePaneDefinition(mixed $data): ?array
     {
@@ -184,6 +184,17 @@ class DashboardWidgetController extends AbstractController
 
         $label = \is_string($data['label'] ?? null) ? $data['label'] : '';
         $icon = \is_string($data['icon'] ?? null) ? $data['icon'] : null;
+        // The pane's ORIGINAL widget key, if it had one (data-merge-def
+        // carries the sortable key of whatever card it was captured from -
+        // see layout.html.twig's captureMergeDefinition()). Round-tripped
+        // as-is into the stored composite's own pane data so
+        // LayoutArranger can recognize "this code-defined key has been
+        // absorbed into a composite" and skip re-appending it as its own
+        // standalone card - without this, a merged code-defined widget
+        // (its underlying configureWidgetItems() entry never goes away)
+        // reappeared as a duplicate right next to the composite it's now
+        // part of on the very next save/reload.
+        $sourceKey = \is_string($data['sourceKey'] ?? null) && '' !== $data['sourceKey'] ? $data['sourceKey'] : null;
 
         // A pane coming from data-merge-def names its type 'blockName'
         // (that's the top-level widget's own attribute name); a pane
@@ -198,6 +209,7 @@ class DashboardWidgetController extends AbstractController
                 'label' => $label,
                 'icon' => $icon,
                 'params' => \is_array($data['params'] ?? null) ? $data['params'] : [],
+                'sourceKey' => $sourceKey,
             ];
         }
 
@@ -217,7 +229,7 @@ class DashboardWidgetController extends AbstractController
                 return null;
             }
 
-            return ['label' => $label, 'icon' => $icon, 'subItems' => $subItems];
+            return ['label' => $label, 'icon' => $icon, 'subItems' => $subItems, 'sourceKey' => $sourceKey];
         }
 
         return null;

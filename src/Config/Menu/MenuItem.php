@@ -76,6 +76,15 @@ class MenuItem
     /** Grid column span for dashboard widgets (1-3). Ignored by sidebar items. */
     protected int $size = 1;
 
+    /**
+     * Explicit height override in pixels for dashboard widgets - null
+     * means "auto" (the card's own natural content height, or whatever a
+     * taller sibling in the same grid row stretches it to - see
+     * layout.html.twig's .widget-block/.widget-group flex-fill rules).
+     * Ignored by sidebar items, same as size.
+     */
+    protected ?int $height = null;
+
     public function __construct(string $type, TranslatableInterface|string|null $label = null, ?string $icon = null)
     {
         $this->type = $type;
@@ -376,6 +385,18 @@ class MenuItem
     public function setSize(int $size): static
     {
         $this->size = max(1, min(10, $size));
+        return $this;
+    }
+
+    public function getHeight(): ?int
+    {
+        return $this->height;
+    }
+
+    /** null clears back to auto. A generous absolute ceiling/floor, same reasoning as setSize(). */
+    public function setHeight(?int $height): static
+    {
+        $this->height = null === $height ? null : max(80, min(2000, $height));
         return $this;
     }
 

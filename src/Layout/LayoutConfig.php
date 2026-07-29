@@ -4,8 +4,8 @@ namespace Base\Admin\Layout;
 
 /**
  * One persisted layout: an ordered, hide/show-annotated tree of item keys.
- * Shape: {version, items: [{key, visible, size, children: [...]}]}, plus
- * four OPTIONAL keys (blockName, label, icon, params) present only on
+ * Shape: {version, items: [{key, visible, size, height, children: [...]}]},
+ * plus four OPTIONAL keys (blockName, label, icon, params) present only on
  * ad-hoc/palette-added widgets - a self-contained widget definition with
  * no code-defined counterpart to re-skin. An item without blockName is
  * byte-identical to the pre-widening 4-key shape (every pre-existing
@@ -21,6 +21,12 @@ class LayoutConfig
     private const MAX_DEPTH = 2;
     private const MAX_ITEMS = 500;
     private const MIN_SIZE = 1;
+    // Explicit height override, in pixels - null means "auto" (natural
+    // content height / stretched to match a taller sibling row, see
+    // layout.html.twig's flex-fill rules). Same range as
+    // MenuItem::setHeight()'s own clamp.
+    private const MIN_HEIGHT = 80;
+    private const MAX_HEIGHT = 2000;
     private const MAX_LABEL_LENGTH = 200;
     private const MAX_ICON_LENGTH = 100;
     private const MAX_BLOCK_NAME_LENGTH = 100;
@@ -45,7 +51,7 @@ class LayoutConfig
     protected int $version = 1;
     protected int $columns = self::DEFAULT_COLUMNS;
 
-    /** @var array<int, array{key: string, visible: bool, size: int, children: array, blockName?: string, label?: string, icon?: ?string, params?: array}> */
+    /** @var array<int, array{key: string, visible: bool, size: int, height: ?int, children: array, blockName?: string, label?: string, icon?: ?string, params?: array}> */
     protected array $items = [];
 
     public static function new(): static
@@ -86,11 +92,13 @@ class LayoutConfig
             }
 
             $size = \is_int($item['size'] ?? null) ? $item['size'] : self::MIN_SIZE;
+            $height = \is_int($item['height'] ?? null) ? max(self::MIN_HEIGHT, min(self::MAX_HEIGHT, $item['height'])) : null;
 
             $entry = [
                 'key' => $item['key'],
                 'visible' => !\array_key_exists('visible', $item) || (bool) $item['visible'],
                 'size' => max(self::MIN_SIZE, min($maxSize, $size)),
+                'height' => $height,
                 'children' => self::sanitizeItems($item['children'] ?? [], $depthRemaining - 1, $maxSize),
             ];
 
@@ -157,7 +165,7 @@ class LayoutConfig
     }
 
     /**
-     * @return array<int, array{key: string, visible: bool, size: int, children: array, blockName?: string, label?: string, icon?: ?string, params?: array}>
+     * @return array<int, array{key: string, visible: bool, size: int, height: ?int, children: array, blockName?: string, label?: string, icon?: ?string, params?: array}>
      */
     public function getItems(): array
     {
@@ -165,7 +173,7 @@ class LayoutConfig
     }
 
     /**
-     * @param array<int, array{key: string, visible: bool, size: int, children: array, blockName?: string, label?: string, icon?: ?string, params?: array}> $items
+     * @param array<int, array{key: string, visible: bool, size: int, height: ?int, children: array, blockName?: string, label?: string, icon?: ?string, params?: array}> $items
      */
     public function setItems(array $items): static
     {

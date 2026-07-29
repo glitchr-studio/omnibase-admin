@@ -16,10 +16,14 @@ class LayoutConfigTest extends TestCase
             ],
         ]);
 
+        // 'height' is new (added alongside 'size') and always present -
+        // an old stored config predating it simply degrades to null
+        // ("auto"), same as any other missing field already does.
         $this->assertSame([
             'key' => 'a',
             'visible' => true,
             'size' => 2,
+            'height' => null,
             'children' => [],
         ], $config->getItems()[0]);
     }
@@ -41,6 +45,7 @@ class LayoutConfigTest extends TestCase
             'key' => 'adhoc.1',
             'visible' => true,
             'size' => 1,
+            'height' => null,
             'children' => [],
             'blockName' => 'analytics_card',
             'label' => 'Second card',
@@ -49,18 +54,47 @@ class LayoutConfigTest extends TestCase
         ], $config->getItems()[0]);
     }
 
-    public function testAnItemWithoutBlockNameStaysTheFourKeyShape(): void
+    public function testAnItemWithoutBlockNameStaysTheFiveKeyShape(): void
     {
         $config = LayoutConfig::fromArray(['items' => [['key' => 'a', 'visible' => true]]]);
 
-        $this->assertSame(['key', 'visible', 'size', 'children'], array_keys($config->getItems()[0]));
+        $this->assertSame(['key', 'visible', 'size', 'height', 'children'], array_keys($config->getItems()[0]));
     }
 
     public function testNonStringBlockNameIsIgnored(): void
     {
         $config = LayoutConfig::fromArray(['items' => [['key' => 'a', 'visible' => true, 'blockName' => 42]]]);
 
-        $this->assertSame(['key', 'visible', 'size', 'children'], array_keys($config->getItems()[0]));
+        $this->assertSame(['key', 'visible', 'size', 'height', 'children'], array_keys($config->getItems()[0]));
+    }
+
+    public function testHeightRoundTripsWhenProvided(): void
+    {
+        $config = LayoutConfig::fromArray(['items' => [
+            ['key' => 'a', 'visible' => true, 'height' => 350],
+        ]]);
+
+        $this->assertSame(350, $config->getItems()[0]['height']);
+    }
+
+    public function testHeightIsClampedToTheValidRange(): void
+    {
+        $config = LayoutConfig::fromArray(['items' => [
+            ['key' => 'a', 'visible' => true, 'height' => 1],
+            ['key' => 'b', 'visible' => true, 'height' => 99999],
+        ]]);
+
+        $this->assertSame(80, $config->getItems()[0]['height']);
+        $this->assertSame(2000, $config->getItems()[1]['height']);
+    }
+
+    public function testNonIntHeightDegradesToNull(): void
+    {
+        $config = LayoutConfig::fromArray(['items' => [
+            ['key' => 'a', 'visible' => true, 'height' => 'tall'],
+        ]]);
+
+        $this->assertNull($config->getItems()[0]['height']);
     }
 
     public function testMissingLabelDefaultsToEmptyStringNotNull(): void
