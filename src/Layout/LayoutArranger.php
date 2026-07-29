@@ -18,7 +18,7 @@ class LayoutArranger
      */
     public function apply(array $items, LayoutConfig $config): array
     {
-        return $this->applyLevel($items, $config->getItems());
+        return $this->applyLevel($items, $config->getItems(), $config->getColumns());
     }
 
     /**
@@ -26,7 +26,7 @@ class LayoutArranger
      * @param array<int, array{key: string, visible: bool, children: array}> $stored
      * @return MenuItem[]
      */
-    private function applyLevel(array $items, array $stored): array
+    private function applyLevel(array $items, array $stored, int $columns): array
     {
         /** @var array<string, MenuItem> $byKey first-wins on a key collision */
         $byKey = [];
@@ -59,9 +59,15 @@ class LayoutArranger
             }
 
             $item->setHidden(!$entry['visible']);
-            $item->setSize($entry['size'] ?? $item->getSize());
+            // min(), not a raw assignment: LayoutConfig::sanitizeItems()
+            // already clamped a STORED size to whatever column count was
+            // in effect when it was saved, but the column count can be
+            // lowered afterwards without that entry ever being re-saved -
+            // re-clamping here against the CURRENT columns is what keeps
+            // an old, now-too-wide stored size from overflowing the grid.
+            $item->setSize(min($columns, $entry['size'] ?? $item->getSize()));
             if ([] !== $item->getSubItems()) {
-                $item->setSubItems($this->applyLevel($item->getSubItems(), $entry['children'] ?? []));
+                $item->setSubItems($this->applyLevel($item->getSubItems(), $entry['children'] ?? [], $columns));
             }
 
             $result[] = $item;
@@ -78,6 +84,11 @@ class LayoutArranger
             }
 
             $item->setHidden(false);
+            // A code-defined default size (e.g. the built-in analytics_card
+            // widget's ->setSize(3)) never went through LayoutConfig's own
+            // sanitizer at all - clamp it here too, so it can't overflow a
+            // dashboard configured with fewer columns than the code default.
+            $item->setSize(min($columns, $item->getSize()));
             $seen[$key] = true;
             $result[] = $item;
         }

@@ -144,6 +144,17 @@ class MenuBuilder
      *        pre-existing caller of resolve() is unaffected.
      * @return MenuItem[]
      */
+    /**
+     * How many columns the given scope's grid is currently configured for
+     * (dashboard.html.twig needs this outside resolve()'s own return value,
+     * to set the --widget-columns CSS custom property and the resize
+     * control's own upper bound).
+     */
+    public function getColumns(string $layoutScope): int
+    {
+        return $this->layoutStore->get($layoutScope)->getColumns();
+    }
+
     public function resolve(iterable $items, ?string $layoutScope = null): array
     {
         $items = is_array($items) ? $items : iterator_to_array($items, false);

@@ -122,4 +122,53 @@ class LayoutConfigTest extends TestCase
         $this->assertLessThanOrEqual(200, \mb_strlen($item['label']));
         $this->assertLessThanOrEqual(100, \mb_strlen($item['icon']));
     }
+
+    public function testColumnsDefaultsToFiveWhenMissing(): void
+    {
+        $config = LayoutConfig::fromArray(['items' => []]);
+
+        $this->assertSame(5, $config->getColumns());
+    }
+
+    public function testColumnsIsClampedToTheValidRange(): void
+    {
+        $this->assertSame(2, LayoutConfig::fromArray(['columns' => 0])->getColumns());
+        $this->assertSame(2, LayoutConfig::fromArray(['columns' => -5])->getColumns());
+        $this->assertSame(10, LayoutConfig::fromArray(['columns' => 999])->getColumns());
+        $this->assertSame(3, LayoutConfig::fromArray(['columns' => 3])->getColumns());
+    }
+
+    public function testNonIntColumnsDegradesToDefault(): void
+    {
+        $this->assertSame(5, LayoutConfig::fromArray(['columns' => 'ten'])->getColumns());
+        $this->assertSame(5, LayoutConfig::fromArray(['columns' => null])->getColumns());
+    }
+
+    public function testItemSizeIsClampedToTheConfiguredColumnsNotAFixedThree(): void
+    {
+        // A widget-size of 5 used to be silently capped to 3 (the old
+        // hardcoded MAX_SIZE) - now it's capped to whatever the SAME
+        // config's own columns value is, and can legitimately survive
+        // above 3 when columns allows it.
+        $config = LayoutConfig::fromArray([
+            'columns' => 10,
+            'items' => [['key' => 'a', 'visible' => true, 'size' => 5, 'children' => []]],
+        ]);
+        $this->assertSame(5, $config->getItems()[0]['size']);
+
+        // A narrower configured column count clamps size down to match,
+        // even below the old fixed ceiling of 3.
+        $config = LayoutConfig::fromArray([
+            'columns' => 2,
+            'items' => [['key' => 'a', 'visible' => true, 'size' => 3, 'children' => []]],
+        ]);
+        $this->assertSame(2, $config->getItems()[0]['size']);
+    }
+
+    public function testToArrayIncludesColumns(): void
+    {
+        $config = LayoutConfig::fromArray(['columns' => 7, 'items' => []]);
+
+        $this->assertSame(['version' => 1, 'columns' => 7, 'items' => []], $config->toArray());
+    }
 }

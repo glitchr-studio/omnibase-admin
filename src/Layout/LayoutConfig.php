@@ -21,7 +21,6 @@ class LayoutConfig
     private const MAX_DEPTH = 2;
     private const MAX_ITEMS = 500;
     private const MIN_SIZE = 1;
-    private const MAX_SIZE = 3;
     private const MAX_LABEL_LENGTH = 200;
     private const MAX_ICON_LENGTH = 100;
     private const MAX_BLOCK_NAME_LENGTH = 100;
@@ -32,8 +31,19 @@ class LayoutConfig
     // sanitization intact for the merge feature to round-trip through a
     // save/reload. See LayoutConfigTest::testDeeplyNestedParamsAreCappedNotThrown.
     private const MAX_PARAMS_DEPTH = 4;
+    // How many columns the dashboard grid is divided into - configurable
+    // per the owner's own request ("why not... allow to change it to 2 3
+    // 5 10?"), not a fixed 3. DEFAULT_COLUMNS=5 matches what was already
+    // being used/liked before this was made configurable at all. A
+    // widget's own 'size' is always clamped to [MIN_SIZE, columns] - not
+    // a separate fixed ceiling - so "size 3" always means "3 of however
+    // many columns are configured", never silently overflows the grid.
+    private const MIN_COLUMNS = 2;
+    private const MAX_COLUMNS = 10;
+    private const DEFAULT_COLUMNS = 5;
 
     protected int $version = 1;
+    protected int $columns = self::DEFAULT_COLUMNS;
 
     /** @var array<int, array{key: string, visible: bool, size: int, children: array, blockName?: string, label?: string, icon?: ?string, params?: array}> */
     protected array $items = [];
@@ -52,12 +62,14 @@ class LayoutConfig
         }
 
         $config->version = \is_int($data['version'] ?? null) ? $data['version'] : 1;
-        $config->items = self::sanitizeItems($data['items'] ?? [], self::MAX_DEPTH);
+        $columns = \is_int($data['columns'] ?? null) ? $data['columns'] : self::DEFAULT_COLUMNS;
+        $config->columns = max(self::MIN_COLUMNS, min(self::MAX_COLUMNS, $columns));
+        $config->items = self::sanitizeItems($data['items'] ?? [], self::MAX_DEPTH, $config->columns);
 
         return $config;
     }
 
-    private static function sanitizeItems(mixed $items, int $depthRemaining): array
+    private static function sanitizeItems(mixed $items, int $depthRemaining, int $maxSize): array
     {
         if (!\is_array($items) || $depthRemaining < 0) {
             return [];
@@ -78,8 +90,8 @@ class LayoutConfig
             $entry = [
                 'key' => $item['key'],
                 'visible' => !\array_key_exists('visible', $item) || (bool) $item['visible'],
-                'size' => max(self::MIN_SIZE, min(self::MAX_SIZE, $size)),
-                'children' => self::sanitizeItems($item['children'] ?? [], $depthRemaining - 1),
+                'size' => max(self::MIN_SIZE, min($maxSize, $size)),
+                'children' => self::sanitizeItems($item['children'] ?? [], $depthRemaining - 1, $maxSize),
             ];
 
             $blockName = $item['blockName'] ?? null;
@@ -133,6 +145,17 @@ class LayoutConfig
         return $this->version;
     }
 
+    public function getColumns(): int
+    {
+        return $this->columns;
+    }
+
+    public function setColumns(int $columns): static
+    {
+        $this->columns = max(self::MIN_COLUMNS, min(self::MAX_COLUMNS, $columns));
+        return $this;
+    }
+
     /**
      * @return array<int, array{key: string, visible: bool, size: int, children: array, blockName?: string, label?: string, icon?: ?string, params?: array}>
      */
@@ -154,6 +177,7 @@ class LayoutConfig
     {
         return [
             'version' => $this->version,
+            'columns' => $this->columns,
             'items' => $this->items,
         ];
     }

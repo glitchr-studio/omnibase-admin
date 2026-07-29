@@ -26,6 +26,7 @@ customize:
     resize: Glisser pour redimensionner
     remove: Supprimer
     add_widget: Ajouter un widget
+    columns: Colonnes
     done: Terminé
     saved: Mise en page enregistrée.
 

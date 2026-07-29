@@ -63,6 +63,7 @@ abstract class AbstractDashboardController extends AbstractController
             // widget groups are configured
             'quick_access' => [] === $widgets ? $this->buildQuickAccess($menu) : [],
             'customize_enabled' => $this->isGranted(\Base\Enum\UserRole::SUPERADMIN),
+            'dashboard_columns' => $this->menuBuilder->getColumns(LayoutScope::DASHBOARD),
         ]);
     }
 

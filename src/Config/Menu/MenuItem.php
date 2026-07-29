@@ -364,9 +364,18 @@ class MenuItem
         return $this->size;
     }
 
+    /**
+     * A generous absolute ceiling (matching Layout\LayoutConfig::MAX_COLUMNS
+     * - not imported here, this class doesn't depend on the Layout
+     * namespace), not the real business limit: the dashboard's actual
+     * configured column count is dynamic and enforced separately, in
+     * LayoutConfig::sanitizeItems() (stored values) and
+     * LayoutArranger::apply() (code-defined defaults) - both of which know
+     * the CURRENT column count, which this model class has no way to.
+     */
     public function setSize(int $size): static
     {
-        $this->size = max(1, min(3, $size));
+        $this->size = max(1, min(10, $size));
         return $this;
     }
 

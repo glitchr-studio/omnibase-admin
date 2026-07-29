@@ -21,6 +21,21 @@
        palette must stay reachable even if every widget were ever hidden/
        removed, otherwise there'd be no way back in through the UI. #}
     <div class="widget-grid-toolbar">
+        {# Columns is a per-scope setting (LayoutConfig::$columns), not a
+           per-widget one - changing it live-updates --widget-columns on
+           the grid below via a delegated JS handler, and is included in
+           the same batched POST as everything else on "Done" (see
+           saveScope() below). Presets match what was actually asked for
+           ("2 3 5 10"), not a free-form input - a dashboard's column
+           count isn't something that needs arbitrary precision. #}
+        <label class="admin-columns-select">
+            {{ 'customize.columns'|trans({}, 'admin') }}
+            <select data-columns-select>
+                {% for n in [2, 3, 5, 10] %}
+                    <option value="{{ n }}" {{ n == dashboard_columns ? 'selected' }}>{{ n }}</option>
+                {% endfor %}
+            </select>
+        </label>
         <div class="admin-icon-dropdown" data-dropdown>
             <button type="button" class="btn" aria-haspopup="true" aria-expanded="false" id="admin-add-widget-trigger">
                 <i class="fa-solid fa-plus"></i> {{ 'customize.add_widget'|trans({}, 'admin') }}
@@ -34,8 +49,14 @@
    supplies its OWN single .card (either analytics_card's, or the
    .widget-group class right below), so nothing is ever a card nested
    inside another card. New widget types must follow the same rule: one
-   .card per grid item, never a wrapping card around the whole grid. #}
-<div class="widget-grid" data-sortable="dashboard">
+   .card per grid item, never a wrapping card around the whole grid.
+
+   --widget-columns backs grid-template-columns (see layout.html.twig's
+   CSS) - a real, configurable column count instead of however many
+   ~240px tracks happen to fit the viewport, so a widget's size (1..N)
+   always means "N of THIS many columns", never silently more or fewer
+   than what the resize control (also capped to this same number) implies. #}
+<div class="widget-grid" data-sortable="dashboard" data-widget-columns="{{ dashboard_columns|default(5) }}" style="--widget-columns: {{ dashboard_columns|default(5) }}">
         {% for widget in widgets %}
             {% if widget.type == 'block' %}
                 {{ include('@Admin/widget/_block.html.twig', {widget: widget, customize_enabled: customize_enabled ?? false}) }}
@@ -51,7 +72,7 @@
                         {% set mergeSubItems = mergeSubItems|merge([{label: (item.label ? item.label|trans({}, 'admin') : ''), icon: item.icon, url: item.linkUrl}]) %}
                     {% endif %}
                 {% endfor %}
-                <div class="widget-group card widget-size-{{ widget.size }} {{ widget.hidden ? 'is-hidden' }}" data-sortable-item data-sortable-key="{{ widget.key }}" data-widget-size="{{ widget.size }}" data-merge-def="{{ {label: (widget.label ? widget.label|trans({}, 'admin') : ''), icon: widget.icon, subItems: mergeSubItems}|json_encode|e('html_attr') }}">
+                <div class="widget-group card {{ widget.hidden ? 'is-hidden' }}" style="grid-column: span {{ widget.size }}" data-sortable-item data-sortable-key="{{ widget.key }}" data-widget-size="{{ widget.size }}" data-merge-def="{{ {label: (widget.label ? widget.label|trans({}, 'admin') : ''), icon: widget.icon, subItems: mergeSubItems}|json_encode|e('html_attr') }}">
                     {% if customize_enabled is defined and customize_enabled %}
                         <div class="item-controls widget-controls">
                             <button type="button" class="item-handle" data-sortable-handle title="{{ 'customize.reorder'|trans({}, 'admin') }}"><i class="fa-solid fa-grip-vertical"></i></button>

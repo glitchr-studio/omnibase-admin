@@ -100,14 +100,45 @@ class LayoutArrangerTest extends TestCase
         $this->assertSame(['a', 'b'], array_map(fn ($i) => $i->getKey(), $result));
     }
 
-    public function testAppliesAStoredSizeAndClampsItToTheValidRange(): void
+    public function testAppliesAStoredSizeAndClampsItToTheConfiguredColumns(): void
     {
         $a = MenuItem::linkToUrl('A', null, '/a')->setKey('a')->setSize(1);
 
-        $config = LayoutConfig::fromArray(['items' => [['key' => 'a', 'visible' => true, 'size' => 99]]]);
+        // columns:3 makes the valid range explicit - LayoutConfig's own
+        // sanitizer already clamps a stored 99 down to the configured
+        // column count (3) on the way in, so this also exercises that
+        // LayoutArranger doesn't need to reclamp what's already valid.
+        $config = LayoutConfig::fromArray(['columns' => 3, 'items' => [['key' => 'a', 'visible' => true, 'size' => 99]]]);
         $result = $this->arranger->apply([$a], $config);
 
         $this->assertSame(3, $result[0]->getSize());
+    }
+
+    public function testAppliesAStoredSizeAboveTheOldFixedCeilingWhenColumnsAllowsIt(): void
+    {
+        // Sizes were hardcoded to a max of 3 before columns became
+        // configurable - with columns:10, a stored size of 5 must survive
+        // intact, not get silently capped at the old fixed ceiling.
+        $a = MenuItem::linkToUrl('A', null, '/a')->setKey('a')->setSize(1);
+
+        $config = LayoutConfig::fromArray(['columns' => 10, 'items' => [['key' => 'a', 'visible' => true, 'size' => 5]]]);
+        $result = $this->arranger->apply([$a], $config);
+
+        $this->assertSame(5, $result[0]->getSize());
+    }
+
+    public function testCodeDefinedSizeIsClampedToTheConfiguredColumnsEvenWithNoStoredEntry(): void
+    {
+        // A code default (e.g. the built-in analytics_card's ->setSize(3))
+        // never goes through LayoutConfig's own sanitizer at all - it must
+        // still be clamped against a narrower configured column count so
+        // it can't overflow the grid.
+        $a = MenuItem::linkToUrl('A', null, '/a')->setKey('a')->setSize(3);
+
+        $config = LayoutConfig::fromArray(['columns' => 2, 'items' => []]);
+        $result = $this->arranger->apply([$a], $config);
+
+        $this->assertSame(2, $result[0]->getSize());
     }
 
     public function testCaptureThenApplyRoundTripsTheCodeDefinedSize(): void
