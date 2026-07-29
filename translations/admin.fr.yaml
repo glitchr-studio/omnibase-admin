@@ -24,6 +24,8 @@ customize:
     reorder: Glisser pour réorganiser
     toggle_visibility: Afficher/masquer
     resize: Glisser pour redimensionner
+    remove: Supprimer
+    add_widget: Ajouter un widget
     done: Terminé
     saved: Mise en page enregistrée.
 

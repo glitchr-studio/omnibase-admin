@@ -24,6 +24,8 @@ customize:
     reorder: Drag to reorder
     toggle_visibility: Show/hide
     resize: Drag to resize
+    remove: Remove
+    add_widget: Add widget
     done: Done
     saved: Layout saved.
 

@@ -81,15 +81,55 @@ return function (ContainerConfigurator $configurator) {
     // live via curl against beta while wiring AnalyticsController - the
     // exact same gap was already latent in LayoutController, just never
     // exercised end-to-end before now.
+    //
+    // A raw `service('service_container')` reference (the first attempt
+    // at this fix) turned out to be fragile in a way that only surfaced
+    // later: AbstractController::isGranted() calls
+    // $this->container->has('security.authorization_checker'), which is
+    // a PRIVATE service (confirmed via debug:container) - Symfony's
+    // compiled container only keeps a private service's getter method at
+    // all if something ELSE happens to reference it directly at compile
+    // time, so whether `service_container`->has() finds it depends on
+    // incidental compilation luck, not anything guaranteed. Caught live:
+    // after a full cache rebuild, every isGranted() call in this file
+    // started throwing "The SecurityBundle is not registered" - the
+    // private-service getter had been pruned. A service_locator() is
+    // Symfony's actual intended mechanism for this exact situation: it's
+    // explicitly allowed to reference private services directly
+    // (that's the whole point), independent of compile-time pruning.
+    // Built to match AbstractController::getSubscribedServices()'s own
+    // contract exactly, so every $this->container->get(...)/has(...)
+    // call anywhere in AbstractController (not just isGranted()) keeps
+    // working.
+    $controllerServiceLocator = service_locator([
+        'router' => service('router')->nullOnInvalid(),
+        'request_stack' => service('request_stack')->nullOnInvalid(),
+        'http_kernel' => service('http_kernel')->nullOnInvalid(),
+        'serializer' => service('serializer')->nullOnInvalid(),
+        'security.authorization_checker' => service('security.authorization_checker')->nullOnInvalid(),
+        'twig' => service('twig')->nullOnInvalid(),
+        'form.factory' => service('form.factory')->nullOnInvalid(),
+        'security.token_storage' => service('security.token_storage')->nullOnInvalid(),
+        'security.csrf.token_manager' => service('security.csrf.token_manager')->nullOnInvalid(),
+        'parameter_bag' => service('parameter_bag')->nullOnInvalid(),
+        'web_link.http_header_serializer' => service('web_link.http_header_serializer')->nullOnInvalid(),
+    ]);
+
     $services->set(LayoutController::class)
         ->args([service(LayoutStore::class)])
-        ->call('setContainer', [service('service_container')])
+        ->call('setContainer', [$controllerServiceLocator])
         ->public(true)
         ->tag('controller.service_arguments');
 
     $services->set(AnalyticsController::class)
         ->args([service(\Base\Service\Analytics::class), service('translator'), service(\Base\Admin\Widget\TimelineEventRegistry::class)])
-        ->call('setContainer', [service('service_container')])
+        ->call('setContainer', [$controllerServiceLocator])
+        ->public(true)
+        ->tag('controller.service_arguments');
+
+    $services->set(\Base\Admin\Controller\DashboardWidgetController::class)
+        ->args([service(\Base\Admin\Widget\PaletteWidgetTypeRegistry::class), service('translator')])
+        ->call('setContainer', [$controllerServiceLocator])
         ->public(true)
         ->tag('controller.service_arguments');
 
@@ -101,10 +141,14 @@ return function (ContainerConfigurator $configurator) {
     // thing - its own autoconfigured services pick up the tag for free.
     $services->set(\Base\Admin\Widget\AnalyticsCardWidgetType::class)
         ->args([service(\Base\Service\Analytics::class), service(\Base\Admin\Widget\TimelineEventRegistry::class)])
-        ->tag('base.admin.dashboard_widget_type');
+        ->tag('base.admin.dashboard_widget_type')
+        ->tag('base.admin.dashboard_widget_type.palette');
 
     $services->set(DashboardWidgetTypeRegistry::class)
         ->args([tagged_iterator('base.admin.dashboard_widget_type')]);
+
+    $services->set(\Base\Admin\Widget\PaletteWidgetTypeRegistry::class)
+        ->args([tagged_iterator('base.admin.dashboard_widget_type.palette')]);
 
     $services->set(\Base\Admin\Widget\TimelineEventRegistry::class)
         ->args([tagged_iterator('base.admin.timeline_event_provider')]);

@@ -12,7 +12,7 @@ use Base\Service\Analytics;
  * A second instance with different $params (e.g. ['days' => 30]) shows a
  * genuinely different initial window with zero Twig changes required.
  */
-final class AnalyticsCardWidgetType implements DashboardWidgetTypeInterface
+final class AnalyticsCardWidgetType implements PaletteDashboardWidgetTypeInterface
 {
     public function __construct(
         private readonly Analytics $analytics,
@@ -28,6 +28,16 @@ final class AnalyticsCardWidgetType implements DashboardWidgetTypeInterface
     public function getTemplate(): string
     {
         return '@Admin/widget/analytics_card.html.twig';
+    }
+
+    public function getDefaultLabel(): string
+    {
+        return 'dashboard.analytics_title';
+    }
+
+    public function getDefaultIcon(): ?string
+    {
+        return 'fa-solid fa-chart-line';
     }
 
     public function getTemplateVars(MenuItem $widget): array

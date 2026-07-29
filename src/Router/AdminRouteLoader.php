@@ -67,6 +67,7 @@ class AdminRouteLoader extends Loader
         $this->addDashboardRoute($routes, $prefix);
         $this->addLayoutRoute($routes, $prefix);
         $this->addAnalyticsRoute($routes, $prefix);
+        $this->addDashboardWidgetRoutes($routes, $prefix);
 
         return $routes;
     }
@@ -101,6 +102,32 @@ class AdminRouteLoader extends Loader
             $prefix . '/analytics/breakdown/{range}',
             ['_controller' => \Base\Admin\Controller\AnalyticsController::class . '::breakdown'],
             ['range' => 'today|7d|14d|30d|all'],
+            [],
+            '',
+            [],
+            ['GET']
+        ));
+    }
+
+    /**
+     * The dashboard "+ Add widget" palette - see DashboardWidgetController.
+     * GET + no CSRF (read-only, neither action persists anything).
+     */
+    private function addDashboardWidgetRoutes(RouteCollection $routes, string $prefix): void
+    {
+        $routes->add('admin_dashboard_widget_types', new Route(
+            $prefix . '/dashboard/widget-types',
+            ['_controller' => \Base\Admin\Controller\DashboardWidgetController::class . '::types'],
+            [],
+            [],
+            '',
+            [],
+            ['GET']
+        ));
+        $routes->add('admin_dashboard_widget_new', new Route(
+            $prefix . '/dashboard/widget/{blockName}/new',
+            ['_controller' => \Base\Admin\Controller\DashboardWidgetController::class . '::newInstance'],
+            ['blockName' => '[\w\-]+'],
             [],
             '',
             [],

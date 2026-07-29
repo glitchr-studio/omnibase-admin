@@ -5,6 +5,7 @@ namespace Base\Admin;
 use Base\Admin\Controller\CrudControllerInterface;
 use Base\Admin\DependencyInjection\Compiler\AdminRoutePass;
 use Base\Admin\Widget\DashboardWidgetTypeInterface;
+use Base\Admin\Widget\PaletteDashboardWidgetTypeInterface;
 use Base\Bundle\AbstractBaseBundle;
 use Base\Traits\SingletonTrait;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -63,6 +64,12 @@ class AdminBundle extends AbstractBaseBundle
         // enough (same as MenuBuilder's own dashboard-controller argument).
         $container->registerForAutoconfiguration(DashboardWidgetTypeInterface::class)
             ->addTag('base.admin.dashboard_widget_type');
+
+        // Additive: a type implementing this ALSO gets tagged for the
+        // palette, on top of the base tag above (both autoconfiguration
+        // rules apply independently to the same class).
+        $container->registerForAutoconfiguration(PaletteDashboardWidgetTypeInterface::class)
+            ->addTag('base.admin.dashboard_widget_type.palette');
 
         // Legal across the bundle boundary even though the interface lives
         // in base-bundle, not here - same admin-depends-on-base direction
