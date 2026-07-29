@@ -15,12 +15,16 @@
 </div>
 {% endblock %}
 
-{% block content %}
+{% block topbar_dashboard_extra %}
 {% if customize_enabled is defined and customize_enabled %}
-    {# Outside the "widgets is not empty" gate below on purpose - the
-       palette must stay reachable even if every widget were ever hidden/
-       removed, otherwise there'd be no way back in through the UI. #}
-    <div class="widget-grid-toolbar">
+    {# Server-gated on customize_enabled (superadmin) same as before, but
+       ONLY actually visible while is-customizing is toggled on (see
+       layout.html.twig's own #admin-customize-done { display:none } /
+       body.is-customizing #admin-customize-done { display:inline-flex }
+       pattern) - a superadmin viewing the dashboard normally (not
+       editing) shouldn't see either control at all, not just be unable
+       to use them. #}
+    <div class="admin-topbar-dashboard-extra">
         {# Columns is a per-scope setting (LayoutConfig::$columns), not a
            per-widget one - changing it live-updates --widget-columns on
            the grid below via a delegated JS handler, and is included in
@@ -30,11 +34,13 @@
            count isn't something that needs arbitrary precision. #}
         <label class="admin-columns-select">
             {{ 'customize.columns'|trans({}, 'admin') }}
-            <select data-columns-select>
-                {% for n in [2, 3, 5, 10] %}
-                    <option value="{{ n }}" {{ n == dashboard_columns ? 'selected' }}>{{ n }}</option>
-                {% endfor %}
-            </select>
+            <span class="admin-select-wrap">
+                <select data-columns-select>
+                    {% for n in [2, 3, 5, 10] %}
+                        <option value="{{ n }}" {{ n == dashboard_columns ? 'selected' }}>{{ n }}</option>
+                    {% endfor %}
+                </select>
+            </span>
         </label>
         <div class="admin-icon-dropdown" data-dropdown>
             <button type="button" class="btn" aria-haspopup="true" aria-expanded="false" id="admin-add-widget-trigger">
@@ -44,6 +50,9 @@
         </div>
     </div>
 {% endif %}
+{% endblock %}
+
+{% block content %}
 {% if widgets is defined and widgets is not empty %}
 {# .widget-grid is a plain grid, not a .card itself - every widget below
    supplies its OWN single .card (either analytics_card's, or the
