@@ -45,8 +45,17 @@ class LayoutArranger
             $key = $entry['key'];
             $item = $byKey[$key] ?? null;
             if (null === $item) {
-                // a removed CRUD/menu item - drop the stale stored entry silently
-                continue;
+                if (empty($entry['blockName'])) {
+                    // a removed CRUD/menu item - drop the stale stored entry silently
+                    continue;
+                }
+                // an ad-hoc/palette-added widget: no code-defined counterpart
+                // exists (and never will), so the stored entry IS its whole
+                // definition - synthesize a real MenuItem straight from it.
+                // True removal falls out for free from this design: if a
+                // future save simply omits this key, it's never synthesized
+                // again - no tombstone/delete path needed anywhere here.
+                $item = $this->synthesizeAdHocWidget($entry);
             }
 
             $item->setHidden(!$entry['visible']);
@@ -74,6 +83,23 @@ class LayoutArranger
         }
 
         return $result;
+    }
+
+    /**
+     * Builds a real MenuItem straight from a stored ad-hoc entry - no
+     * DashboardWidgetTypeRegistry dependency needed here (that stays this
+     * class's own promise: "no dependencies beyond MenuItem"). Whether
+     * blockName actually resolves to something renderable is decided
+     * later, exactly where it already is today for every widget:
+     * dashboard.html.twig's own {% if widgetType %} guard.
+     */
+    private function synthesizeAdHocWidget(array $entry): MenuItem
+    {
+        return (new MenuItem(MenuItem::TYPE_BLOCK, $entry['label'] ?? '', $entry['icon'] ?? null))
+            ->setBlockName($entry['blockName'])
+            ->setParams($entry['params'] ?? [])
+            ->setKey($entry['key'])
+            ->setAdHoc(true);
     }
 
     /**

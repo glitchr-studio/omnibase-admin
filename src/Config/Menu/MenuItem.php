@@ -62,6 +62,17 @@ class MenuItem
     /** runtime state, set by the layout arranger - hidden items still render (greyed, in customize mode) so they can be un-hidden */
     protected bool $hidden = false;
 
+    /**
+     * True when this item has no code-defined counterpart - it exists
+     * purely because a superadmin added it via the dashboard widget
+     * palette. Set only by LayoutArranger's synthesis pass or
+     * DashboardWidgetController's new-instance endpoint, never by app
+     * code. Needed because blockName alone can't distinguish an ad-hoc
+     * widget from a code-defined one (e.g. the built-in analytics_card
+     * also has a non-null blockName).
+     */
+    protected bool $adHoc = false;
+
     /** Grid column span for dashboard widgets (1-3). Ignored by sidebar items. */
     protected int $size = 1;
 
@@ -356,6 +367,17 @@ class MenuItem
     public function setSize(int $size): static
     {
         $this->size = max(1, min(3, $size));
+        return $this;
+    }
+
+    public function isAdHoc(): bool
+    {
+        return $this->adHoc;
+    }
+
+    public function setAdHoc(bool $adHoc): static
+    {
+        $this->adHoc = $adHoc;
         return $this;
     }
 }

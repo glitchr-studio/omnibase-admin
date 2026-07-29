@@ -3,6 +3,7 @@
 namespace Tests\Base\Admin\Layout;
 
 use Base\Admin\Config\MenuItem;
+use Base\Admin\Config\Menu\MenuItem as MenuItemModel;
 use Base\Admin\Layout\LayoutArranger;
 use Base\Admin\Layout\LayoutConfig;
 use PHPUnit\Framework\TestCase;
@@ -117,5 +118,46 @@ class LayoutArrangerTest extends TestCase
         $result = $this->arranger->apply([$a], $captured);
 
         $this->assertSame(3, $result[0]->getSize());
+    }
+
+    public function testSynthesizesAnAdHocWidgetFromAStoredEntryWithNoCodeMatch(): void
+    {
+        $config = LayoutConfig::fromArray(['items' => [
+            ['key' => 'adhoc.1', 'visible' => true, 'size' => 2, 'blockName' => 'analytics_card', 'label' => 'Second card', 'icon' => 'fa-solid fa-chart-line', 'params' => ['days' => 30]],
+        ]]);
+
+        $result = $this->arranger->apply([], $config);
+
+        $this->assertCount(1, $result);
+        $this->assertSame(MenuItemModel::TYPE_BLOCK, $result[0]->getType());
+        $this->assertTrue($result[0]->isAdHoc());
+        $this->assertSame('analytics_card', $result[0]->getBlockName());
+        $this->assertSame('Second card', $result[0]->getLabel());
+        $this->assertSame(['days' => 30], $result[0]->getParams());
+        $this->assertSame(2, $result[0]->getSize());
+        $this->assertFalse($result[0]->isHidden());
+    }
+
+    public function testAStoredEntryWithNoBlockNameAndNoCodeMatchIsStillDroppedAsStale(): void
+    {
+        $config = LayoutConfig::fromArray(['items' => [
+            ['key' => 'removed-crud', 'visible' => true],
+        ]]);
+
+        $result = $this->arranger->apply([], $config);
+
+        $this->assertSame([], $result);
+    }
+
+    public function testAnAdHocWidgetOmittedFromTheNextSaveIsNeverSynthesizedAgain(): void
+    {
+        // Simulates "remove": the superadmin's next Done click simply
+        // doesn't include this key anymore - no separate delete path exists
+        // or is needed anywhere in LayoutArranger.
+        $config = LayoutConfig::fromArray(['items' => []]);
+
+        $result = $this->arranger->apply([], $config);
+
+        $this->assertSame([], $result);
     }
 }
