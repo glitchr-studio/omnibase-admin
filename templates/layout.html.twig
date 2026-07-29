@@ -314,6 +314,15 @@
         @supports (background: color-mix(in srgb, red 8%, transparent)) {
             .is-merge-target { background: color-mix(in srgb, var(--admin-accent) 8%, transparent); }
         }
+        {# merge/split both do a real server round trip (~0.7-1s on this
+           dev-mode environment, measured live) - this is what makes that
+           wait visibly "something is happening" instead of looking inert
+           (see the pendingKeys comment in the script below for why that
+           mattered: no feedback read as broken and invited a duplicate
+           click/drop for the same card). A gentle pulse, not a spinner -
+           the card's own content stays fully legible the whole time. #}
+        .is-busy { animation: admin-busy-pulse 1s ease-in-out infinite; cursor: wait; }
+        @keyframes admin-busy-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
         .item-handle { cursor: grab; touch-action: none; }
         body.is-customizing [data-sortable-item] { cursor: default; }
         .is-dragging { opacity: .85; box-shadow: 0 8px 20px rgba(0,0,0,.18); border-radius: 6px; background: var(--admin-surface); }
@@ -740,7 +749,19 @@
            (line ~576) to stack panes vertically once the composite itself
            is sized/viewport-narrow - same responsive trigger a customize-
            mode resize already uses everywhere else on this page. #}
-        .composite-card { padding: 1.5rem; }
+        {# display:flex + column here is what lets .composite-panes below
+           actually fill the card's real height. .widget-block > .card
+           (this card) already stretches to match a taller sibling in the
+           same dashboard row (see that rule's own comment on
+           .widget-block), but that stretch stopped one level too
+           shallow: .composite-card itself grew, yet its plain-block
+           child (.composite-panes) just took its own natural content
+           height and left the REST as visible empty space at the
+           bottom - reported live as a composite next to something taller
+           showing a big blank gap under its panes. flex:1 on
+           .composite-panes (below) is what finally propagates the
+           stretch all the way down to the actual pane boxes. #}
+        .composite-card { padding: 1.5rem; display: flex; flex-direction: column; }
         {# 2 columns, not a single flex row - up to MAX_COMPOSITE_PANES (4)
            panes can land here now (merge onto an existing composite grows
            its own panes), wrapping naturally into a 2x2 arrangement for
@@ -751,8 +772,12 @@
            border around every pane reads correctly regardless of
            position. overflow:hidden keeps a bordered pane's own rounded
            corners clean against its embedded child's square-cornered
-           padding/background. #}
-        .composite-panes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; }
+           padding/background. flex:1 (not just display:grid) is what
+           lets this actually consume the composite-card's full stretched
+           height instead of only its own content's natural height -
+           CSS Grid's own align-items:stretch default then does the rest,
+           making each .composite-pane fill that height too. #}
+        .composite-panes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; flex: 1 1 auto; }
         .composite-pane { min-width: 0; border: 1px solid var(--admin-border); border-radius: var(--admin-radius); overflow: hidden; }
         @container (max-width: 480px) {
             .composite-panes { grid-template-columns: 1fr; }
@@ -1537,7 +1562,25 @@
 
         var MAX_COMPOSITE_PANES = 4;
 
+        // merge/split both do a real server round trip (rendering fresh
+        // Twig fragments, not a client-only DOM tweak) - measured live
+        // against this dev-mode beta environment at roughly 0.7-1s per
+        // request, consistently, not just a one-off cold start. With zero
+        // visual feedback during that window, a click/drop looked like it
+        // "didn't work" and a repeated attempt fired a SECOND overlapping
+        // request for the same card - reported live as "doesn't work the
+        // first time, only the second". pendingKeys tracks which widget
+        // keys currently have a request in flight so a second attempt on
+        // the SAME card is a deliberate no-op (not a race), and .is-busy
+        // gives the wait itself a visible state instead of looking inert.
+        var pendingKeys = {};
+        function isPending(el) { return !!pendingKeys[el.dataset.sortableKey]; }
+        function markPending(el) { pendingKeys[el.dataset.sortableKey] = true; el.classList.add('is-busy'); }
+        function clearPending(el) { delete pendingKeys[el.dataset.sortableKey]; el.classList.remove('is-busy'); }
+
         function handleMerge(draggedEl, targetEl) {
+            if (isPending(draggedEl) || isPending(targetEl)) return;
+
             var dragged = captureMergeDefinition(draggedEl);
             if (!dragged) return; // isMergeable() already guards this - defensive only
 
@@ -1555,10 +1598,13 @@
             if (panes.length >= MAX_COMPOSITE_PANES) return; // already full - drop is simply a no-op, not an error
             panes.push(dragged);
 
+            markPending(draggedEl);
+            markPending(targetEl);
+
             var url = '{{ path("admin_dashboard_widget_merge") }}?panes=' + encodeURIComponent(JSON.stringify(panes));
 
             fetch(url)
-                .then(function (r) { return r.text(); })
+                .then(function (r) { if (!r.ok) throw new Error('merge failed: ' + r.status); return r.text(); })
                 .then(function (html) {
                     targetEl.insertAdjacentHTML('beforebegin', html);
                     targetEl.remove();
@@ -1567,6 +1613,14 @@
                     // below: a plain DOM insertion never triggers either of
                     // admin-charts.js's own init paths.
                     if (window.AdminCharts && window.AdminCharts.init) window.AdminCharts.init();
+                })
+                .catch(function () {
+                    // Leave both cards exactly as they were - clearing
+                    // pending below (via finally) is what lets a retry work.
+                })
+                .finally(function () {
+                    clearPending(draggedEl);
+                    clearPending(targetEl);
                 });
         }
 
@@ -1579,18 +1633,27 @@
             var button = e.target.closest('[data-split-item]');
             if (!button || !body.classList.contains('is-customizing')) return;
             var item = button.closest('[data-sortable-item]');
-            if (!item) return;
+            if (!item || isPending(item)) return;
 
             var panes = captureWidgetParams(item).panes;
             if (!Array.isArray(panes) || !panes.length) return;
 
+            markPending(item);
+            button.disabled = true;
+
             var url = '{{ path("admin_dashboard_widget_split") }}?panes=' + encodeURIComponent(JSON.stringify(panes));
             fetch(url)
-                .then(function (r) { return r.text(); })
+                .then(function (r) { if (!r.ok) throw new Error('split failed: ' + r.status); return r.text(); })
                 .then(function (html) {
                     item.insertAdjacentHTML('beforebegin', html);
                     item.remove();
                     if (window.AdminCharts && window.AdminCharts.init) window.AdminCharts.init();
+                })
+                .catch(function () {
+                    button.disabled = false;
+                })
+                .finally(function () {
+                    clearPending(item);
                 });
         });
 
