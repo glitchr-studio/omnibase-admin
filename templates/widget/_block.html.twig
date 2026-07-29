@@ -17,24 +17,16 @@
    again on every request). Merging needs a code-defined widget's
    definition too (you can drag the built-in analytics_card onto another
    card), so it's rendered unconditionally here rather than reusing the
-   adHoc-gated attributes. Omitted for the composite type itself - v1
-   doesn't support merging a composite into/onto another card, so it's
-   simply invisible to the merge JS (drag/reorder/resize/hide are
-   unaffected, only merge-drop detection skips it). #}
+   adHoc-gated attributes. Omitted for the composite type itself - a
+   composite can still be a merge TARGET (dropping a third/fourth card
+   onto it grows its own panes, see layout.html.twig's isMergeTarget), but
+   it can't be DRAGGED to merge further into something else - one level of
+   fusion is the practical ceiling, so this is what keeps it out of the
+   "can this be dragged to start a merge" side of that check. #}
 <div class="widget-block {{ widget.hidden ? 'is-hidden' }}" style="grid-column: span {{ widget.size }}" data-sortable-item data-sortable-key="{{ widget.key }}" data-widget-size="{{ widget.size }}"{% if widget.adHoc %} data-block-name="{{ widget.blockName }}" data-widget-label="{{ widget.label }}" data-widget-icon="{{ widget.icon }}" data-widget-params="{{ widget.params|json_encode }}"{% endif %}{% if widget.blockName and widget.blockName != 'composite' %} data-merge-def="{{ {blockName: widget.blockName, label: (widget.label ? widget.label|trans({}, 'admin') : ''), icon: widget.icon, params: widget.params}|json_encode|e('html_attr') }}"{% endif %}>
     {% if customize_enabled is defined and customize_enabled %}
-        {# Resize sits in the SAME always-visible top-right control
-           row as the grip/eye buttons - not a separate bottom-right
-           corner tab anymore. A corner tab depends on the card's
-           own height and scroll position to ever come into view
-           (worse still inside the nest overlay's own constrained
-           iframe height); reported repeatedly as "no handler
-           visible" despite the control genuinely working when
-           found. This row is the one spot on the card already
-           confirmed visible in every report. #}
         <div class="item-controls widget-controls">
             <button type="button" class="item-handle" data-sortable-handle title="{{ 'customize.reorder'|trans({}, 'admin') }}"><i class="fa-solid fa-grip-vertical"></i></button>
-            <button type="button" class="item-resize-handle" data-resize-handle title="{{ 'customize.resize'|trans({}, 'admin') }}"><i class="fa-solid fa-up-right-and-down-left-from-center"></i></button>
             <button type="button" class="item-toggle" data-toggle-hidden title="{{ 'customize.toggle_visibility'|trans({}, 'admin') }}"><i class="fa-solid fa-eye{{ widget.hidden ? '-slash' }}"></i></button>
             {# Only ad-hoc/palette-added widgets get a remove button - a
                code-defined widget (e.g. the built-in analytics_card) keeps
@@ -45,10 +37,27 @@
                "stop mentioning this key next save" - no confirmation
                dialog, immediate DOM removal (see layout.html.twig's
                [data-remove-item] handler). #}
+            {% if widget.blockName == 'composite' %}
+                {# Rebuilds each pane as its own standalone card again (see
+                   layout.html.twig's [data-split-item] handler +
+                   DashboardWidgetController::split()) - reads this
+                   widget's OWN data-widget-params (its 'panes' array),
+                   already present unconditionally below since a composite
+                   is always adHoc. #}
+                <button type="button" class="item-split" data-split-item title="{{ 'customize.split'|trans({}, 'admin') }}"><i class="fa-solid fa-object-ungroup"></i></button>
+            {% endif %}
             {% if widget.adHoc %}
                 <button type="button" class="item-remove" data-remove-item title="{{ 'customize.remove'|trans({}, 'admin') }}"><i class="fa-solid fa-trash"></i></button>
             {% endif %}
         </div>
+        {# A standalone sibling of .item-controls, NOT nested inside it:
+           .widget-controls is itself position:absolute, so an absolutely-
+           positioned CHILD of it resolves bottom/right against ITS small
+           icon-row box, not the whole card - landing back up near the top
+           regardless of a bottom-right CSS rule. Being a direct child of
+           .widget-block (also position:relative) instead is what actually
+           anchors it to the card's own corner. #}
+        <button type="button" class="item-resize-handle" data-resize-handle title="{{ 'customize.resize'|trans({}, 'admin') }}"><i class="fa-solid fa-up-right-and-down-left-from-center"></i></button>
     {% endif %}
     {% set widgetType = widget.blockName ? dashboard_widget_type(widget.blockName) : null %}
     {% if widgetType %}

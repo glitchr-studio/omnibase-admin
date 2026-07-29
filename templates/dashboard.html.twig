@@ -32,7 +32,7 @@
            saveScope() below). Presets match what was actually asked for
            ("2 3 5 10"), not a free-form input - a dashboard's column
            count isn't something that needs arbitrary precision. #}
-        <label class="admin-columns-select">
+        <label class="admin-columns-select" title="{{ 'customize.columns_hint'|trans({}, 'admin') }}">
             {{ 'customize.columns'|trans({}, 'admin') }}
             <span class="admin-select-wrap">
                 <select data-columns-select>
@@ -70,44 +70,7 @@
             {% if widget.type == 'block' %}
                 {{ include('@Admin/widget/_block.html.twig', {widget: widget, customize_enabled: customize_enabled ?? false}) }}
             {% else %}
-                {# Resize was previously omitted here on the theory that a
-                   fixed link list has nothing to preview at a wider size -
-                   reinstated so every card can be freely sized for layout
-                   purposes (e.g. to make room beside a merged composite),
-                   even though the list content itself doesn't reflow. #}
-                {% set mergeSubItems = [] %}
-                {% for item in widget.subItems %}
-                    {% if item.linkUrl %}
-                        {% set mergeSubItems = mergeSubItems|merge([{label: (item.label ? item.label|trans({}, 'admin') : ''), icon: item.icon, url: item.linkUrl}]) %}
-                    {% endif %}
-                {% endfor %}
-                <div class="widget-group card {{ widget.hidden ? 'is-hidden' }}" style="grid-column: span {{ widget.size }}" data-sortable-item data-sortable-key="{{ widget.key }}" data-widget-size="{{ widget.size }}" data-merge-def="{{ {label: (widget.label ? widget.label|trans({}, 'admin') : ''), icon: widget.icon, subItems: mergeSubItems}|json_encode|e('html_attr') }}">
-                    {% if customize_enabled is defined and customize_enabled %}
-                        <div class="item-controls widget-controls">
-                            <button type="button" class="item-handle" data-sortable-handle title="{{ 'customize.reorder'|trans({}, 'admin') }}"><i class="fa-solid fa-grip-vertical"></i></button>
-                            <button type="button" class="item-resize-handle" data-resize-handle title="{{ 'customize.resize'|trans({}, 'admin') }}"><i class="fa-solid fa-up-right-and-down-left-from-center"></i></button>
-                            <button type="button" class="item-toggle" data-toggle-hidden title="{{ 'customize.toggle_visibility'|trans({}, 'admin') }}"><i class="fa-solid fa-eye{{ widget.hidden ? '-slash' }}"></i></button>
-                        </div>
-                    {% endif %}
-                    {% if widget.icon %}<div class="widget-icon"><i class="{{ widget.icon }}"></i></div>{% endif %}
-                    <h2>{{ widget.label|trans({}, 'admin') }}</h2>
-                    <ul data-sortable="dashboard-items-{{ widget.key }}">
-                        {% for item in widget.subItems %}
-                            {% if item.linkUrl %}
-                            <li>
-                                <a href="{{ item.linkUrl }}">
-                                    {%- if item.crudActionName == 'new' -%}
-                                        <i class="fa-solid fa-circle-plus"></i>
-                                    {%- elseif item.icon -%}
-                                        <i class="{{ item.icon }}"></i>
-                                    {%- endif -%}
-                                    {{ item.label|trans({}, 'admin') }}
-                                </a>
-                            </li>
-                            {% endif %}
-                        {% endfor %}
-                    </ul>
-                </div>
+                {{ include('@Admin/widget/_group.html.twig', {widget: widget, customize_enabled: customize_enabled ?? false}) }}
             {% endif %}
         {% endfor %}
 </div>

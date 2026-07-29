@@ -30,7 +30,8 @@
         mergeable: false,      // opt-in: dropping in the INNER zone of another item fires onMerge instead of reordering
         mergeInset: 28,        // px inset from an item's edges that counts as its "merge zone" rather than its "reorder edge"
         mergeTargetClass: 'is-merge-target',
-        isMergeable: null,     // function(el): bool - which items can be a merge target/source; null = all of them
+        isMergeable: null,     // function(el): bool - gates the item being DRAGGED (can it be a merge source at all); null = anything can
+        isMergeTarget: null,   // function(el): bool - gates merge TARGET candidates; null = falls back to isMergeable (same rule both ways)
         onMerge: null,         // function(draggedEl, targetEl, container) - fires on drop instead of onChange, only when armed
     };
 
@@ -207,9 +208,14 @@
     // there's never a conflict between the two at drop time.
     StickySortable.prototype.findMergeTarget = function (siblings, x, y) {
         var inset = this.options.mergeInset;
+        // isMergeTarget, not isMergeable, for the CANDIDATE side - a
+        // composite can be a valid drop target (gains a pane) without
+        // being draggable to merge further itself; falls back to
+        // isMergeable when the two aren't meant to differ.
+        var isTarget = this.options.isMergeTarget || this.options.isMergeable;
         for (var i = 0; i < siblings.length; i++) {
             var el = siblings[i];
-            if (this.options.isMergeable && !this.options.isMergeable(el)) {
+            if (isTarget && !isTarget(el)) {
                 continue;
             }
             var r = el.getBoundingClientRect();

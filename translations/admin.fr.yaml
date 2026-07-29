@@ -25,8 +25,10 @@ customize:
     toggle_visibility: Afficher/masquer
     resize: Glisser pour redimensionner
     remove: Supprimer
+    split: Séparer
     add_widget: Ajouter un widget
-    columns: Colonnes
+    columns: "Colonnes (max)"
+    columns_hint: "Nombre de colonnes visé sur un grand écran - réduit automatiquement sur un écran plus étroit pour que les cartes ne soient jamais trop serrées."
     done: Terminé
     saved: Mise en page enregistrée.
 

@@ -142,6 +142,15 @@ class AdminRouteLoader extends Loader
             [],
             ['GET']
         ));
+        $routes->add('admin_dashboard_widget_split', new Route(
+            $prefix . '/dashboard/widget/split',
+            ['_controller' => \Base\Admin\Controller\DashboardWidgetController::class . '::split'],
+            [],
+            [],
+            '',
+            [],
+            ['GET']
+        ));
     }
 
     /**

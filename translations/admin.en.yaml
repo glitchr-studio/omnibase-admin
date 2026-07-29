@@ -25,8 +25,10 @@ customize:
     toggle_visibility: Show/hide
     resize: Drag to resize
     remove: Remove
+    split: Split apart
     add_widget: Add widget
-    columns: Columns
+    columns: "Columns (max)"
+    columns_hint: "Target column count on a wide screen - automatically reduced on a narrower one so cards never get cramped."
     done: Done
     saved: Layout saved.
 

@@ -186,9 +186,9 @@
         .admin-menu li { display: flex; align-items: stretch; justify-content: space-between; min-height: 2.4rem; }
         .admin-menu li a { flex: 1; }
         .admin-menu li .item-controls { align-self: center; }
-        .item-handle, .item-toggle, .item-remove { display: flex; align-items: center; justify-content: center; width: 1.6rem; height: 1.6rem; border: 0; border-radius: 6px;
+        .item-handle, .item-toggle, .item-remove, .item-split { display: flex; align-items: center; justify-content: center; width: 1.6rem; height: 1.6rem; border: 0; border-radius: 6px;
             background: none; color: var(--admin-muted); cursor: pointer; font-size: .78rem; flex-shrink: 0; }
-        .item-handle:hover, .item-toggle:hover { background: var(--admin-bg); color: var(--admin-text); }
+        .item-handle:hover, .item-toggle:hover, .item-split:hover { background: var(--admin-bg); color: var(--admin-text); }
         {# Danger-tinted hover only, not a permanent color - only ad-hoc/
            palette-added widgets ever get this button (see _block.html.twig),
            and it deletes immediately with no confirmation step, so the
@@ -282,9 +282,18 @@
            height), and was repeatedly reported as invisible despite
            genuinely working once found. Solid accent fill (not just on
            hover) keeps it obviously distinct from its two plain siblings. #}
-        .item-resize-handle { display: none; width: 1.6rem; height: 1.6rem; border: 0; border-radius: 6px;
+        {# Bottom-right corner, its own floating circle - not grouped into
+           the top-right .widget-controls row anymore. Explicitly asked
+           for back after the top-row placement (moved there earlier over
+           a "hard to find when scrolled/small" concern) - safe to make
+           standalone regardless of where it sits in .item-controls'
+           markup, since position:absolute anchors it to .widget-block/
+           .widget-group's own box (both position:relative) either way,
+           not to whatever row it's DOM-nested in. #}
+        .item-resize-handle { display: none; width: 1.8rem; height: 1.8rem; border: 0; border-radius: 50%;
             align-items: center; justify-content: center; color: #fff; cursor: ew-resize; touch-action: none;
-            background: var(--admin-accent); padding: 0; font: inherit; flex-shrink: 0; }
+            background: var(--admin-accent); padding: 0; font: inherit; flex-shrink: 0;
+            position: absolute; bottom: .6rem; right: .6rem; z-index: 2; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
         body.is-customizing .item-resize-handle { display: flex; }
         .item-resize-handle:hover, .item-resize-handle.is-resizing { filter: brightness(1.12); }
         .item-resize-handle i { font-size: .75rem; }
@@ -685,14 +694,15 @@
         {# .widget-controls floats absolutely over the card's top-right
            corner - without this, a wide stat row's own right-aligned
            content (e.g. the last stat's change badge) runs right up
-           against the handle/resize/toggle/remove icons. Sized for the
-           MAX case (an ad-hoc analytics_card instance gets all 4:
-           handle+resize+toggle+remove - 4 * 1.6rem + 3 * .3rem gap + the
-           .6rem right offset = 7.9rem, rounded up) - the built-in,
-           code-defined instance only ever shows 3, so this is a little
-           generous there, which is harmless. Only needed while the
-           controls are actually visible. #}
-        body.is-customizing .analytics-card-header { padding-right: 8rem; }
+           against the handle/toggle/remove icons. Resize now floats
+           separately at the bottom-right corner (see .item-resize-handle),
+           so this only needs room for the MAX top-row case (an ad-hoc
+           analytics_card instance gets all 3: handle+toggle+remove -
+           3 * 1.6rem + 2 * .3rem gap + the .6rem right offset = 5.7rem,
+           rounded up) - the built-in, code-defined instance only ever
+           shows 2, so this is a little generous there, which is harmless.
+           Only needed while the controls are actually visible. #}
+        body.is-customizing .analytics-card-header { padding-right: 6rem; }
         .analytics-card-header h2 { margin: 0; font-size: 1.1rem; }
         .analytics-stat-row { display: flex; gap: 1.75rem; flex-wrap: wrap; }
         .analytics-stat { min-width: 6rem; }
@@ -731,12 +741,21 @@
            is sized/viewport-narrow - same responsive trigger a customize-
            mode resize already uses everywhere else on this page. #}
         .composite-card { padding: 1.5rem; }
-        .composite-panes { display: flex; gap: 1.5rem; }
-        .composite-pane { flex: 1; min-width: 0; }
-        .composite-pane + .composite-pane { padding-left: 1.5rem; border-left: 1px solid var(--admin-border); }
+        {# 2 columns, not a single flex row - up to MAX_COMPOSITE_PANES (4)
+           panes can land here now (merge onto an existing composite grows
+           its own panes), wrapping naturally into a 2x2 arrangement for
+           3-4 rather than squeezing everything into one ever-narrower
+           row. A border per pane (not the old "+ sibling" divider) is
+           what generalizes to both rows: "not the first" stops meaning
+           "not top-left" the moment panes wrap to a second row, but a
+           border around every pane reads correctly regardless of
+           position. overflow:hidden keeps a bordered pane's own rounded
+           corners clean against its embedded child's square-cornered
+           padding/background. #}
+        .composite-panes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; }
+        .composite-pane { min-width: 0; border: 1px solid var(--admin-border); border-radius: var(--admin-radius); overflow: hidden; }
         @container (max-width: 480px) {
-            .composite-panes { flex-direction: column; gap: 1.25rem; }
-            .composite-pane + .composite-pane { padding-left: 0; border-left: 0; padding-top: 1.25rem; border-top: 1px solid var(--admin-border); }
+            .composite-panes { grid-template-columns: 1fr; }
         }
         .filter-bar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .75rem; padding: .75rem .9rem; margin-bottom: 1rem;
                       background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: var(--admin-radius); }
@@ -1470,12 +1489,17 @@
                 var isDashboard = 'dashboard' === this.dataset.sortable;
                 var opts = { handle: '[data-sortable-handle]', axis: isDashboard ? null : 'y' };
                 if (isDashboard) {
-                    // Only a card carrying its own data-merge-def can be a
-                    // merge source or target - a composite never does (see
-                    // _block.html.twig), so dragging one onto/off another
-                    // card always just reorders, never fuses.
+                    // Only a card carrying its own data-merge-def can be
+                    // DRAGGED to start a merge - a composite never does
+                    // (see _block.html.twig), so picking one up and moving
+                    // it always just reorders, never fuses it into
+                    // something else. A composite CAN be a merge TARGET
+                    // though (isMergeTarget, separate from isMergeable) -
+                    // dropping a third/fourth card onto one grows its own
+                    // panes instead of creating a new nested composite.
                     opts.mergeable = true;
                     opts.isMergeable = function (el) { return !!el.dataset.mergeDef; };
+                    opts.isMergeTarget = function (el) { return !!el.dataset.mergeDef || 'composite' === el.dataset.blockName; };
                     opts.onMerge = handleMerge;
                 }
                 $(this).stickySortable(opts);
@@ -1495,14 +1519,40 @@
             }
         }
 
+        // A composite's OWN definition (data-widget-params, present on
+        // every adHoc widget - a composite is always adHoc) is just
+        // {panes: [...]} already shaped exactly how the server expects a
+        // pane list - no separate capture format needed for "this IS a
+        // composite" vs "this is a plain card being merged".
+        function captureWidgetParams(el) {
+            try {
+                return JSON.parse(el.dataset.widgetParams || '{}');
+            } catch (err) {
+                return {};
+            }
+        }
+
+        var MAX_COMPOSITE_PANES = 4;
+
         function handleMerge(draggedEl, targetEl) {
             var dragged = captureMergeDefinition(draggedEl);
-            var target = captureMergeDefinition(targetEl);
-            if (!dragged || !target) return; // isMergeable() already guards this - defensive only
+            if (!dragged) return; // isMergeable() already guards this - defensive only
 
-            var url = '{{ path("admin_dashboard_widget_merge") }}'
-                + '?target=' + encodeURIComponent(JSON.stringify(target))
-                + '&dragged=' + encodeURIComponent(JSON.stringify(dragged));
+            var isExistingComposite = 'composite' === targetEl.dataset.blockName;
+            var panes;
+            if (isExistingComposite) {
+                var existing = captureWidgetParams(targetEl).panes;
+                panes = Array.isArray(existing) ? existing.slice() : [];
+            } else {
+                var target = captureMergeDefinition(targetEl);
+                if (!target) return;
+                panes = [target];
+            }
+
+            if (panes.length >= MAX_COMPOSITE_PANES) return; // already full - drop is simply a no-op, not an error
+            panes.push(dragged);
+
+            var url = '{{ path("admin_dashboard_widget_merge") }}?panes=' + encodeURIComponent(JSON.stringify(panes));
 
             fetch(url)
                 .then(function (r) { return r.text(); })
@@ -1516,6 +1566,30 @@
                     if (window.AdminCharts && window.AdminCharts.init) window.AdminCharts.init();
                 });
         }
+
+        // Split a composite back into its standalone panes - the inverse
+        // of handleMerge(). Sends the composite's OWN panes list as-is;
+        // the server renders each one as its own fresh widget fragment
+        // (possibly several sibling elements in one response) and this
+        // swaps them in for the composite node.
+        document.addEventListener('click', function (e) {
+            var button = e.target.closest('[data-split-item]');
+            if (!button || !body.classList.contains('is-customizing')) return;
+            var item = button.closest('[data-sortable-item]');
+            if (!item) return;
+
+            var panes = captureWidgetParams(item).panes;
+            if (!Array.isArray(panes) || !panes.length) return;
+
+            var url = '{{ path("admin_dashboard_widget_split") }}?panes=' + encodeURIComponent(JSON.stringify(panes));
+            fetch(url)
+                .then(function (r) { return r.text(); })
+                .then(function (html) {
+                    item.insertAdjacentHTML('beforebegin', html);
+                    item.remove();
+                    if (window.AdminCharts && window.AdminCharts.init) window.AdminCharts.init();
+                });
+        });
 
         if (toggleBtn) {
             toggleBtn.addEventListener('click', function () {

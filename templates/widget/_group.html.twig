@@ -1,0 +1,51 @@
+{# Link-list ("widget-group") card - a section + its sub-items, e.g. the
+   built-in Blog/Photos/Destinations cards configureWidgetItems() yields.
+   Extracted from dashboard.html.twig's widget loop (same reason as
+   widget/_block.html.twig: DashboardWidgetController::split() needs to
+   render one of these standalone, exactly matching what the dashboard's
+   own loop produces, with no duplicated markup between the two paths).
+
+   This card IS its own visible box (one div, unlike _block.html.twig's
+   wrapper-plus-inner-card split) - see layout.html.twig's own CSS comment
+   on why .widget-group needs no flex/stretch fix the way .widget-block
+   does. #}
+{% set mergeSubItems = [] %}
+{% for item in widget.subItems %}
+    {% if item.linkUrl %}
+        {% set mergeSubItems = mergeSubItems|merge([{label: (item.label ? item.label|trans({}, 'admin') : ''), icon: item.icon, url: item.linkUrl}]) %}
+    {% endif %}
+{% endfor %}
+<div class="widget-group card {{ widget.hidden ? 'is-hidden' }}" style="grid-column: span {{ widget.size }}" data-sortable-item data-sortable-key="{{ widget.key }}" data-widget-size="{{ widget.size }}" data-merge-def="{{ {label: (widget.label ? widget.label|trans({}, 'admin') : ''), icon: widget.icon, subItems: mergeSubItems}|json_encode|e('html_attr') }}">
+    {% if customize_enabled is defined and customize_enabled %}
+        <div class="item-controls widget-controls">
+            <button type="button" class="item-handle" data-sortable-handle title="{{ 'customize.reorder'|trans({}, 'admin') }}"><i class="fa-solid fa-grip-vertical"></i></button>
+            <button type="button" class="item-toggle" data-toggle-hidden title="{{ 'customize.toggle_visibility'|trans({}, 'admin') }}"><i class="fa-solid fa-eye{{ widget.hidden ? '-slash' }}"></i></button>
+            {% if widget.adHoc %}
+                <button type="button" class="item-remove" data-remove-item title="{{ 'customize.remove'|trans({}, 'admin') }}"><i class="fa-solid fa-trash"></i></button>
+            {% endif %}
+        </div>
+        {# Standalone sibling, not nested in .widget-controls - see
+           _block.html.twig's own comment on why (an absolutely-positioned
+           child of an absolutely-positioned parent anchors to THAT
+           parent's small box, not the card). #}
+        <button type="button" class="item-resize-handle" data-resize-handle title="{{ 'customize.resize'|trans({}, 'admin') }}"><i class="fa-solid fa-up-right-and-down-left-from-center"></i></button>
+    {% endif %}
+    {% if widget.icon %}<div class="widget-icon"><i class="{{ widget.icon }}"></i></div>{% endif %}
+    <h2>{{ widget.label|trans({}, 'admin') }}</h2>
+    <ul data-sortable="dashboard-items-{{ widget.key }}">
+        {% for item in widget.subItems %}
+            {% if item.linkUrl %}
+            <li>
+                <a href="{{ item.linkUrl }}">
+                    {%- if item.crudActionName == 'new' -%}
+                        <i class="fa-solid fa-circle-plus"></i>
+                    {%- elseif item.icon -%}
+                        <i class="{{ item.icon }}"></i>
+                    {%- endif -%}
+                    {{ item.label|trans({}, 'admin') }}
+                </a>
+            </li>
+            {% endif %}
+        {% endfor %}
+    </ul>
+</div>

@@ -3,6 +3,7 @@
 namespace Base\Admin\Controller;
 
 use Base\Admin\Config\Menu\MenuItem;
+use Base\Admin\Config\MenuItem as MenuItemFacade;
 use Base\Admin\Widget\PaletteWidgetTypeRegistry;
 use Base\Enum\UserRole;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -12,16 +13,23 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
- * Backs the dashboard's "+ Add widget" palette (types/newInstance) and the
- * drag-one-card-onto-another merge gesture (merge). All three actions are
- * GET, no CSRF - read-only, none of them persists anything (persistence
- * still only ever happens through the existing batched admin_layout_save
- * POST on "Done"). Each renders server-side Twig so the client never has
- * to reinvent widget markup itself - it only ever inserts/replaces
- * whatever HTML comes back.
+ * Backs the dashboard's "+ Add widget" palette (types/newInstance), the
+ * drag-one-card-onto-another merge gesture (merge, also used to add a
+ * THIRD/FOURTH card into an already-merged composite), and pulling a
+ * composite back apart into its standalone cards again (split). All
+ * actions are GET, no CSRF - read-only, none of them persists anything
+ * (persistence still only ever happens through the existing batched
+ * admin_layout_save POST on "Done"). Each renders server-side Twig so the
+ * client never has to reinvent widget markup itself - it only ever
+ * inserts/replaces whatever HTML comes back.
  */
 class DashboardWidgetController extends AbstractController
 {
+    // A 2x2 arrangement is the practical ceiling for one composite card -
+    // beyond that it stops reading as "one fused card" and the merge
+    // gesture (drop onto a small existing card) gets fiddly to target.
+    private const MAX_PANES = 4;
+
     public function __construct(
         protected readonly PaletteWidgetTypeRegistry $paletteRegistry,
         protected readonly TranslatorInterface $translator,
@@ -42,30 +50,46 @@ class DashboardWidgetController extends AbstractController
     }
 
     /**
-     * Drag-to-merge: the client sends each side's own full definition
-     * (captured client-side from data-merge-def, see _block.html.twig and
-     * dashboard.html.twig's group branch), this renders the two-pane
-     * composite fragment the same way newInstance() renders a single
-     * fresh one - GET, no CSRF, nothing persisted here either (the
-     * dropped/target nodes only stop existing in storage once "Done"
-     * batches the whole grid's current DOM state, same as every other
-     * customize-mode edit).
+     * Drag-to-merge: the client sends the full list of panes the resulting
+     * composite should have - either [target, dragged] for a brand new
+     * 2-pane fusion, or [...existing composite's own panes, dragged] when
+     * dropping a THIRD/FOURTH card onto an already-merged one (the client
+     * decides which case it is; this endpoint doesn't care, it just
+     * renders whatever pane list it's given, capped at MAX_PANES).
      */
     public function merge(Request $request): Response
     {
         $this->assertSuperadmin();
 
-        $target = $this->decodePaneDefinition($request->query->get('target'));
-        $dragged = $this->decodePaneDefinition($request->query->get('dragged'));
-        if (null === $target || null === $dragged) {
-            throw $this->createNotFoundException('Invalid widget definition to merge.');
+        $rawPanes = \json_decode((string) $request->query->get('panes', ''), true);
+        if (!\is_array($rawPanes)) {
+            throw $this->createNotFoundException('Invalid widget definitions to merge.');
+        }
+
+        $panes = [];
+        foreach ($rawPanes as $rawPane) {
+            $pane = $this->sanitizePaneDefinition($rawPane);
+            if (null !== $pane) {
+                $panes[] = $pane;
+            }
+            if (\count($panes) >= self::MAX_PANES) {
+                break;
+            }
+        }
+
+        if (\count($panes) < 2) {
+            throw $this->createNotFoundException('At least two valid widget definitions are required to merge.');
         }
 
         $widget = (new MenuItem(MenuItem::TYPE_BLOCK, null, null))
             ->setBlockName('composite')
-            ->setParams(['panes' => [$target, $dragged]])
+            ->setParams(['panes' => $panes])
             ->setKey('adhoc.' . \bin2hex(\random_bytes(6)))
-            ->setSize(2)
+            // 2 panes reads fine at the default 2-wide composite; 3-4
+            // wrapping into a 2x2 grid (see composite.html.twig's CSS)
+            // wants the extra room - still just a starting point, the
+            // resize handle can always widen/narrow it afterwards.
+            ->setSize(\count($panes) > 2 ? 3 : 2)
             ->setAdHoc(true);
 
         return $this->render('@Admin/widget/_block.html.twig', [
@@ -75,22 +99,85 @@ class DashboardWidgetController extends AbstractController
     }
 
     /**
-     * Validation boundary for a merge pane definition coming from the
-     * client (data-merge-def, itself just a straight JSON dump of what
-     * the server rendered - trusted in spirit, but still untrusted
-     * request input) - same defensive shape as LayoutConfig::fromArray():
-     * never throws on malformed input, drops anything that doesn't fit
-     * either the block-pane or the group-pane shape.
+     * The inverse of merge(): the client sends a composite's own
+     * data-widget-params (its 'panes' array, unchanged), this renders each
+     * pane back out as its own standalone widget fragment - block-type
+     * panes through the same _block.html.twig wrapper newInstance() uses,
+     * group-type (link-list) panes through _group.html.twig - concatenated
+     * into one response. The client removes the composite node and
+     * inserts this in its place; nothing is persisted here either, same
+     * as every other action in this controller.
+     */
+    public function split(Request $request): Response
+    {
+        $this->assertSuperadmin();
+
+        $rawPanes = \json_decode((string) $request->query->get('panes', ''), true);
+        if (!\is_array($rawPanes)) {
+            throw $this->createNotFoundException('Invalid composite widget definition to split.');
+        }
+
+        $html = '';
+        foreach ($rawPanes as $rawPane) {
+            $pane = $this->sanitizePaneDefinition($rawPane);
+            if (null === $pane) {
+                continue;
+            }
+
+            $key = 'adhoc.' . \bin2hex(\random_bytes(6));
+
+            if (isset($pane['type'])) {
+                $widget = (new MenuItem(MenuItem::TYPE_BLOCK, $pane['label'], $pane['icon']))
+                    ->setBlockName($pane['type'])
+                    ->setParams($pane['params'])
+                    ->setKey($key)
+                    ->setSize(1)
+                    ->setAdHoc(true);
+
+                $html .= $this->renderView('@Admin/widget/_block.html.twig', [
+                    'widget' => $widget,
+                    'customize_enabled' => true,
+                ]);
+                continue;
+            }
+
+            $subItems = [];
+            foreach ($pane['subItems'] as $subItem) {
+                $subItems[] = MenuItemFacade::linkToUrl($subItem['label'], $subItem['icon'], $subItem['url'])->setLinkUrl($subItem['url']);
+            }
+
+            $widget = (new MenuItem(MenuItem::TYPE_SECTION, $pane['label'], $pane['icon']))
+                ->setSubItems($subItems)
+                ->setKey($key)
+                ->setSize(1)
+                ->setAdHoc(true);
+
+            $html .= $this->renderView('@Admin/widget/_group.html.twig', [
+                'widget' => $widget,
+                'customize_enabled' => true,
+            ]);
+        }
+
+        if ('' === $html) {
+            throw $this->createNotFoundException('No valid panes to split out of this composite.');
+        }
+
+        return new Response($html);
+    }
+
+    /**
+     * Validation boundary for a pane definition coming from the client
+     * (data-merge-def or a composite's own data-widget-params - both
+     * trusted in spirit, still untrusted request input): never throws on
+     * malformed input, drops anything that doesn't fit either the
+     * block-pane ({type, label, icon, params}) or the group-pane
+     * ({label, icon, subItems}) shape. Same defensive style as
+     * LayoutConfig::fromArray().
      *
      * @return array{type: string, label: ?string, icon: ?string, params: array}|array{label: ?string, icon: ?string, subItems: array}|null
      */
-    private function decodePaneDefinition(?string $raw): ?array
+    private function sanitizePaneDefinition(mixed $data): ?array
     {
-        if (!\is_string($raw) || '' === $raw) {
-            return null;
-        }
-
-        $data = \json_decode($raw, true);
         if (!\is_array($data)) {
             return null;
         }
@@ -98,9 +185,16 @@ class DashboardWidgetController extends AbstractController
         $label = \is_string($data['label'] ?? null) ? $data['label'] : '';
         $icon = \is_string($data['icon'] ?? null) ? $data['icon'] : null;
 
-        if (\is_string($data['blockName'] ?? null) && '' !== $data['blockName']) {
+        // A pane coming from data-merge-def names its type 'blockName'
+        // (that's the top-level widget's own attribute name); a pane
+        // coming from an EXISTING composite's own data-widget-params
+        // (the split/re-merge case) names it 'type' (CompositeWidgetType's
+        // own pane shape, params.panes[n].type) - accept either so both
+        // call sites can hand this method their data as-is.
+        $type = $data['blockName'] ?? $data['type'] ?? null;
+        if (\is_string($type) && '' !== $type && 'composite' !== $type) {
             return [
-                'type' => $data['blockName'],
+                'type' => $type,
                 'label' => $label,
                 'icon' => $icon,
                 'params' => \is_array($data['params'] ?? null) ? $data['params'] : [],
