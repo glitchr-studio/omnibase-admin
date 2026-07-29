@@ -1315,34 +1315,37 @@
     <main class="admin-main">
         {% block topbar %}
             <div class="admin-topbar">
-                {% if is_granted('ROLE_SUPERADMIN') %}
-                    {# On the LEFT, not grouped with the always-visible icon
-                       cluster on the right - that cluster is right-anchored
-                       (margin-left: auto), so a button toggling display:none
-                       inside it shifts every other icon's position each time
-                       customize mode turns on/off. Nothing else on this side
-                       ever appears/disappears, so this can never displace
-                       anything else. #}
-                    <button type="button" class="btn btn-primary" id="admin-customize-done" data-csrf-token="{{ csrf_token('admin-layout') }}">{{ 'customize.done'|trans({}, 'admin') }}</button>
-                {% endif %}
-                {# Dashboard-only customize controls (widget palette, column
-                   count) - empty on every other admin page, since only
-                   dashboard.html.twig overrides this block. Lives in the
-                   sticky topbar rather than scrolling away with the page
-                   content, right beside "Terminé" since both only ever mean
-                   anything together (in customize mode). #}
-                {% block topbar_dashboard_extra %}{% endblock %}
                 {% if admin_context is defined and admin_context.crudControllerFqcn %}
                     {# persistent search, present on every page of a CRUD (index/
                        new/edit/detail) not just the index listing - always
                        submits back to that CRUD's own index, matching
-                       production's global-looking-but-context-scoped search bar #}
+                       production's global-looking-but-context-scoped search bar.
+                       First now (not last): its flex:1 is what absorbs the
+                       leftover space, pulling everything after it - the
+                       customize controls, then the icon cluster - over to
+                       the right side of the bar instead of them sitting
+                       flush left. #}
                     <form class="topbar-search" method="get" action="{{ admin_url(admin_context.crudControllerFqcn, 'index') }}">
                         <i class="fa-solid fa-magnifying-glass"></i>
                         <input type="search" name="query" placeholder="{{ 'datagrid.search_placeholder'|trans({}, 'admin') }}">
                     </form>
                 {% else %}
                     <span></span>
+                {% endif %}
+                {# Dashboard-only customize controls (widget palette, column
+                   count) - empty on every other admin page, since only
+                   dashboard.html.twig overrides this block. #}
+                {% block topbar_dashboard_extra %}{% endblock %}
+                {% if is_granted('ROLE_SUPERADMIN') %}
+                    {# Last among the customize-mode controls (after the
+                       palette/columns, right before the icon cluster) -
+                       "Done" reads as the final action in that group, not
+                       the first thing you see. Still its own sibling, not
+                       merged into .admin-topbar-icons: that cluster is
+                       right-anchored (margin-left: auto), which already
+                       keeps ITS OWN position fixed regardless of what
+                       shows/hides before it - nothing here can displace it. #}
+                    <button type="button" class="btn btn-primary" id="admin-customize-done" data-csrf-token="{{ csrf_token('admin-layout') }}">{{ 'customize.done'|trans({}, 'admin') }}</button>
                 {% endif %}
                 <div class="admin-topbar-icons">
                     {% if admin_active_users is defined and admin_active_users is not empty %}
