@@ -2,14 +2,22 @@
    arrive as template vars (getTemplateVars()), not fetched here, so this
    template stays agnostic of the data source and reusable across multiple
    analytics_card instances with different params (see MenuItem::block()'s
-   $instanceKey/$params). #}
+   $instanceKey/$params).
+
+   'embedded' (set by composite.html.twig when this renders as one pane of
+   a CompositeWidgetType, unset/false at the top level) drops the .card
+   class - the outer composite already supplies ONE shared border/
+   background for every pane, so a pane keeping its own .card would nest
+   a card inside a card, which this codebase's dashboard loop explicitly
+   never allows ("nothing is ever a card nested inside another card").
+   .analytics-card's own padding is kept either way. #}
 {% set labels = {
     pageViews: 'analytics.label.page_views'|trans({}, 'admin'),
     uniqueVisitors: 'analytics.label.unique_visitors'|trans({}, 'admin'),
     uniqueUsers: 'analytics.label.unique_users'|trans({}, 'admin'),
 } %}
 {% set colors = { pageViews: '#2563eb', uniqueVisitors: '#16a34a', uniqueUsers: '#dc2626' } %}
-<div class="card analytics-card">
+<div class="analytics-card {{ (embedded is not defined or not embedded) ? 'card' }}">
     <div class="analytics-card-header">
         <h2>{{ widget.label|trans({}, 'admin') }}</h2>
         <div class="analytics-stat-row">

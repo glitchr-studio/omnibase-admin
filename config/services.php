@@ -144,6 +144,12 @@ return function (ContainerConfigurator $configurator) {
         ->tag('base.admin.dashboard_widget_type')
         ->tag('base.admin.dashboard_widget_type.palette');
 
+    // No .palette tag, no constructor args - deliberately excluded from the
+    // "+ Add widget" palette (see the class's own docblock: composing a
+    // composite is a code-level decision in v1).
+    $services->set(\Base\Admin\Widget\CompositeWidgetType::class)
+        ->tag('base.admin.dashboard_widget_type');
+
     $services->set(DashboardWidgetTypeRegistry::class)
         ->args([tagged_iterator('base.admin.dashboard_widget_type')]);
 

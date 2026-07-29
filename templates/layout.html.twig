@@ -626,6 +626,24 @@
             .analytics-range-picker { display: none; }
             .analytics-chart-wrap { display: none; }
         }
+        {# CompositeWidgetType ("dual-width card"): ONE .card (composite-card)
+           holds N panes side by side - each pane's own widget-type template
+           renders with embedded:true (drops its normally-own .card, see
+           analytics_card.html.twig's comment), so there's exactly one
+           border/background for the whole thing, divided by a rule between
+           panes rather than a second nested card. Reuses the SAME
+           container-type: inline-size mechanism already on .widget-block
+           (line ~576) to stack panes vertically once the composite itself
+           is sized/viewport-narrow - same responsive trigger a customize-
+           mode resize already uses everywhere else on this page. #}
+        .composite-card { padding: 1.5rem; }
+        .composite-panes { display: flex; gap: 1.5rem; }
+        .composite-pane { flex: 1; min-width: 0; }
+        .composite-pane + .composite-pane { padding-left: 1.5rem; border-left: 1px solid var(--admin-border); }
+        @container (max-width: 480px) {
+            .composite-panes { flex-direction: column; gap: 1.25rem; }
+            .composite-pane + .composite-pane { padding-left: 0; border-left: 0; padding-top: 1.25rem; border-top: 1px solid var(--admin-border); }
+        }
         .filter-bar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .75rem; padding: .75rem .9rem; margin-bottom: 1rem;
                       background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: var(--admin-radius); }
         .filter-bar label { display: flex; flex-direction: column; gap: .2rem; font-size: .82rem; color: var(--admin-muted); }

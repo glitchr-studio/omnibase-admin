@@ -1,0 +1,26 @@
+{# One .card, N panes side by side - each pane resolves+includes its own
+   child widget type via the SAME dashboard_widget_type() dispatch the
+   top-level dashboard loop already uses. Safe to nest: Twig's include()
+   FUNCTION form (not the {% include %} tag) merges ambient context then
+   overlays the explicit variables argument, so each child template gets
+   its own correct 'widget' variable with no leakage between panes or
+   from this composite's own outer widget - the exact mechanism already
+   proven live for two independent top-level analytics_card instances,
+   which generalizes unchanged to nested panes.
+
+   'widget' here is the OUTER composite MenuItem (from _block.html.twig's
+   own include) - not shadowed by 'pane' below. #}
+<div class="card composite-card">
+    <div class="composite-panes">
+        {% for pane in panes %}
+            <div class="composite-pane">
+                {% set paneType = pane.blockName ? dashboard_widget_type(pane.blockName) : null %}
+                {% if paneType %}
+                    {# embedded:true - see analytics_card.html.twig's own comment
+                       on why this drops its normally-own .card class here. #}
+                    {{ include(paneType.getTemplate(), paneType.getTemplateVars(pane)|merge({widget: pane, embedded: true})) }}
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+</div>
