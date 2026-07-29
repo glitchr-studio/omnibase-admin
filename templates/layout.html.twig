@@ -186,9 +186,14 @@
         .admin-menu li { display: flex; align-items: stretch; justify-content: space-between; min-height: 2.4rem; }
         .admin-menu li a { flex: 1; }
         .admin-menu li .item-controls { align-self: center; }
-        .item-handle, .item-toggle { display: flex; align-items: center; justify-content: center; width: 1.6rem; height: 1.6rem; border: 0; border-radius: 6px;
+        .item-handle, .item-toggle, .item-remove { display: flex; align-items: center; justify-content: center; width: 1.6rem; height: 1.6rem; border: 0; border-radius: 6px;
             background: none; color: var(--admin-muted); cursor: pointer; font-size: .78rem; flex-shrink: 0; }
         .item-handle:hover, .item-toggle:hover { background: var(--admin-bg); color: var(--admin-text); }
+        {# Danger-tinted hover only, not a permanent color - only ad-hoc/
+           palette-added widgets ever get this button (see _block.html.twig),
+           and it deletes immediately with no confirmation step, so the
+           hover state is the one warning a user gets before clicking. #}
+        .item-remove:hover { background: var(--admin-danger); color: #fff; }
         {# ── Collapsed sidebar (icon-only rail) ──────────────────────────
            A section's label + members have nowhere to sit inline once
            collapsed, so the whole section-group pops them out as a flyout
@@ -559,6 +564,8 @@
            for sitting OUTSIDE that stack, offsetting past the brand icon;
            inside it, that would double up as an extra, wrong indent. #}
         .dashboard-welcome { margin: .3rem 0 0; color: var(--admin-muted); font-size: .92rem; }
+        .widget-grid-toolbar { display: flex; justify-content: flex-end; margin-bottom: 1rem; }
+        .widget-grid-toolbar [data-widget-palette-menu] { min-width: 12rem; }
         .widget-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1.5rem; }
         {# Widgets span 1-3 auto-fill tracks (superadmin-adjustable via the
            resize control in customize mode, persisted like everything else
@@ -584,12 +591,14 @@
         {# .widget-controls floats absolutely over the card's top-right
            corner - without this, a wide stat row's own right-aligned
            content (e.g. the last stat's change badge) runs right up
-           against the handle/resize/toggle icons. Only needed while
-           they're actually visible. Sized for 3 buttons now that resize
-           joined the same row as handle/toggle (3 * 1.6rem + 2 * .3rem
-           gap + the .6rem right offset = 6rem, rounded up for breathing
-           room). #}
-        body.is-customizing .analytics-card-header { padding-right: 6.5rem; }
+           against the handle/resize/toggle/remove icons. Sized for the
+           MAX case (an ad-hoc analytics_card instance gets all 4:
+           handle+resize+toggle+remove - 4 * 1.6rem + 3 * .3rem gap + the
+           .6rem right offset = 7.9rem, rounded up) - the built-in,
+           code-defined instance only ever shows 3, so this is a little
+           generous there, which is harmless. Only needed while the
+           controls are actually visible. #}
+        body.is-customizing .analytics-card-header { padding-right: 8rem; }
         .analytics-card-header h2 { margin: 0; font-size: 1.1rem; }
         .analytics-stat-row { display: flex; gap: 1.75rem; flex-wrap: wrap; }
         .analytics-stat { min-width: 6rem; }
@@ -1355,6 +1364,19 @@
             if (icon) icon.classList.toggle('fa-eye', !item.classList.contains('is-hidden'));
         });
 
+        // Remove (ad-hoc/palette-added widgets only - see _block.html.twig's
+        // own comment on why a code-defined widget only ever gets hide/show).
+        // Immediate DOM removal, no confirmation: the next captureLevel()
+        // simply won't see this node anymore, and LayoutArranger's
+        // synthesis pass never re-creates a key nothing mentions - that
+        // absence IS the removal, nothing else to signal server-side.
+        document.addEventListener('click', function (e) {
+            var button = e.target.closest('[data-remove-item]');
+            if (!button || !body.classList.contains('is-customizing')) return;
+            var item = button.closest('[data-sortable-item]');
+            if (item) item.remove();
+        });
+
         // resize drag, with an explicit live preview: dragging the corner
         // does NOT touch the real widget/grid at all while the pointer is
         // down - it moves/resizes a separate dashed-outline ghost (fixed-
@@ -1528,16 +1550,79 @@
                 });
         });
 
+        // "+ Add widget" palette: fetches the registered type list once
+        // (lazily, on first open - reuses the SAME generic [data-dropdown]
+        // open/close handler already wired above for the topbar's theme/
+        // language menus, nothing new there), then GETs a fresh instance's
+        // rendered markup and inserts it directly - no separate JSON
+        // contract to keep in sync, the fragment already carries its own
+        // data-sortable-key/data-block-name/etc (see _block.html.twig).
+        // Reachable only from inside an already-active customize session,
+        // so the inserted node is immediately draggable/resizable/
+        // removable for free: StickySortable binds on the CONTAINER, not
+        // per-item, and the resize/hide/remove handlers above are all
+        // document-delegated - nothing here needs to re-init anything.
+        var paletteTypes = null;
+        var paletteTrigger = document.getElementById('admin-add-widget-trigger');
+        var paletteMenu = document.querySelector('[data-widget-palette-menu]');
+        if (paletteTrigger && paletteMenu) {
+            paletteTrigger.addEventListener('click', function () {
+                if (paletteTypes) return;
+                fetch('{{ path("admin_dashboard_widget_types") }}')
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        paletteTypes = data.types || [];
+                        paletteMenu.innerHTML = paletteTypes.map(function (t) {
+                            return '<button type="button" data-add-widget-type="' + t.name + '">'
+                                + (t.icon ? '<i class="' + t.icon + '"></i> ' : '') + t.label + '</button>';
+                        }).join('');
+                    });
+            });
+        }
+        document.addEventListener('click', function (e) {
+            var button = e.target.closest('[data-add-widget-type]');
+            if (!button) return;
+            var grid = document.querySelector('[data-sortable="dashboard"]');
+            if (!grid) return;
+
+            var label = window.prompt('{{ 'customize.add_widget'|trans({}, 'admin')|e('js') }}', button.textContent.trim());
+            if (null === label) return; // cancelled
+
+            var url = '{{ path("admin_dashboard_widget_new", {blockName: "__BLOCK__"}) }}'.replace('__BLOCK__', encodeURIComponent(button.dataset.addWidgetType))
+                + '?label=' + encodeURIComponent(label);
+            fetch(url)
+                .then(function (r) { return r.text(); })
+                .then(function (html) {
+                    grid.insertAdjacentHTML('beforeend', html);
+                    // Neither the 'load'-driven init nor the SPA-swap path
+                    // in admin-charts.js ever sees a plain DOM insertion
+                    // like this one - the new canvas needs an explicit push.
+                    if (window.AdminCharts && window.AdminCharts.init) window.AdminCharts.init();
+                });
+        });
+
         function captureLevel(container) {
             var items = [];
             container.querySelectorAll(':scope > [data-sortable-item]').forEach(function (el) {
                 var childContainer = el.querySelector(':scope > [data-sortable]');
-                items.push({
+                var entry = {
                     key: el.dataset.sortableKey,
                     visible: !el.classList.contains('is-hidden'),
                     size: parseInt(el.dataset.widgetSize || '1', 10),
                     children: childContainer ? captureLevel(childContainer) : [],
-                });
+                };
+                // Ad-hoc/palette-added widgets carry their own definition in
+                // data-* attributes (see _block.html.twig) - an ordinary
+                // code-tracked node never has data-block-name, so this stays
+                // a no-op and every existing widget's captured shape is
+                // unaffected.
+                if (el.dataset.blockName) {
+                    entry.blockName = el.dataset.blockName;
+                    entry.label = el.dataset.widgetLabel || '';
+                    entry.icon = el.dataset.widgetIcon || null;
+                    try { entry.params = JSON.parse(el.dataset.widgetParams || '{}'); } catch (err) { entry.params = {}; }
+                }
+                items.push(entry);
             });
             return items;
         }
