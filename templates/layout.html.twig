@@ -821,19 +821,22 @@
            panes can land here now (merge onto an existing composite grows
            its own panes), wrapping naturally into a 2x2 arrangement for
            3-4 rather than squeezing everything into one ever-narrower
-           row. A border per pane (not the old "+ sibling" divider) is
-           what generalizes to both rows: "not the first" stops meaning
-           "not top-left" the moment panes wrap to a second row, but a
-           border around every pane reads correctly regardless of
-           position. overflow:hidden keeps a bordered pane's own rounded
-           corners clean against its embedded child's square-cornered
-           padding/background. flex:1 (not just display:grid) is what
+           row. Separation between panes is the grid gap alone (no border,
+           no divider line - see .composite-pane below and the comment on
+           .composite-card above) - the gap generalizes to a wrapped 2x2
+           the same way a border-per-pane would have, without the "two
+           small cards glued together" look a full border around every
+           pane produced. overflow:hidden on .composite-pane is now just
+           an overflow guard (a long unbroken link, a mid-resize canvas)
+           rather than a rounded-corner clip - nothing left to clip a
+           corner against once the pane has no border of its own. flex:1
+           (not just display:grid) is what
            lets this actually consume the composite-card's full stretched
            height instead of only its own content's natural height -
            CSS Grid's own align-items:stretch default then does the rest,
            making each .composite-pane fill that height too. #}
         .composite-panes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; flex: 1 1 auto; }
-        .composite-pane { min-width: 0; border: 1px solid var(--admin-border); border-radius: var(--admin-radius); overflow: hidden; padding: 1.25rem 1.5rem; }
+        .composite-pane { min-width: 0; overflow: hidden; padding: 1.25rem 1.5rem; }
         @container (max-width: 480px) {
             .composite-panes { grid-template-columns: 1fr; }
         }
