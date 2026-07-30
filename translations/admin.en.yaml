@@ -127,3 +127,9 @@ analytics:
         30d: 30 days
         all: All time
         since_prefix: "Since"
+    settings:
+        title: Widget settings
+        title_label: Title
+        series_label: Lines shown
+        cancel: Cancel
+        apply: Apply

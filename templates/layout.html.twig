@@ -735,15 +735,29 @@
         .analytics-range-btn:hover { border-color: var(--admin-accent); color: var(--admin-text); }
         .analytics-range-btn.is-active { background: var(--admin-accent); border-color: var(--admin-accent); color: #fff; }
         .analytics-chart-wrap { position: relative; height: 240px; }
-        {# Reused by the (upcoming) series-toggle checkboxes in the widget's
-           settings panel as a color swatch next to each series' label -
-           kept dark-mode aware since it's driven by the same
+        {# Reused by the series-toggle checkboxes in the widget's settings
+           panel below as a color swatch next to each series' label - kept
+           dark-mode aware since it's driven by the same
            AnalyticsSeriesPalette colors as the chart itself. #}
         .analytics-source-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--chip-color); display: inline-block; flex-shrink: 0; }
         :root[data-theme="dark"] .analytics-source-dot { background: var(--chip-color-dark, var(--chip-color)); }
         @media (prefers-color-scheme: dark) {
             :root:not([data-theme]) .analytics-source-dot { background: var(--chip-color-dark, var(--chip-color)); }
         }
+        {# Gear button that opens .analytics-settings-panel - lives in the
+           card header, NOT the generic top-right .item-controls row (see
+           analytics_card.html.twig's own comment: title/series only ever
+           make sense for this widget type). Customize-mode-gated the same
+           way as every other edit affordance on this page. #}
+        .analytics-settings-toggle { display: none; width: 1.6rem; height: 1.6rem; border: 1px solid var(--admin-border); background: var(--admin-surface); color: var(--admin-muted); border-radius: 50%; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+        .analytics-settings-toggle:hover, .analytics-settings-toggle.is-active { border-color: var(--admin-accent); color: var(--admin-accent); }
+        body.is-customizing .analytics-settings-toggle { display: inline-flex; }
+        .analytics-settings-panel { border: 1px solid var(--admin-border); border-radius: var(--admin-radius); padding: 1rem; margin-bottom: 1rem; display: flex; flex-direction: column; gap: .9rem; background: var(--admin-surface); }
+        .analytics-settings-field { display: flex; flex-direction: column; gap: .4rem; font-size: .78rem; color: var(--admin-muted); text-transform: uppercase; letter-spacing: .03em; }
+        .analytics-settings-field input[type="text"] { font: inherit; text-transform: none; letter-spacing: normal; color: var(--admin-text); background: var(--admin-bg); border: 1px solid var(--admin-border); border-radius: 6px; padding: .4rem .6rem; }
+        .analytics-settings-series { display: flex; flex-wrap: wrap; gap: .4rem .9rem; }
+        .analytics-settings-series-item { display: inline-flex; align-items: center; gap: .4rem; font-size: .85rem; text-transform: none; letter-spacing: normal; color: var(--admin-text); cursor: pointer; }
+        .analytics-settings-actions { display: flex; justify-content: flex-end; gap: .5rem; }
         {# Elementary info only (just the 3 numbers) once the widget is
            shrunk down to a single grid track - the chart needs real width
            to be legible and just clips awkwardly otherwise. Queries the
@@ -1977,6 +1991,102 @@
                 .catch(function () {
                     if (requestId === picker._analyticsRequestId) picker.classList.remove('is-loading');
                 });
+        });
+
+        // Analytics card settings panel (title + which series it plots).
+        // Applying writes data-block-name/data-widget-label/data-widget-
+        // params straight onto the SAME widget-block node captureLevel()
+        // already knows how to read (see its own comment, above) - "Done"
+        // then round-trips this through the existing save/load path with
+        // zero new server plumbing. LayoutArranger::applyLevel() applies
+        // the stored override onto the matched CODE-DEFINED item in place
+        // (see its own docblock) rather than spawning an ad-hoc duplicate
+        // alongside the built-in card - tried the duplicate-friendly
+        // approach first and it does exactly that, since
+        // configureDashboardBlockItems() re-offers the built-in key every
+        // request regardless of what's stored under a DIFFERENT key.
+        //
+        // data-merge-def (see _block.html.twig) is the one existing source
+        // of "this instance's current blockName/label/icon/params" for
+        // ANY widget with a blockName, code-defined or ad-hoc alike - read
+        // on open (to pre-fill the form) and again on apply (to preserve
+        // any OTHER params this instance already carries, e.g. 'days',
+        // instead of clobbering them with just {series: [...]}).
+        document.addEventListener('click', function (e) {
+            var toggle = e.target.closest('[data-analytics-settings-toggle]');
+            if (toggle) {
+                var toggleCard = toggle.closest('[data-analytics-card]');
+                var togglePanel = toggleCard.querySelector('[data-analytics-settings-panel]');
+                var opening = !!togglePanel.hidden;
+                if (opening) {
+                    var toggleBlock = toggleCard.closest('[data-sortable-item]');
+                    var toggleDef = JSON.parse((toggleBlock && toggleBlock.dataset.mergeDef) || '{}');
+                    var toggleSeries = (toggleDef.params && toggleDef.params.series) || null;
+                    toggleCard.querySelector('[data-analytics-settings-title]').value = toggleDef.label || '';
+                    toggleCard.querySelectorAll('[data-analytics-settings-series]').forEach(function (cb) {
+                        cb.checked = toggleSeries ? toggleSeries.indexOf(cb.value) !== -1 : true;
+                    });
+                }
+                togglePanel.hidden = !opening;
+                toggle.classList.toggle('is-active', opening);
+                return;
+            }
+
+            var cancel = e.target.closest('[data-analytics-settings-cancel]');
+            if (cancel) {
+                var cancelCard = cancel.closest('[data-analytics-card]');
+                cancelCard.querySelector('[data-analytics-settings-panel]').hidden = true;
+                cancelCard.querySelector('[data-analytics-settings-toggle]').classList.remove('is-active');
+                return;
+            }
+
+            var apply = e.target.closest('[data-analytics-settings-apply]');
+            if (!apply) return;
+
+            var applyCard = apply.closest('[data-analytics-card]');
+            var applyBlock = applyCard.closest('[data-sortable-item]');
+            var applyDef = JSON.parse((applyBlock && applyBlock.dataset.mergeDef) || '{}');
+            var titleInput = applyCard.querySelector('[data-analytics-settings-title]');
+            var title = titleInput.value.trim();
+            var series = Array.prototype.map.call(
+                applyCard.querySelectorAll('[data-analytics-settings-series]:checked'),
+                function (cb) { return cb.value; }
+            );
+            // At least one series - an empty chart is never a useful state,
+            // and AnalyticsCardWidgetType already falls back to "all" server-
+            // side for an empty/unknown selection, so this just keeps the
+            // CLIENT-side preview honest with what a reload would actually show.
+            if (!series.length) {
+                series = Array.prototype.map.call(
+                    applyCard.querySelectorAll('[data-analytics-settings-series]'),
+                    function (cb) { return cb.value; }
+                );
+            }
+
+            applyBlock.dataset.blockName = applyDef.blockName || 'analytics_card';
+            applyBlock.dataset.widgetLabel = title || applyDef.label || '';
+            applyBlock.dataset.widgetIcon = applyDef.icon || '';
+            applyBlock.dataset.widgetParams = JSON.stringify(Object.assign({}, applyDef.params, { series: series }));
+
+            var titleEl = applyCard.querySelector('[data-analytics-title]');
+            if (titleEl) titleEl.textContent = title || applyDef.label || '';
+
+            var applyCanvas = applyCard.querySelector('[data-admin-chart]');
+            var applyPicker = applyCard.querySelector('[data-analytics-range-picker]');
+            var applyActiveBtn = applyPicker && (applyPicker.querySelector('[data-range].is-active') || applyPicker.querySelector('[data-range]'));
+            var applyEndpoints = applyPicker ? JSON.parse(applyPicker.dataset.analyticsEndpoints || '{}') : {};
+            var applyUrl = applyActiveBtn ? applyEndpoints[applyActiveBtn.dataset.range] : null;
+            if (applyCanvas && applyUrl && window.AdminCharts) {
+                fetch(applyUrl, { headers: { Accept: 'application/json' } })
+                    .then(function (res) { return res.json(); })
+                    .then(function (data) {
+                        var datasets = (data.datasets || []).filter(function (ds) { return series.indexOf(ds.key) !== -1; });
+                        window.AdminCharts.update(applyCanvas, { labels: data.labels, datasets: datasets, events: data.events });
+                    });
+            }
+
+            applyCard.querySelector('[data-analytics-settings-panel]').hidden = true;
+            applyCard.querySelector('[data-analytics-settings-toggle]').classList.remove('is-active');
         });
 
         // "+ Add widget" palette: fetches the registered type list once

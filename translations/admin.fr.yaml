@@ -127,3 +127,9 @@ analytics:
         30d: 30 jours
         all: Depuis toujours
         since_prefix: "Depuis le"
+    settings:
+        title: Paramètres du widget
+        title_label: Titre
+        series_label: Courbes affichées
+        cancel: Annuler
+        apply: Appliquer
