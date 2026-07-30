@@ -44,9 +44,15 @@ class MenuItem
     /**
      * Instance-specific config for a block-type widget (e.g. which metric/
      * window a given analytics_card instance shows) - passed straight
-     * through to DashboardWidgetTypeInterface::getTemplateVars(). Not
-     * persisted by LayoutConfig: this is code-defined content, same
-     * category as label/icon, not superadmin-customizable state.
+     * through to DashboardWidgetTypeInterface::getTemplateVars(). Code-
+     * defined by default (set once in configureDashboardBlockItems() /
+     * DashboardWidgetController), same as label/icon - but a superadmin
+     * CAN override both label and params for a matched code-defined item
+     * from the customize UI (an analytics_card settings panel, for one),
+     * in which case LayoutArranger::applyLevel() applies the stored
+     * override on top of this before the item ever reaches a template.
+     * blockName/icon stay code-only either way - only label/params are
+     * ever superadmin-customizable this way.
      */
     protected array $params = [];
 

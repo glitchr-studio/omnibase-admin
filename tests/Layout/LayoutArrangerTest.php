@@ -269,4 +269,72 @@ class LayoutArrangerTest extends TestCase
 
         $this->assertSame(['adhoc.composite', 'b'], array_map(fn ($i) => $i->getKey(), $result));
     }
+
+    public function testAppliesAStoredLabelAndParamsOverrideOntoAMatchedCodeDefinedItem(): void
+    {
+        $card = MenuItem::block('analytics_card', 'dashboard.analytics_title', 'fa-solid fa-chart-line', null, ['days' => 14]);
+
+        $config = LayoutConfig::fromArray(['items' => [
+            ['key' => $card->getKey(), 'visible' => true, 'blockName' => 'analytics_card', 'label' => 'My traffic', 'params' => ['series' => ['pageViewsBot', 'pageViewsAi']]],
+        ]]);
+
+        $result = $this->arranger->apply([$card], $config);
+
+        $this->assertCount(1, $result);
+        $this->assertSame('My traffic', $result[0]->getLabel());
+        $this->assertSame(['series' => ['pageViewsBot', 'pageViewsAi']], $result[0]->getParams());
+        // Same instance, not a synthesized ad-hoc replacement - the whole
+        // point is editing this widget in place, not spawning a duplicate.
+        $this->assertFalse($result[0]->isAdHoc());
+        $this->assertSame($card, $result[0]);
+    }
+
+    public function testAnEmptyStoredLabelFallsBackToTheCodeDefinedDefaultInsteadOfBlanking(): void
+    {
+        $card = MenuItem::block('analytics_card', 'dashboard.analytics_title');
+
+        $config = LayoutConfig::fromArray(['items' => [
+            ['key' => $card->getKey(), 'visible' => true, 'blockName' => 'analytics_card', 'label' => '', 'params' => []],
+        ]]);
+
+        $result = $this->arranger->apply([$card], $config);
+
+        $this->assertSame('dashboard.analytics_title', $result[0]->getLabel());
+    }
+
+    public function testAStoredOverrideNeverChangesBlockNameOrIconOfAMatchedCodeDefinedItem(): void
+    {
+        // blockName/icon are code-only even for a customized instance -
+        // only label/params are ever superadmin-editable this way (see
+        // MenuItem::$params' own docblock).
+        $card = MenuItem::block('analytics_card', 'dashboard.analytics_title', 'fa-solid fa-chart-line');
+
+        $config = LayoutConfig::fromArray(['items' => [
+            ['key' => $card->getKey(), 'visible' => true, 'blockName' => 'something_else', 'icon' => 'fa-solid fa-bomb', 'label' => 'Renamed', 'params' => []],
+        ]]);
+
+        $result = $this->arranger->apply([$card], $config);
+
+        $this->assertSame('analytics_card', $result[0]->getBlockName());
+        $this->assertSame('fa-solid fa-chart-line', $result[0]->getIcon());
+        $this->assertSame('Renamed', $result[0]->getLabel());
+    }
+
+    public function testAStoredEntryWithNoBlockNameLeavesAMatchedCodeDefinedItemsLabelAndParamsAlone(): void
+    {
+        // Every pre-existing stored config (saved before this feature
+        // existed) has no blockName on its entries at all - must stay a
+        // pure no-op, not accidentally wipe the code-defined label/params
+        // just because the entry now flows through the same branch check.
+        $card = MenuItem::block('analytics_card', 'dashboard.analytics_title', null, null, ['days' => 14]);
+
+        $config = LayoutConfig::fromArray(['items' => [
+            ['key' => $card->getKey(), 'visible' => true],
+        ]]);
+
+        $result = $this->arranger->apply([$card], $config);
+
+        $this->assertSame('dashboard.analytics_title', $result[0]->getLabel());
+        $this->assertSame(['days' => 14], $result[0]->getParams());
+    }
 }

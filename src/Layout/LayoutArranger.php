@@ -57,6 +57,25 @@ class LayoutArranger
                 // future save simply omits this key, it's never synthesized
                 // again - no tombstone/delete path needed anywhere here.
                 $item = $this->synthesizeAdHocWidget($entry);
+            } elseif (!empty($entry['blockName'])) {
+                // A code-defined widget the admin has customized in place
+                // (see the analytics card's settings panel) - blockName
+                // present on a stored entry that DID match a code-defined
+                // item means "apply this override", not "synthesize a new
+                // widget": blockName/icon are deliberately left untouched
+                // (swapping what a key renders isn't customizing it, it's
+                // a different widget), only label/params ever get applied
+                // this way. An empty label falls back to the code-defined
+                // default rather than shipping a blank title - the same
+                // "clear the field to reset" a superadmin would expect,
+                // not a state this app has to specifically distinguish
+                // from "never customized".
+                if (\is_string($entry['label'] ?? null) && '' !== $entry['label']) {
+                    $item->setLabel($entry['label']);
+                }
+                if (\is_array($entry['params'] ?? null)) {
+                    $item->setParams($entry['params']);
+                }
             }
 
             $item->setHidden(!$entry['visible']);
