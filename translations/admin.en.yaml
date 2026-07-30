@@ -115,6 +115,9 @@ analytics:
     unique_users: "%count% users"
     label:
         page_views: Page views
+        page_views_human: Human
+        page_views_bot: Bot
+        page_views_ai: AI
         unique_visitors: Visitors
         unique_users: Users
     range:

@@ -13,15 +13,51 @@
    .analytics-card's own padding is kept either way. #}
 {% set labels = {
     pageViews: 'analytics.label.page_views'|trans({}, 'admin'),
+    pageViewsHuman: 'analytics.label.page_views_human'|trans({}, 'admin'),
+    pageViewsBot: 'analytics.label.page_views_bot'|trans({}, 'admin'),
+    pageViewsAi: 'analytics.label.page_views_ai'|trans({}, 'admin'),
     uniqueVisitors: 'analytics.label.unique_visitors'|trans({}, 'admin'),
     uniqueUsers: 'analytics.label.unique_users'|trans({}, 'admin'),
 } %}
-{% set colors = { pageViews: '#2563eb', uniqueVisitors: '#16a34a', uniqueUsers: '#dc2626' } %}
+{% set colors = {
+    pageViewsHuman: '#2563eb',
+    pageViewsBot: '#f59e0b',
+    pageViewsAi: '#8b5cf6',
+    uniqueVisitors: '#16a34a',
+    uniqueUsers: '#dc2626',
+} %}
+{# Source totals over the same fixed series the rest of the stat row uses
+   (see the range-picker comment below) - a human/bot/ai split of the
+   headline "page views" number, not a separate query of its own. #}
+{% set sourceTotals = {
+    pageViewsHuman: series|reduce((carry, day) => carry + day.pageViewsHuman, 0),
+    pageViewsBot: series|reduce((carry, day) => carry + day.pageViewsBot, 0),
+    pageViewsAi: series|reduce((carry, day) => carry + day.pageViewsAi, 0),
+} %}
+{% set sourceTotalAll = sourceTotals.pageViewsHuman + sourceTotals.pageViewsBot + sourceTotals.pageViewsAi %}
 <div class="analytics-card {{ (embedded is not defined or not embedded) ? 'card' }}">
     <div class="analytics-card-header">
         <h2>{{ widget.label|trans({}, 'admin') }}</h2>
         <div class="analytics-stat-row">
-            {% for key in ['pageViews', 'uniqueVisitors', 'uniqueUsers'] %}
+            <div class="analytics-stat">
+                <span class="analytics-stat-value">
+                    {{ series|reduce((carry, day) => carry + day.pageViews, 0) }}
+                    {%- if change.pageViews is not null %}
+                        <span class="analytics-stat-change {{ change.pageViews >= 0 ? 'is-up' : 'is-down' }}">
+                            {{ change.pageViews >= 0 ? '+' : '' }}{{ change.pageViews }}%
+                        </span>
+                    {% endif %}
+                </span>
+                <span class="analytics-stat-label">{{ labels.pageViews }}</span>
+                <span class="analytics-source-breakdown">
+                    {% for key in ['pageViewsHuman', 'pageViewsBot', 'pageViewsAi'] %}
+                        <span class="analytics-source-chip" style="--chip-color: {{ colors[key] }}" title="{{ sourceTotals[key] }}">
+                            <i class="analytics-source-dot"></i>{{ labels[key] }} {{ sourceTotalAll > 0 ? (100 * sourceTotals[key] / sourceTotalAll)|round : 0 }}%
+                        </span>
+                    {% endfor %}
+                </span>
+            </div>
+            {% for key in ['uniqueVisitors', 'uniqueUsers'] %}
                 <div class="analytics-stat">
                     <span class="analytics-stat-value">
                         {{ series|reduce((carry, day) => carry + day[key], 0) }}
@@ -53,7 +89,7 @@
     <div class="analytics-chart-wrap">
         <canvas data-admin-chart="{{ {
             labels: series|map(day => day.date|date('d/m')),
-            datasets: ['pageViews', 'uniqueVisitors', 'uniqueUsers']|map(key => {
+            datasets: ['pageViewsHuman', 'pageViewsBot', 'pageViewsAi', 'uniqueVisitors', 'uniqueUsers']|map(key => {
                 label: labels[key],
                 data: series|map(day => day[key]),
                 color: colors[key],

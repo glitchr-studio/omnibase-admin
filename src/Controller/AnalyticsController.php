@@ -41,11 +41,19 @@ class AnalyticsController extends AbstractController
         $series = $this->analytics->dailyBreakdown(self::RANGES[$range]);
 
         $labels = [
-            'pageViews' => $this->translator->trans('analytics.label.page_views', [], 'admin'),
+            'pageViewsHuman' => $this->translator->trans('analytics.label.page_views_human', [], 'admin'),
+            'pageViewsBot' => $this->translator->trans('analytics.label.page_views_bot', [], 'admin'),
+            'pageViewsAi' => $this->translator->trans('analytics.label.page_views_ai', [], 'admin'),
             'uniqueVisitors' => $this->translator->trans('analytics.label.unique_visitors', [], 'admin'),
             'uniqueUsers' => $this->translator->trans('analytics.label.unique_users', [], 'admin'),
         ];
-        $colors = ['pageViews' => '#2563eb', 'uniqueVisitors' => '#16a34a', 'uniqueUsers' => '#dc2626'];
+        $colors = [
+            'pageViewsHuman' => '#2563eb',
+            'pageViewsBot' => '#f59e0b',
+            'pageViewsAi' => '#8b5cf6',
+            'uniqueVisitors' => '#16a34a',
+            'uniqueUsers' => '#dc2626',
+        ];
 
         // Same date format as the range picker's own hint - a single day
         // ("today") is unambiguous either way, but a long "all time" series
@@ -65,7 +73,7 @@ class AnalyticsController extends AbstractController
                     'data' => \array_map(fn (array $day) => $day[$key], $series),
                     'color' => $colors[$key],
                 ],
-                ['pageViews', 'uniqueVisitors', 'uniqueUsers'],
+                ['pageViewsHuman', 'pageViewsBot', 'pageViewsAi', 'uniqueVisitors', 'uniqueUsers'],
             ),
             'events' => $this->timelineEvents->getFormattedEvents($series, $formattedLabels, $dateFormat),
         ]);
