@@ -28,6 +28,18 @@
         <div class="item-controls widget-controls">
             <button type="button" class="item-handle" data-sortable-handle title="{{ 'customize.reorder'|trans({}, 'admin') }}"><i class="fa-solid fa-grip-vertical"></i></button>
             <button type="button" class="item-toggle" data-toggle-hidden title="{{ 'customize.toggle_visibility'|trans({}, 'admin') }}"><i class="fa-solid fa-eye{{ widget.hidden ? '-slash' }}"></i></button>
+            {% if widget.blockName == 'analytics_card' %}
+                {# Opens analytics_card.html.twig's own settings panel
+                   (title + series toggle) - lives in the shared controls
+                   row, uniform with drag/eye/split/remove, rather than a
+                   separately-styled button inside the widget's own header
+                   (tried that first; looked inconsistent). Not offered for
+                   a composite PANE: a pane never goes through THIS
+                   template again (composite.html.twig includes a pane's
+                   widget type directly), so this check naturally never
+                   matches there - no separate embedded-mode guard needed. #}
+                <button type="button" class="item-settings" data-analytics-settings-toggle title="{{ 'analytics.settings.title'|trans({}, 'admin') }}"><i class="fa-solid fa-gear"></i></button>
+            {% endif %}
             {# Only ad-hoc/palette-added widgets get a remove button - a
                code-defined widget (e.g. the built-in analytics_card) keeps
                only hide/show: LayoutArranger always re-offers it even when

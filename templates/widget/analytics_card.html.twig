@@ -49,22 +49,6 @@
                 </div>
             {% endfor %}
         </div>
-        {% if embedded is not defined or not embedded %}
-            {# Customize-mode only (CSS-gated, same as .item-controls/.item-
-               resize-handle) - opens .analytics-settings-panel below. Lives
-               inside this widget-type's own template rather than the generic
-               _block.html.twig controls row, since title/series only ever
-               make sense for THIS widget type - a future widget type with
-               its own instance settings would get its own panel the same
-               way, not a shared one every widget type has to opt out of.
-               Not offered for a composite PANE (embedded:true): the JS side
-               would need to write into params.panes[n] instead of the
-               widget-block's own top-level params, and this app's merge
-               feature is explicitly "one level of fusion is the practical
-               ceiling" already - not extending that ceiling to per-pane
-               settings too, at least for now. #}
-            <button type="button" class="analytics-settings-toggle" data-analytics-settings-toggle title="{{ 'analytics.settings.title'|trans({}, 'admin') }}"><i class="fa-solid fa-gear"></i></button>
-        {% endif %}
     </div>
     {% if embedded is not defined or not embedded %}
         {# Pre-filled from this instance's CURRENT label/params on open, not

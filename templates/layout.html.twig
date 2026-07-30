@@ -186,9 +186,9 @@
         .admin-menu li { display: flex; align-items: stretch; justify-content: space-between; min-height: 2.4rem; }
         .admin-menu li a { flex: 1; }
         .admin-menu li .item-controls { align-self: center; }
-        .item-handle, .item-toggle, .item-remove, .item-split { display: flex; align-items: center; justify-content: center; width: 1.6rem; height: 1.6rem; border: 0; border-radius: 6px;
+        .item-handle, .item-toggle, .item-remove, .item-split, .item-settings { display: flex; align-items: center; justify-content: center; width: 1.6rem; height: 1.6rem; border: 0; border-radius: 6px;
             background: none; color: var(--admin-muted); cursor: pointer; font-size: .78rem; flex-shrink: 0; }
-        .item-handle:hover, .item-toggle:hover, .item-split:hover { background: var(--admin-bg); color: var(--admin-text); }
+        .item-handle:hover, .item-toggle:hover, .item-split:hover, .item-settings:hover, .item-settings.is-active { background: var(--admin-bg); color: var(--admin-text); }
         {# Danger-tinted hover only, not a permanent color - only ad-hoc/
            palette-added widgets ever get this button (see _block.html.twig),
            and it deletes immediately with no confirmation step, so the
@@ -284,27 +284,27 @@
            purely for layout purposes (e.g. leaving room beside a merged
            composite card in the same row).
 
-           Lives in the SAME top-right .item-controls row as the grip/eye
-           buttons, not a separate bottom-right corner tab - a corner tab's
-           visibility depends on the card's own height and how far you've
-           scrolled (worse inside the nest overlay's own constrained iframe
-           height), and was repeatedly reported as invisible despite
-           genuinely working once found. Solid accent fill (not just on
-           hover) keeps it obviously distinct from its two plain siblings. #}
-        {# Bottom-right corner, its own floating circle - not grouped into
-           the top-right .widget-controls row anymore. Explicitly asked
-           for back after the top-row placement (moved there earlier over
-           a "hard to find when scrolled/small" concern) - safe to make
-           standalone regardless of where it sits in .item-controls'
-           markup, since position:absolute anchors it to .widget-block/
-           .widget-group's own box (both position:relative) either way,
-           not to whatever row it's DOM-nested in. #}
-        .item-resize-handle { display: none; width: 1.8rem; height: 1.8rem; border: 0; border-radius: 50%;
-            align-items: center; justify-content: center; color: #fff; cursor: ew-resize; touch-action: none;
-            background: var(--admin-accent); padding: 0; font: inherit; flex-shrink: 0;
-            position: absolute; bottom: .6rem; right: .6rem; z-index: 2; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+           Bottom-right corner, its own floating circle - not grouped into
+           the top-right .item-controls row (tried that once; a corner
+           tab's visibility depends on the card's own height and how far
+           you've scrolled, and it was repeatedly reported as invisible
+           despite genuinely working once found). position:absolute
+           anchors it to .widget-block/.widget-group's own box (both
+           position:relative), not to whatever row it's DOM-nested in, so
+           it stays a standalone sibling of .item-controls either way.
+
+           Outlined, matching the surface/border/muted-icon look every
+           other control on this page uses (not a solid accent fill) - a
+           loud floating blue pill read as detached from the card rather
+           than one of its own controls, found live. Findability now
+           comes from the fixed bottom-right position + hover feedback,
+           not from being the one differently-colored thing on the page. #}
+        .item-resize-handle { display: none; width: 1.8rem; height: 1.8rem; border: 1px solid var(--admin-border); border-radius: 50%;
+            align-items: center; justify-content: center; color: var(--admin-muted); cursor: ew-resize; touch-action: none;
+            background: var(--admin-surface); padding: 0; font: inherit; flex-shrink: 0;
+            position: absolute; bottom: .6rem; right: .6rem; z-index: 2; }
         body.is-customizing .item-resize-handle { display: flex; }
-        .item-resize-handle:hover, .item-resize-handle.is-resizing { filter: brightness(1.12); }
+        .item-resize-handle:hover, .item-resize-handle.is-resizing { border-color: var(--admin-accent); color: var(--admin-accent); }
         .item-resize-handle i { font-size: .75rem; }
         .admin-resize-ghost { position: fixed; border: 2px dashed var(--admin-accent); border-radius: var(--admin-radius);
             background: rgba(37,99,235,.08); pointer-events: none; z-index: 1000; }
@@ -754,14 +754,6 @@
         @media (prefers-color-scheme: dark) {
             :root:not([data-theme]) .analytics-source-dot { background: var(--chip-color-dark, var(--chip-color)); }
         }
-        {# Gear button that opens .analytics-settings-panel - lives in the
-           card header, NOT the generic top-right .item-controls row (see
-           analytics_card.html.twig's own comment: title/series only ever
-           make sense for this widget type). Customize-mode-gated the same
-           way as every other edit affordance on this page. #}
-        .analytics-settings-toggle { display: none; width: 1.6rem; height: 1.6rem; border: 1px solid var(--admin-border); background: var(--admin-surface); color: var(--admin-muted); border-radius: 50%; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
-        .analytics-settings-toggle:hover, .analytics-settings-toggle.is-active { border-color: var(--admin-accent); color: var(--admin-accent); }
-        body.is-customizing .analytics-settings-toggle { display: inline-flex; }
         {# Belt-and-suspenders with the JS reset in the "Terminé" handler
            below: this panel's own visibility is otherwise driven purely by
            its `hidden` attribute, with nothing tying it to customize mode
@@ -794,12 +786,15 @@
         {# CompositeWidgetType ("dual-width card"): ONE .card (composite-card)
            holds N panes side by side - each pane's own widget-type template
            renders with embedded:true (drops its normally-own .card, see
-           analytics_card.html.twig's comment), so there's exactly one
-           border/background for the whole thing, divided by a rule between
-           panes rather than a second nested card. Reuses the SAME
-           container-type: inline-size mechanism already on .widget-block
-           (line ~576) to stack panes vertically once the composite itself
-           is sized/viewport-narrow - same responsive trigger a customize-
+           analytics_card.html.twig's comment), so there's exactly ONE
+           visible border/background for the whole thing - a bordered box
+           per pane read as two small cards awkwardly stuck together
+           inside a bigger card, not one merged card, found live.
+           Separation between panes is the grid gap alone (below), not a
+           border or divider line of any kind. Reuses the SAME container-
+           type: inline-size mechanism already on .widget-block (line
+           ~576) to stack panes vertically once the composite itself is
+           sized/viewport-narrow - same responsive trigger a customize-
            mode resize already uses everywhere else on this page. #}
         {# display:flex + column here is what lets .composite-panes below
            actually fill the card's real height. .widget-block > .card
@@ -1575,8 +1570,12 @@
             if (!on) {
                 document.querySelectorAll('[data-analytics-settings-panel]:not([hidden])').forEach(function (panel) {
                     panel.hidden = true;
-                    var card = panel.closest('[data-analytics-card]');
-                    var toggle = card && card.querySelector('[data-analytics-settings-toggle]');
+                    // The toggle button lives in _block.html.twig's shared
+                    // top-right .item-controls row, a SIBLING of
+                    // .analytics-card, not a descendant of it - both are
+                    // reachable from the common .widget-block ancestor.
+                    var widgetBlock = panel.closest('[data-sortable-item]');
+                    var toggle = widgetBlock && widgetBlock.querySelector('[data-analytics-settings-toggle]');
                     if (toggle) toggle.classList.remove('is-active');
                 });
             }
@@ -2051,11 +2050,17 @@
         document.addEventListener('click', function (e) {
             var toggle = e.target.closest('[data-analytics-settings-toggle]');
             if (toggle) {
-                var toggleCard = toggle.closest('[data-analytics-card]');
+                // The toggle button lives in _block.html.twig's shared
+                // top-right .item-controls row (uniform with drag/eye/
+                // split/remove), a SIBLING of .analytics-card rather than
+                // a descendant of it - both reachable from the common
+                // .widget-block ancestor.
+                var toggleBlock = toggle.closest('[data-sortable-item]');
+                var toggleCard = toggleBlock && toggleBlock.querySelector('[data-analytics-card]');
+                if (!toggleCard) return;
                 var togglePanel = toggleCard.querySelector('[data-analytics-settings-panel]');
                 var opening = !!togglePanel.hidden;
                 if (opening) {
-                    var toggleBlock = toggleCard.closest('[data-sortable-item]');
                     var toggleDef = JSON.parse((toggleBlock && toggleBlock.dataset.mergeDef) || '{}');
                     var toggleSeries = (toggleDef.params && toggleDef.params.series) || null;
                     toggleCard.querySelector('[data-analytics-settings-title]').value = toggleDef.label || '';
@@ -2070,9 +2075,10 @@
 
             var cancel = e.target.closest('[data-analytics-settings-cancel]');
             if (cancel) {
-                var cancelCard = cancel.closest('[data-analytics-card]');
-                cancelCard.querySelector('[data-analytics-settings-panel]').hidden = true;
-                cancelCard.querySelector('[data-analytics-settings-toggle]').classList.remove('is-active');
+                cancel.closest('[data-analytics-settings-panel]').hidden = true;
+                var cancelBlock = cancel.closest('[data-sortable-item]');
+                var cancelToggle = cancelBlock && cancelBlock.querySelector('[data-analytics-settings-toggle]');
+                if (cancelToggle) cancelToggle.classList.remove('is-active');
                 return;
             }
 
@@ -2122,7 +2128,8 @@
             }
 
             applyCard.querySelector('[data-analytics-settings-panel]').hidden = true;
-            applyCard.querySelector('[data-analytics-settings-toggle]').classList.remove('is-active');
+            var applyToggle = applyBlock.querySelector('[data-analytics-settings-toggle]');
+            if (applyToggle) applyToggle.classList.remove('is-active');
         });
 
         // "+ Add widget" palette: fetches the registered type list once
