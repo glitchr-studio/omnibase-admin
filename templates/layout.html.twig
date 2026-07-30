@@ -186,8 +186,12 @@
         .admin-menu li { display: flex; align-items: stretch; justify-content: space-between; min-height: 2.4rem; }
         .admin-menu li a { flex: 1; }
         .admin-menu li .item-controls { align-self: center; }
-        .item-handle, .item-toggle, .item-remove, .item-split, .item-settings { display: flex; align-items: center; justify-content: center; width: 1.6rem; height: 1.6rem; border: 0; border-radius: 6px;
-            background: none; color: var(--admin-muted); cursor: pointer; font-size: .78rem; flex-shrink: 0; }
+        {# Icon glyph sized closer to its box (font-size raised from .78rem,
+           box tightened from 1.6rem) - the FontAwesome glyph read as
+           swimming in empty padding at the old ratio, found live. Still
+           comfortably above a 24px touch target (1.5rem = 24px exactly). #}
+        .item-handle, .item-toggle, .item-remove, .item-split, .item-settings { display: flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; border: 0; border-radius: 6px;
+            background: none; color: var(--admin-muted); cursor: pointer; font-size: .88rem; flex-shrink: 0; }
         .item-handle:hover, .item-toggle:hover, .item-split:hover, .item-settings:hover, .item-settings.is-active { background: var(--admin-bg); color: var(--admin-text); }
         {# Danger-tinted hover only, not a permanent color - only ad-hoc/
            palette-added widgets ever get this button (see _block.html.twig),
@@ -305,7 +309,7 @@
             position: absolute; bottom: .6rem; right: .6rem; z-index: 2; }
         body.is-customizing .item-resize-handle { display: flex; }
         .item-resize-handle:hover, .item-resize-handle.is-resizing { border-color: var(--admin-accent); color: var(--admin-accent); }
-        .item-resize-handle i { font-size: .75rem; }
+        .item-resize-handle i { font-size: .85rem; }
         .admin-resize-ghost { position: fixed; border: 2px dashed var(--admin-accent); border-radius: var(--admin-radius);
             background: rgba(37,99,235,.08); pointer-events: none; z-index: 1000; }
         @supports (background: color-mix(in srgb, red 8%, transparent)) {
@@ -722,15 +726,16 @@
         {# .widget-controls floats absolutely over the card's top-right
            corner - without this, a wide stat row's own right-aligned
            content (e.g. the last stat's change badge) runs right up
-           against the handle/toggle/remove icons. Resize now floats
+           against the handle/toggle/settings/remove icons. Resize floats
            separately at the bottom-right corner (see .item-resize-handle),
-           so this only needs room for the MAX top-row case (an ad-hoc
-           analytics_card instance gets all 3: handle+toggle+remove -
-           3 * 1.6rem + 2 * .3rem gap + the .6rem right offset = 5.7rem,
-           rounded up) - the built-in, code-defined instance only ever
-           shows 2, so this is a little generous there, which is harmless.
-           Only needed while the controls are actually visible. #}
-        body.is-customizing .analytics-card-header { padding-right: 6rem; }
+           so this only needs room for the MAX top-row case: an ad-hoc
+           analytics_card instance gets all 4 (handle+toggle+settings+
+           remove) - 4 * 1.5rem + 3 * .3rem gap + the .6rem right offset =
+           7.5rem, rounded up. The built-in, code-defined instance only
+           ever shows 3 (no remove button), so this is a little generous
+           there, which is harmless. Only needed while the controls are
+           actually visible. #}
+        body.is-customizing .analytics-card-header { padding-right: 7.5rem; }
         .analytics-card-header h2 { margin: 0; font-size: 1.1rem; }
         .analytics-stat-row { display: flex; gap: 1.75rem; flex-wrap: wrap; }
         .analytics-stat { min-width: 6rem; }
