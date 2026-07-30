@@ -699,14 +699,24 @@
             .widget-block, .widget-group { grid-column: span 1 !important; }
         }
         .widget-group { padding: 1.25rem 1.5rem; }
-        .widget-group h2 { margin: .6rem 0 .7rem; font-size: 1.25rem; }
+        .widget-group h2, .composite-pane h2 { margin: .6rem 0 .7rem; font-size: 1.25rem; }
         .widget-icon { font-size: 2rem; }
-        .widget-group ul { list-style: none; margin: 0; padding: 0; }
-        .widget-group li { margin: .35rem 0; }
-        .widget-group li a { display: inline-flex; align-items: center; gap: .5rem; color: inherit; text-decoration: none; }
-        .widget-group li a:hover { color: var(--admin-accent); }
-        .widget-group li a i { width: 1.2rem; text-align: center; }
-        .widget-group li a .fa-circle-plus { color: var(--admin-accent); }
+        {# .composite-pane shares this same <ul><li><a> markup (see
+           composite.html.twig's link-list pane branch) but deliberately
+           has no .widget-group wrapper of its own - merging two link-list
+           widgets must never nest a card-styled box inside another card,
+           the same "never a card in a card" rule analytics_card.html.twig
+           follows via embedded:true. Without also listing it here, a
+           merged Photos/Blog pane's links fell back to the browser's raw
+           default blue/purple/underlined styling - found live, and easy
+           to mistake for a caching issue since it only ever showed up
+           once two widgets were actually merged. #}
+        .widget-group ul, .composite-pane ul { list-style: none; margin: 0; padding: 0; }
+        .widget-group li, .composite-pane li { margin: .35rem 0; }
+        .widget-group li a, .composite-pane li a { display: inline-flex; align-items: center; gap: .5rem; color: inherit; text-decoration: none; }
+        .widget-group li a:hover, .composite-pane li a:hover { color: var(--admin-accent); }
+        .widget-group li a i, .composite-pane li a i { width: 1.2rem; text-align: center; }
+        .widget-group li a .fa-circle-plus, .composite-pane li a .fa-circle-plus { color: var(--admin-accent); }
         .analytics-card { padding: 1.5rem; }
         .analytics-card-header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 1.5rem; margin-bottom: 1.25rem; }
         {# .widget-controls floats absolutely over the card's top-right
@@ -828,7 +838,7 @@
            CSS Grid's own align-items:stretch default then does the rest,
            making each .composite-pane fill that height too. #}
         .composite-panes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; flex: 1 1 auto; }
-        .composite-pane { min-width: 0; border: 1px solid var(--admin-border); border-radius: var(--admin-radius); overflow: hidden; }
+        .composite-pane { min-width: 0; border: 1px solid var(--admin-border); border-radius: var(--admin-radius); overflow: hidden; padding: 1.25rem 1.5rem; }
         @container (max-width: 480px) {
             .composite-panes { grid-template-columns: 1fr; }
         }
