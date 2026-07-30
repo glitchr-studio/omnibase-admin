@@ -752,7 +752,17 @@
         .analytics-settings-toggle { display: none; width: 1.6rem; height: 1.6rem; border: 1px solid var(--admin-border); background: var(--admin-surface); color: var(--admin-muted); border-radius: 50%; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
         .analytics-settings-toggle:hover, .analytics-settings-toggle.is-active { border-color: var(--admin-accent); color: var(--admin-accent); }
         body.is-customizing .analytics-settings-toggle { display: inline-flex; }
-        .analytics-settings-panel { border: 1px solid var(--admin-border); border-radius: var(--admin-radius); padding: 1rem; margin-bottom: 1rem; display: flex; flex-direction: column; gap: .9rem; background: var(--admin-surface); }
+        {# Belt-and-suspenders with the JS reset in the "Terminé" handler
+           below: this panel's own visibility is otherwise driven purely by
+           its `hidden` attribute, with nothing tying it to customize mode
+           at all - opening it, then leaving customize mode any OTHER way
+           than the panel's own Cancel/Apply buttons (clicking "Terminé",
+           for one) left it stuck open outside customize mode too, found
+           live. This is the CSS-level fallback: even if some future exit
+           path forgets to reset `hidden` again, the panel still can't
+           render outside body.is-customizing. #}
+        .analytics-settings-panel { display: none; }
+        body.is-customizing .analytics-settings-panel:not([hidden]) { border: 1px solid var(--admin-border); border-radius: var(--admin-radius); padding: 1rem; margin-bottom: 1rem; display: flex; flex-direction: column; gap: .9rem; background: var(--admin-surface); }
         .analytics-settings-field { display: flex; flex-direction: column; gap: .4rem; font-size: .78rem; color: var(--admin-muted); text-transform: uppercase; letter-spacing: .03em; }
         .analytics-settings-field input[type="text"] { font: inherit; text-transform: none; letter-spacing: normal; color: var(--admin-text); background: var(--admin-bg); border: 1px solid var(--admin-border); border-radius: 6px; padding: .4rem .6rem; }
         .analytics-settings-series { display: flex; flex-wrap: wrap; gap: .4rem .9rem; }
@@ -1544,6 +1554,22 @@
             if (toggleBtn) toggleBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
             try { localStorage.setItem(STORAGE_KEY, on ? '1' : '0'); } catch (e) {}
             if (on) initSortables();
+            // Every way OUT of customize mode (Terminé, the toolbar toggle,
+            // whatever else calls this with on=false) must also close any
+            // analytics settings panel left open - its own `hidden` state
+            // otherwise has nothing tying it to customize mode at all, and
+            // stayed stuck open outside customize mode once entered, found
+            // live. Discards whatever was mid-edit, same as clicking the
+            // panel's own Cancel would - leaving customize mode is already
+            // an implicit "never mind" for everything else here too.
+            if (!on) {
+                document.querySelectorAll('[data-analytics-settings-panel]:not([hidden])').forEach(function (panel) {
+                    panel.hidden = true;
+                    var card = panel.closest('[data-analytics-card]');
+                    var toggle = card && card.querySelector('[data-analytics-settings-toggle]');
+                    if (toggle) toggle.classList.remove('is-active');
+                });
+            }
         }
 
         function initSortables() {

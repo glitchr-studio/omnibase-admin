@@ -35,6 +35,19 @@
                 </span>
                 <span class="analytics-stat-label">{{ 'analytics.label.page_views'|trans({}, 'admin') }}</span>
             </div>
+            {% for key in ['uniqueVisitors', 'uniqueUsers'] %}
+                <div class="analytics-stat">
+                    <span class="analytics-stat-value">
+                        {{ series|reduce((carry, day) => carry + day[key], 0) }}
+                        {%- if change[key] is not null %}
+                            <span class="analytics-stat-change {{ change[key] >= 0 ? 'is-up' : 'is-down' }}">
+                                {{ change[key] >= 0 ? '+' : '' }}{{ change[key] }}%
+                            </span>
+                        {% endif %}
+                    </span>
+                    <span class="analytics-stat-label">{{ palette[key].label }}</span>
+                </div>
+            {% endfor %}
         </div>
         {% if embedded is not defined or not embedded %}
             {# Customize-mode only (CSS-gated, same as .item-controls/.item-
