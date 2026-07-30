@@ -44,8 +44,25 @@ final class AnalyticsCardWidgetType implements PaletteDashboardWidgetTypeInterfa
 
     public function getTemplateVars(MenuItem $widget): array
     {
-        $days = $widget->getParams()['days'] ?? 14;
+        $params = $widget->getParams();
+        $days = $params['days'] ?? 14;
         $series = $this->analytics->dailyBreakdown($days);
+
+        // Which lines this instance plots - an editable-per-instance param
+        // (see the widget's own settings panel), not a fixed set: human-
+        // scale and bot/AI-scale traffic flatten each other on one shared
+        // axis, so letting an admin turn a series off is how THIS instance
+        // stays readable, rather than the template forcing a one-size split
+        // on every instance. Unknown/stale keys (a param saved before a
+        // series was renamed or removed) are silently dropped rather than
+        // sent to the chart, which never heard of them.
+        $visibleSeries = \array_values(\array_intersect(
+            $params['series'] ?? \array_keys(AnalyticsSeriesPalette::SERIES),
+            \array_keys(AnalyticsSeriesPalette::SERIES),
+        ));
+        if ([] === $visibleSeries) {
+            $visibleSeries = \array_keys(AnalyticsSeriesPalette::SERIES);
+        }
 
         // Same 'd/m' format the template's own canvas JSON uses for its
         // labels - kept in lockstep here (rather than importing
@@ -64,6 +81,7 @@ final class AnalyticsCardWidgetType implements PaletteDashboardWidgetTypeInterfa
                 fn (array $entry) => \array_merge($entry, ['label' => $this->translator->trans($entry['label'], [], 'admin')]),
                 AnalyticsSeriesPalette::SERIES,
             ),
+            'visibleSeries' => $visibleSeries,
         ];
     }
 }

@@ -1,18 +1,16 @@
 {# Rendered via Base\Admin\Widget\AnalyticsCardWidgetType - 'series'/'change'/
-   'palette' arrive as template vars (getTemplateVars()), not fetched here,
-   so this template stays agnostic of the data source and reusable across
-   multiple analytics_card instances with different params (see MenuItem::
-   block()'s $instanceKey/$params).
+   'palette'/'visibleSeries' arrive as template vars (getTemplateVars()),
+   not fetched here, so this template stays agnostic of the data source and
+   reusable across multiple analytics_card instances with different params
+   (see MenuItem::block()'s $instanceKey/$params).
 
-   Small multiples, not one shared-axis chart: Human page views (hundreds)
-   and Bot/AI/Visitors/Users (single digits to low tens) on the same linear
-   y-axis flattens every series but the biggest one into an invisible line
-   along the bottom - the exact "two measures of different scale on one
-   axis" case the dataviz skill's anti-pattern list calls out (real example
-   there: Users 0-30k plotted against Sessions 0-800k looked "hallucinated"
-   to a reviewer). Each source gets its own canvas, its own auto-scaled
-   axis, and its own total/delta in its header - so a handful of AI-bot
-   hits are exactly as readable as hundreds of human ones.
+   One shared-axis chart, series togglable per instance (params.series,
+   edited via the widget's own settings panel - see the edit-mode markup
+   below) rather than a fixed small-multiples split: human-scale traffic
+   and bot/AI-scale traffic DO flatten each other on one linear axis when
+   plotted together, but that's now something the admin curates by turning
+   a series off (e.g. hide Human to actually see Bot/AI's shape) instead of
+   something this template forces on every instance unconditionally.
 
    'embedded' (set by composite.html.twig when this renders as one pane of
    a CompositeWidgetType, unset/false at the top level) drops the .card
@@ -24,7 +22,7 @@
 {% set totalPageViews = series|reduce((carry, day) => carry + day.pageViews, 0) %}
 <div class="analytics-card {{ (embedded is not defined or not embedded) ? 'card' }}">
     <div class="analytics-card-header">
-        <h2>{{ widget.label|trans({}, 'admin') }}</h2>
+        <h2 class="analytics-card-title" data-analytics-title>{{ widget.label|trans({}, 'admin') }}</h2>
         <div class="analytics-stat-row">
             <div class="analytics-stat">
                 <span class="analytics-stat-value">
@@ -39,10 +37,9 @@
             </div>
         </div>
     </div>
-    {# Range picker swaps every mini-chart below at once - the stat row above
-       stays a fixed "this week vs last week" summary regardless of which
-       window the charts are showing, so the two never contradict each
-       other. #}
+    {# Range picker only swaps the chart below - the stat row above stays
+       a fixed "this week vs last week" summary regardless of which window
+       the chart is showing, so the two never contradict each other. #}
     <div class="analytics-range-picker" data-analytics-range-picker data-analytics-endpoints="{{ {
         today: path('admin_analytics_breakdown', {range: 'today'}),
         '7d': path('admin_analytics_breakdown', {range: '7d'}),
@@ -54,33 +51,17 @@
             <button type="button" class="analytics-range-btn {{ range == '14d' ? 'is-active' }}" data-range="{{ range }}" {% if range == 'all' %}data-since-prefix="{{ 'analytics.range.since_prefix'|trans({}, 'admin') }}"{% endif %}>{{ ('analytics.range.' ~ range)|trans({}, 'admin') }}</button>
         {% endfor %}
     </div>
-    <div class="analytics-chart-grid">
-        {% for key, meta in palette %}
-            {% set total = series|reduce((carry, day) => carry + day[key], 0) %}
-            <div class="analytics-mini-chart">
-                <div class="analytics-mini-chart-header">
-                    <span class="analytics-source-dot" style="--chip-color: {{ meta.color }}; --chip-color-dark: {{ meta.colorDark }}"></span>
-                    <span class="analytics-mini-chart-title">{{ meta.label }}</span>
-                    <span class="analytics-mini-chart-value">
-                        {{ total }}
-                        {%- if change[key] is not null %}
-                            <span class="analytics-stat-change {{ change[key] >= 0 ? 'is-up' : 'is-down' }}">{{ change[key] >= 0 ? '+' : '' }}{{ change[key] }}%</span>
-                        {% endif %}
-                    </span>
-                </div>
-                <div class="analytics-mini-chart-wrap">
-                    <canvas data-source-key="{{ key }}" data-admin-chart="{{ {
-                        labels: series|map(day => day.date|date('d/m')),
-                        datasets: [{
-                            label: meta.label,
-                            data: series|map(day => day[key]),
-                            color: meta.color,
-                            colorDark: meta.colorDark,
-                        }],
-                        events: events|default([]),
-                    }|json_encode }}"></canvas>
-                </div>
-            </div>
-        {% endfor %}
+    <div class="analytics-chart-wrap">
+        <canvas data-admin-chart="{{ {
+            labels: series|map(day => day.date|date('d/m')),
+            datasets: visibleSeries|map(key => {
+                key: key,
+                label: palette[key].label,
+                data: series|map(day => day[key]),
+                color: palette[key].color,
+                colorDark: palette[key].colorDark,
+            }),
+            events: events|default([]),
+        }|json_encode }}"></canvas>
     </div>
 </div>
