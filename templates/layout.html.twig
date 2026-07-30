@@ -773,7 +773,15 @@
            showing a big blank gap under its panes. flex:1 on
            .composite-panes (below) is what finally propagates the
            stretch all the way down to the actual pane boxes. #}
-        .composite-card { padding: 1.5rem; display: flex; flex-direction: column; }
+        {# Bottom/right padding is wider than top/left specifically to clear
+           .item-resize-handle (1.8rem circle, inset .6rem from this card's
+           own edge - see that rule) - a plain 1.5rem gutter is narrower
+           than the handle's 2.4rem footprint, so the handle visually cut
+           across the last pane's own rounded corner instead of sitting in
+           the gutter beside it. Only composite-card needs this: a plain
+           .widget-group/.analytics-card has no nested bordered pane for
+           the handle to collide with in the first place. #}
+        .composite-card { padding: 1.5rem 2.75rem 2.75rem 1.5rem; display: flex; flex-direction: column; }
         {# 2 columns, not a single flex row - up to MAX_COMPOSITE_PANES (4)
            panes can land here now (merge onto an existing composite grows
            its own panes), wrapping naturally into a 2x2 arrangement for
