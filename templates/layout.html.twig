@@ -218,7 +218,16 @@
         html.is-sidebar-collapsed .admin-menu .section-label { flex: none; justify-content: center; }
         html.is-sidebar-collapsed .admin-menu a i { margin-right: 0; }
         html.is-sidebar-collapsed .admin-menu .label-text, html.is-sidebar-collapsed .admin-menu .sub { display: none; }
-        html.is-sidebar-collapsed .admin-menu .item-controls, html.is-sidebar-collapsed .item-resize-handle { display: none !important; }
+        {# Both halves must stay scoped to .admin-menu - .item-resize-handle
+           on its own (no .admin-menu prefix) matched EVERY resize handle in
+           the document, including the dashboard widget-grid's own ones
+           while actively customizing it (body.is-customizing's own
+           .item-resize-handle{display:flex} rule lost to this !important
+           regardless of the sidebar's collapse state) - found live: drag
+           handles on dashboard cards silently vanished whenever the
+           sidebar happened to be collapsed (a persisted localStorage
+           preference), with no visible error to explain why. #}
+        html.is-sidebar-collapsed .admin-menu .item-controls, html.is-sidebar-collapsed .admin-menu .item-resize-handle { display: none !important; }
         html.is-sidebar-collapsed .admin-sidebar-stats { display: none; }
         html.is-sidebar-collapsed .section-group { position: relative; }
         {# .admin-aside is overflow-y:auto (it's the scrollable sidebar
