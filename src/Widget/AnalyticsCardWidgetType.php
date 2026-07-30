@@ -4,6 +4,7 @@ namespace Base\Admin\Widget;
 
 use Base\Admin\Config\Menu\MenuItem;
 use Base\Service\Analytics;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * The built-in "Trafic" dashboard card - also the reference implementation
@@ -17,6 +18,7 @@ final class AnalyticsCardWidgetType implements PaletteDashboardWidgetTypeInterfa
     public function __construct(
         private readonly Analytics $analytics,
         private readonly TimelineEventRegistry $timelineEvents,
+        private readonly TranslatorInterface $translator,
     ) {
     }
 
@@ -58,6 +60,10 @@ final class AnalyticsCardWidgetType implements PaletteDashboardWidgetTypeInterfa
             'series' => $series,
             'change' => $this->analytics->weekOverWeekChange(),
             'events' => $this->timelineEvents->getFormattedEvents($series, $labels, $dateFormat),
+            'palette' => \array_map(
+                fn (array $entry) => \array_merge($entry, ['label' => $this->translator->trans($entry['label'], [], 'admin')]),
+                AnalyticsSeriesPalette::SERIES,
+            ),
         ];
     }
 }

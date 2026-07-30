@@ -140,7 +140,7 @@ return function (ContainerConfigurator $configurator) {
     // setContainer() above). An app-defined widget type needs no such
     // thing - its own autoconfigured services pick up the tag for free.
     $services->set(\Base\Admin\Widget\AnalyticsCardWidgetType::class)
-        ->args([service(\Base\Service\Analytics::class), service(\Base\Admin\Widget\TimelineEventRegistry::class)])
+        ->args([service(\Base\Service\Analytics::class), service(\Base\Admin\Widget\TimelineEventRegistry::class), service('translator')])
         ->tag('base.admin.dashboard_widget_type')
         ->tag('base.admin.dashboard_widget_type.palette');
 

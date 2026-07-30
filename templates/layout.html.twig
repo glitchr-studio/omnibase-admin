@@ -729,27 +729,40 @@
         .analytics-stat-change { font-size: .8rem; font-weight: 600; margin-left: .4rem; }
         .analytics-stat-change.is-up { color: var(--admin-success); }
         .analytics-stat-change.is-down { color: var(--admin-danger); }
-        .analytics-source-breakdown { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: .35rem; }
-        .analytics-source-chip { display: inline-flex; align-items: center; gap: .3rem; font-size: .72rem; color: var(--admin-muted); white-space: nowrap; }
-        .analytics-source-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--chip-color); display: inline-block; flex-shrink: 0; }
         .analytics-range-picker { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: 1rem; transition: opacity .15s ease; }
         .analytics-range-picker.is-loading { opacity: .5; }
         .analytics-range-btn { border: 1px solid var(--admin-border); background: transparent; color: var(--admin-muted); font-size: .78rem; font-weight: 600; padding: .3rem .75rem; border-radius: 999px; cursor: pointer; transition: background .15s ease, color .15s ease, border-color .15s ease; }
         .analytics-range-btn:hover { border-color: var(--admin-accent); color: var(--admin-text); }
         .analytics-range-btn.is-active { background: var(--admin-accent); border-color: var(--admin-accent); color: #fff; }
-        .analytics-chart-wrap { position: relative; height: 240px; }
-        {# Elementary info only (just the 3 numbers) once the widget is
-           shrunk down to a single grid track - the chart needs real width
-           to be legible and just clips awkwardly otherwise. Queries the
-           widget's own rendered width (container-type: inline-size above),
-           not the viewport, so this reacts to a customize-mode resize the
-           same way it reacts to a narrow screen. #}
+        {# Small multiples, not one shared-axis chart - see analytics_card.
+           html.twig's own comment for why (Human page views vs Bot/AI/
+           Visitors/Users differ by 1-2 orders of magnitude; one axis would
+           flatten every series but the biggest into an invisible line).
+           Each mini-chart auto-scales to its OWN data, so a handful of bot
+           hits reads exactly as clearly as hundreds of human ones. #}
+        .analytics-chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 1.25rem; }
+        .analytics-mini-chart-header { display: flex; align-items: baseline; gap: .4rem; margin-bottom: .3rem; }
+        .analytics-source-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--chip-color); display: inline-block; flex-shrink: 0; }
+        :root[data-theme="dark"] .analytics-source-dot { background: var(--chip-color-dark, var(--chip-color)); }
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme]) .analytics-source-dot { background: var(--chip-color-dark, var(--chip-color)); }
+        }
+        .analytics-mini-chart-title { font-size: .78rem; color: var(--admin-muted); text-transform: uppercase; letter-spacing: .03em; flex: 1 1 auto; }
+        .analytics-mini-chart-value { font-size: 1rem; font-weight: 700; }
+        .analytics-mini-chart-wrap { position: relative; height: 110px; }
+        {# Elementary info only (just the headline number) once the widget
+           is shrunk down to a single grid track - the mini-charts need
+           real width to be legible and just clip awkwardly otherwise.
+           Queries the widget's own rendered width (container-type:
+           inline-size above), not the viewport, so this reacts to a
+           customize-mode resize the same way it reacts to a narrow
+           screen. #}
         @container (max-width: 320px) {
             .analytics-card { padding: 1.1rem; }
             .analytics-card-header { flex-direction: column; gap: .5rem; }
             .analytics-stat-row { gap: 1rem; }
             .analytics-range-picker { display: none; }
-            .analytics-chart-wrap { display: none; }
+            .analytics-chart-grid { display: none; }
         }
         {# CompositeWidgetType ("dual-width card"): ONE .card (composite-card)
            holds N panes side by side - each pane's own widget-type template
@@ -1914,12 +1927,19 @@
         // for the clicked range and hands the JSON straight to admin-charts.js's
         // update() - see AnalyticsController::breakdown(). The stat row above
         // the picker is deliberately left untouched (see the template comment
-        // by the picker's markup): only the chart re-renders.
+        // by the picker's markup): only the charts re-render.
+        //
+        // One fetch, every mini-chart (small multiples - see analytics_card.
+        // html.twig's own comment for why one canvas became several): the
+        // response carries all 5 datasets, each tagged with its source `key`
+        // (AnalyticsController::breakdown()); every canvas in the card is
+        // updated with just ITS matching dataset, keeping each mini-chart's
+        // own auto-scaled axis intact instead of forcing them all onto one.
         //
         // requestId guards against out-of-order responses: two ranges fetched
         // in quick succession aren't guaranteed to RESOLVE in click order (the
         // earlier click's response can land after the later one's), which
-        // would otherwise leave the chart showing stale data under a pill
+        // would otherwise leave the charts showing stale data under a pill
         // that says something else. Only the response matching the picker's
         // latest click is ever applied.
         document.addEventListener('click', function (e) {
@@ -1928,8 +1948,8 @@
             var picker = btn.closest('[data-analytics-range-picker]');
             var endpoints = JSON.parse(picker.dataset.analyticsEndpoints || '{}');
             var url = endpoints[btn.dataset.range];
-            var canvas = picker.closest('.analytics-card').querySelector('[data-admin-chart]');
-            if (!url || !canvas) return;
+            var canvases = picker.closest('.analytics-card').querySelectorAll('[data-admin-chart]');
+            if (!url || !canvases.length) return;
 
             picker.querySelectorAll('[data-range]').forEach(function (b) { b.classList.remove('is-active'); });
             btn.classList.add('is-active');
@@ -1941,7 +1961,15 @@
                 .then(function (res) { return res.json(); })
                 .then(function (data) {
                     if (requestId !== picker._analyticsRequestId) return;
-                    if (window.AdminCharts) window.AdminCharts.update(canvas, data);
+                    if (window.AdminCharts) {
+                        canvases.forEach(function (canvas) {
+                            var dataset = (data.datasets || []).filter(function (ds) {
+                                return ds.key === canvas.dataset.sourceKey;
+                            })[0];
+                            if (!dataset) return;
+                            window.AdminCharts.update(canvas, { labels: data.labels, datasets: [dataset], events: data.events });
+                        });
+                    }
                     // "Depuis toujours" only covers days actually tracked, so
                     // it can show a SHORTER span than "30 jours" (which
                     // zero-fills days before tracking even began) - a title

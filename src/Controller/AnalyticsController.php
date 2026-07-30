@@ -2,6 +2,7 @@
 
 namespace Base\Admin\Controller;
 
+use Base\Admin\Widget\AnalyticsSeriesPalette;
 use Base\Admin\Widget\TimelineEventRegistry;
 use Base\Service\Analytics;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -40,21 +41,6 @@ class AnalyticsController extends AbstractController
 
         $series = $this->analytics->dailyBreakdown(self::RANGES[$range]);
 
-        $labels = [
-            'pageViewsHuman' => $this->translator->trans('analytics.label.page_views_human', [], 'admin'),
-            'pageViewsBot' => $this->translator->trans('analytics.label.page_views_bot', [], 'admin'),
-            'pageViewsAi' => $this->translator->trans('analytics.label.page_views_ai', [], 'admin'),
-            'uniqueVisitors' => $this->translator->trans('analytics.label.unique_visitors', [], 'admin'),
-            'uniqueUsers' => $this->translator->trans('analytics.label.unique_users', [], 'admin'),
-        ];
-        $colors = [
-            'pageViewsHuman' => '#2563eb',
-            'pageViewsBot' => '#f59e0b',
-            'pageViewsAi' => '#8b5cf6',
-            'uniqueVisitors' => '#16a34a',
-            'uniqueUsers' => '#dc2626',
-        ];
-
         // Same date format as the range picker's own hint - a single day
         // ("today") is unambiguous either way, but a long "all time" series
         // spanning years needs the year to actually mean anything.
@@ -68,12 +54,15 @@ class AnalyticsController extends AbstractController
         return $this->json([
             'labels' => $formattedLabels,
             'datasets' => \array_map(
-                fn (string $key) => [
-                    'label' => $labels[$key],
+                fn (string $key, array $palette) => [
+                    'key' => $key,
+                    'label' => $this->translator->trans($palette['label'], [], 'admin'),
                     'data' => \array_map(fn (array $day) => $day[$key], $series),
-                    'color' => $colors[$key],
+                    'color' => $palette['color'],
+                    'colorDark' => $palette['colorDark'],
                 ],
-                ['pageViewsHuman', 'pageViewsBot', 'pageViewsAi', 'uniqueVisitors', 'uniqueUsers'],
+                \array_keys(AnalyticsSeriesPalette::SERIES),
+                \array_values(AnalyticsSeriesPalette::SERIES),
             ),
             'events' => $this->timelineEvents->getFormattedEvents($series, $formattedLabels, $dateFormat),
         ]);
