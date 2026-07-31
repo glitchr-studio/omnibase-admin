@@ -1,0 +1,12 @@
+{# Rendered via Base\Admin\Widget\WelcomeWidgetType - 'welcomeText' arrives
+   as a template var (getTemplateVars()). No title: this card's whole
+   content IS the one line of greeting text, nothing else in it needs a
+   heading to sit under (see the widget type's own comment on why
+   getDefaultLabel() is never rendered here).
+
+   'embedded' (set by composite.html.twig when this renders as one pane of
+   a CompositeWidgetType) drops the .card class, same "never a card nested
+   inside another card" rule every other widget template follows. #}
+<div class="widget-welcome {{ (embedded is not defined or not embedded) ? 'card' }}">
+    <p class="dashboard-welcome">{{ welcomeText }}</p>
+</div>

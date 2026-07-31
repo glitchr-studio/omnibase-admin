@@ -1,6 +1,7 @@
 dashboard:
     title: Tableau de bord
     welcome: Bienvenue dans votre administration. Choisissez une section dans le menu pour gérer vos contenus.
+    welcome_title: Bienvenue
     analytics_title: Trafic
 
 topbar:

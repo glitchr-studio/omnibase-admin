@@ -152,6 +152,12 @@ abstract class AbstractDashboardController extends AbstractController
     public function configureDashboardBlockItems(): iterable
     {
         return [
+            // Full-width, size 1 (the grid's own N columns, not a fixed
+            // span) and listed first - a greeting reads oddly squeezed
+            // into a partial-width card next to other content, and it's
+            // the first thing the historical dashboard showed too.
+            MenuItemFactory::block('welcome', 'dashboard.welcome_title', 'fa-solid fa-hand-wave')
+                ->setSize(5),
             MenuItemFactory::block('analytics_card', 'dashboard.analytics_title', 'fa-solid fa-chart-line')
                 ->setSize(3), // chart-heavy by default; superadmins can shrink it in customize mode
         ];

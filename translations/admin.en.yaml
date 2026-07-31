@@ -1,6 +1,7 @@
 dashboard:
     title: Dashboard
     welcome: Welcome to your administration. Pick a section in the menu to start managing your content.
+    welcome_title: Welcome
     analytics_title: Traffic
 
 topbar:

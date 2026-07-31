@@ -664,6 +664,12 @@
            for sitting OUTSIDE that stack, offsetting past the brand icon;
            inside it, that would double up as an extra, wrong indent. #}
         .dashboard-welcome { margin: .3rem 0 0; color: var(--admin-muted); font-size: .92rem; }
+        {# The "welcome" widget (see Base\Admin\Widget\WelcomeWidgetType) -
+           .dashboard-welcome's own margin above was tuned to sit right
+           under the header's h1/slogan stack, wrong once it's the ONLY
+           thing in its own standalone card. #}
+        .widget-welcome { padding: 1.5rem; display: flex; align-items: center; }
+        .widget-welcome .dashboard-welcome { margin: 0; font-size: 1rem; }
         {# Dashboard-only, rendered into layout.html.twig's own
            topbar_dashboard_extra block (see there) rather than scrolling
            away with the page content - only ever visible while
