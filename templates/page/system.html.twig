@@ -14,7 +14,20 @@
 <div class="card">
     {% if form.children|length > 1 %}
         {{ form_start(form, {attr: {class: 'admin-form'}}) }}
-            {{ form_rest(form) }}
+            {# Unlike crud/_form.html.twig's per-field {% for child in form %}
+               loop (one .form-row per entity field, 12-col .form-grid), this
+               form only ever has up to 3 top-level children (intl/unv/valid -
+               see LayoutSettingListType::buildForm()), each already a
+               self-contained block (locale tabs, or a plain field list) -
+               .form-grid's own CSS grid columns would just misplace these
+               few children into 1/12-width cells instead of helping, so this
+               is a plain padded wrapper instead, not a reuse of .form-grid
+               itself. Without it, the form previously rendered flush against
+               the card's own border (.card has no padding of its own -
+               form-grid supplies it everywhere else). #}
+            <div class="system-form-body">
+                {{ form_rest(form) }}
+            </div>
             <div class="form-footer">
                 <button class="btn btn-primary" type="submit">{{ 'action.save'|trans({}, 'admin') }}</button>
             </div>

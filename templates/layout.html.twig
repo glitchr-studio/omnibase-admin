@@ -432,6 +432,13 @@
         .form-footer-danger { border-top: none; padding-top: 0; }
         form.admin-form .form-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 0 1.25rem; padding: 1.25rem; }
         form.admin-form .form-row { grid-column: span var(--col-span, 12); min-width: 0; margin-bottom: 1rem; }
+        {# page/system.html.twig (Settings + API keys) - not a 12-col field
+           grid like .form-grid above (it has only up to 3 top-level
+           children: intl/unv/valid, each already a self-contained block,
+           see that template's own comment), just the same padding so its
+           content doesn't sit flush against the card's border. #}
+        form.admin-form .system-form-body { padding: 1.25rem; }
+        form.admin-form .system-form-body .form-translatable + .form-translatable { margin-top: 1.5rem; }
         form.admin-form label { display: block; font-weight: 600; margin-bottom: .3rem; }
         form.admin-form input[type=text], form.admin-form input[type=email], form.admin-form input[type=number],
         form.admin-form input[type=password], form.admin-form select, form.admin-form textarea {
