@@ -690,7 +690,18 @@
            .widget-group already behaves. A no-op whenever nothing in the
            row is taller than this widget's own natural height. #}
         .widget-block { display: flex; }
-        .widget-block > .analytics-card, .widget-block > .card { flex: 1 1 auto; min-height: 0; }
+        {# min-height here reads --widget-height (set inline alongside the
+           wrapper's own min-height whenever widget.height is stored/set,
+           see _block.html.twig and layout.html.twig's applyWidgetHeight())
+           rather than staying a flat 0 - the wrapper's OWN min-height only
+           grows the wrapper itself if the row was already going to be
+           that tall for some other reason (a taller sibling stretching
+           it - see .widget-block's own comment above), which isn't the
+           case for a lone/tallest card being resized taller. Mirroring
+           the same height onto the actual visible child is what makes a
+           custom height show up at all, both right after a drag AND on
+           a fresh page load of a previously-saved custom height. #}
+        .widget-block > .analytics-card, .widget-block > .card { flex: 1 1 auto; min-height: var(--widget-height, 0); }
         {# grid-column is set inline per-widget now (style="grid-column:
            span N", see _block.html.twig/dashboard.html.twig) rather than
            via a widget-size-N class - N can now go up to 10 (configurable
@@ -1867,6 +1878,26 @@
         // for "is this a drag or just a click").
         var HEIGHT_TOUCH_THRESHOLD = 4;
 
+        // .widget-block's own min-height is NOT enough on its own: the
+        // wrapper is a CSS Grid item stretched to its row's auto-sized
+        // height (see .widget-block's own comment above), and the actual
+        // visible box is a FLEX CHILD of it (.analytics-card/.card, flex:1
+        // 1 auto) - growing the wrapper's min-height only grows the
+        // wrapper if the row was already going to be at least that tall
+        // for some other reason (a taller sibling), which is not the
+        // common case for a lone/tallest card in its row. --widget-height
+        // (read by the child's own min-height rule, see the .widget-block
+        // > .analytics-card/.card CSS above) mirrors the same floor onto
+        // the element you can actually see, independent of the wrapper's
+        // own stretch behavior - same custom property _block.html.twig
+        // sets server-side for a previously-saved height, so a fresh page
+        // load and a live drag both go through the one mechanism.
+        function applyWidgetHeight(item, height) {
+            item.style.minHeight = height + 'px';
+            item.style.setProperty('--widget-height', height + 'px');
+            item.dataset.widgetHeight = height;
+        }
+
         // The dashboard's own configured column count (see
         // dashboard.html.twig's data-widget-columns) - the resize
         // control's own upper bound, so "size" can never exceed however
@@ -1969,8 +2000,7 @@
                 item.dataset.widgetSize = next;
             }
             if (resizing.heightTouched) {
-                item.style.minHeight = resizing.targetHeight + 'px';
-                item.dataset.widgetHeight = resizing.targetHeight;
+                applyWidgetHeight(item, resizing.targetHeight);
             }
             resizing = null;
         }
@@ -2025,8 +2055,7 @@
             var currentHeight = parseInt(item.dataset.widgetHeight || '', 10) || item.getBoundingClientRect().height;
             var nextHeight = Math.max(MIN_WIDGET_HEIGHT, Math.round(currentHeight + HEIGHT_KEY_STEP * (e.key === 'ArrowDown' ? 1 : -1)));
             if (nextHeight !== currentHeight) {
-                item.style.minHeight = nextHeight + 'px';
-                item.dataset.widgetHeight = nextHeight;
+                applyWidgetHeight(item, nextHeight);
             }
         });
 
