@@ -727,6 +727,36 @@
            for a phone-sized viewport specifically, just continuous
            instead of a single hard breakpoint. #}
         .widget-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(max(240px, calc((100% - (var(--widget-columns, 5) - 1) * 1.5rem) / var(--widget-columns, 5))), 1fr)); gap: 1.5rem; }
+        {# auto-fit picks however many 240px-minimum tracks actually FIT the
+           container - which is not always --widget-columns itself: a
+           narrower container (this admin opened inside transparentJS's
+           nested overlay, capped at max-width:1600px with overflow:hidden -
+           see @glitchr/transparent's own CSS - rather than the full
+           viewport a standalone /admin page gets) can genuinely fit fewer.
+           A widget whose OWN span equals or exceeds however many tracks
+           auto-fit actually created can't just wrap onto a new row like a
+           flex item would - grid instead silently EXTENDS the grid with
+           extra implicit tracks to satisfy that span, making the whole row
+           wider than the container itself, with the nest panel's own
+           overflow:hidden then cropping every card in that row rather than
+           showing a scrollbar. Found live: the dashboard's own full-width
+           "welcome" widget (span 5, deliberately matching the default
+           --widget-columns) inside the nested overlay at a plain desktop
+           width, where the panel's 1600px cap left less room than 5 real
+           240px tracks need.
+           --widget-max-span (only ever lowered below the unconstrained
+           default here, via the media query right below) is what actually
+           prevents this - min() against a widget's own --widget-span
+           (see _block.html.twig/_group.html.twig) rather than clamping
+           every widget to one fixed span the way the 720px/mobile rule
+           further down does (that one's correct there BECAUSE every
+           column collapses to exactly 1 anyway; here smaller widgets must
+           stay their own size, only ones too big for the room actually
+           left get clamped down). #}
+        .widget-block, .widget-group { grid-column: span min(var(--widget-span, 1), var(--widget-max-span, 999)); }
+        @media (max-width: 1600px) {
+            .widget-grid { --widget-max-span: 4; }
+        }
         {# Widgets span 1-N tracks (N = --widget-columns, superadmin-
            adjustable via both the resize control AND the columns select
            above, persisted like everything else in LayoutConfig). Each
@@ -767,13 +797,11 @@
            custom height show up at all, both right after a drag AND on
            a fresh page load of a previously-saved custom height. #}
         .widget-block > .analytics-card, .widget-block > .card { flex: 1 1 auto; min-height: var(--widget-height, 0); }
-        {# grid-column is set inline per-widget now (style="grid-column:
-           span N", see _block.html.twig/dashboard.html.twig) rather than
-           via a widget-size-N class - N can now go up to 10 (configurable
-           columns), and a class-per-N approach doesn't scale as cleanly as
-           just setting the property directly. !important here still wins
-           over that plain (non-important) inline style, same as it did
-           over the old classes. #}
+        {# Every column collapses to exactly 1 at mobile width - a flat
+           !important here (rather than folding into --widget-max-span
+           above) is deliberately simpler: nothing NEEDS to keep its own
+           relative size at this width the way it does at the intermediate
+           1600px breakpoint, so there's no reason to preserve one. #}
         @media (max-width: 720px) {
             .widget-grid { --widget-columns: 1; }
             .widget-block, .widget-group { grid-column: span 1 !important; }
@@ -2114,7 +2142,7 @@
             var item = resizing.item;
             var next = resizing.target;
             if (parseInt(item.dataset.widgetSize, 10) !== next) {
-                item.style.gridColumn = 'span ' + next;
+                item.style.setProperty('--widget-span', next);
                 item.dataset.widgetSize = next;
             }
             if (resizing.heightTouched) {
@@ -2164,7 +2192,7 @@
                 var current = parseInt(item.dataset.widgetSize || '1', 10);
                 var next = Math.max(1, Math.min(currentColumns(), current + (e.key === 'ArrowRight' ? 1 : -1)));
                 if (next !== current) {
-                    item.style.gridColumn = 'span ' + next;
+                    item.style.setProperty('--widget-span', next);
                     item.dataset.widgetSize = next;
                 }
                 return;
