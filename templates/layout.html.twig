@@ -2486,15 +2486,16 @@
             if (applyToggle) applyToggle.classList.remove('is-active');
         });
 
-        // Article-views widget settings panel (which article + optional
-        // title override) - App\Admin\Widget\ArticleViewsWidgetType, an
-        // APP-level widget type reusing this same generic settings-panel
-        // shell. Simpler than the two above: no live chart re-fetch here
-        // (no per-article breakdown endpoint exists yet - a reasonable v2,
-        // not built this round) - applying just updates the visible title
-        // immediately and relies on "Done" to reload+re-render the chart
-        // itself with the new article selection, same as any other
-        // customize-mode edit that doesn't have its own live preview.
+        // Article-views widget settings panel (which article only now -
+        // title edits in place on the heading itself, see
+        // article_views.html.twig's own comment) - App\Admin\Widget\
+        // ArticleViewsWidgetType, an APP-level widget type reusing this
+        // same generic settings-panel shell. Simpler than the two above:
+        // no live chart re-fetch here (no per-article breakdown endpoint
+        // exists yet - a reasonable v2, not built this round) - applying
+        // just relies on "Done" to reload+re-render the chart itself with
+        // the new article selection, same as any other customize-mode
+        // edit that doesn't have its own live preview.
         document.addEventListener('click', function (e) {
             var toggle = e.target.closest('[data-article-views-settings-toggle]');
             if (toggle) {
@@ -2507,7 +2508,6 @@
                     var toggleDef = JSON.parse((toggleBlock && toggleBlock.dataset.mergeDef) || '{}');
                     var toggleArticleId = (toggleDef.params && toggleDef.params.articleId) || '';
                     toggleCard.querySelector('[data-article-views-settings-article]').value = toggleArticleId;
-                    toggleCard.querySelector('[data-article-views-settings-title]').value = toggleDef.label || '';
                 }
                 togglePanel.hidden = !opening;
                 toggle.classList.toggle('is-active', opening);
@@ -2533,15 +2533,15 @@
             var applyDef = JSON.parse(applyBlock.dataset.mergeDef || '{}');
             var articleSelect = applyCard.querySelector('[data-article-views-settings-article]');
             var articleId = articleSelect.value ? parseInt(articleSelect.value, 10) : null;
-            var title = applyCard.querySelector('[data-article-views-settings-title]').value.trim();
 
+            // Label is NOT touched here - the heading's own contenteditable
+            // input handler (generic over any [data-analytics-title]) owns
+            // widgetLabel entirely, independent of whether this panel is
+            // even open.
             applyBlock.dataset.blockName = applyDef.blockName || 'article_views';
-            applyBlock.dataset.widgetLabel = title || applyDef.label || '';
+            applyBlock.dataset.widgetLabel = applyBlock.dataset.widgetLabel || applyDef.label || '';
             applyBlock.dataset.widgetIcon = applyDef.icon || '';
             applyBlock.dataset.widgetParams = JSON.stringify(Object.assign({}, applyDef.params, { articleId: articleId }));
-
-            var titleEl = applyCard.querySelector('[data-analytics-title]');
-            if (titleEl && title) titleEl.textContent = title;
 
             applyCard.querySelector('[data-article-views-settings-panel]').hidden = true;
             var applyToggle = applyBlock.querySelector('[data-article-views-settings-toggle]');
