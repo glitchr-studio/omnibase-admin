@@ -130,11 +130,30 @@
            either one's actual content (logo vs. icon buttons are
            different sizes) - align-items:center on both handles the
            vertical centering that the removed padding used to. #}
-        .admin-aside .brand { display: flex; align-items: center; gap: .6rem; height: 3.3rem; padding: 0 1.25rem; border-bottom: 1px solid var(--admin-border); }
+        {# min-height (was a hard height) - still lines up with .admin-topbar
+           in the common single-line case (no slogan shown), same as before,
+           but now genuinely needs to grow when a slogan IS shown (either
+           set, or an empty one exposed by customize mode below) rather than
+           clipping it. Some vertical padding too - a flush 0-top/bottom
+           padding relying purely on a fixed height + centering read fine
+           for one line, cramped once a second/third line needs to fit. #}
+        .admin-aside .brand { display: flex; align-items: center; gap: .6rem; min-height: 3.3rem; padding: .5rem 1.25rem; border-bottom: 1px solid var(--admin-border); }
         .admin-aside .brand-logo { width: 2.25rem; height: 2.25rem; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
-        .admin-aside .brand-text { display: flex; flex-direction: column; min-width: 0; }
+        .admin-aside .brand-text { display: flex; flex-direction: column; min-width: 0; gap: .1rem; }
         .admin-aside .brand-title { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .admin-aside .brand-slogan { font-size: .78rem; color: var(--admin-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        {# Not set today (or cleared back to empty via the same edit-in-place
+           flow) - hidden at rest rather than sitting there as a dead blank
+           line, but still needs to exist and be clickable-into while
+           customize mode is on (see refreshTitleEditability()) so a
+           superadmin has something to type a first slogan into instead of
+           being sent to the full Settings form. #}
+        .admin-aside .brand-slogan:empty { display: none; }
+        body.is-customizing .admin-aside .brand-slogan:empty { display: block; }
         .admin-aside .brand-user { font-size: .8rem; color: var(--admin-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        [data-brand-title][contenteditable="true"]:focus, [data-brand-slogan][contenteditable="true"]:focus {
+            outline: 2px solid var(--admin-accent); outline-offset: 2px; border-radius: 4px;
+        }
         .admin-menu { list-style: none; margin: .75rem 0 0; padding: 0; }
         {# prod-style vertical rhythm: quick links (dashboard) stay at the
            top, the first section - and everything after it - is pushed to
@@ -1155,6 +1174,13 @@
             // closes any other that's open; clicking anything inside the
             // menu (a real link, or a choice button below) closes it too.
             document.addEventListener('click', function (e) {
+                // The sidebar's own [role=button] IS the dropdown trigger,
+                // and the editable brand title/slogan live right inside it
+                // (see the blur handler further below) - while actually
+                // editing one, a click to place the cursor must not ALSO
+                // toggle the account dropdown open underneath it.
+                if (e.target.closest('[data-brand-title][contenteditable="true"], [data-brand-slogan][contenteditable="true"]')) return;
+
                 const toggle = e.target.closest('[data-dropdown] > .admin-icon-btn, [data-dropdown] > [aria-haspopup]');
                 if (toggle) {
                     const dropdown = toggle.closest('[data-dropdown]');
@@ -1183,6 +1209,11 @@
             // like the topbar dropdowns gets this for free from the browser).
             document.addEventListener('keydown', function (e) {
                 if (e.key !== 'Enter' && e.key !== ' ') return;
+                // Same reasoning as the click guard above - typing a literal
+                // space into the editable slogan, or pressing Enter to
+                // commit it, must not also fire the dropdown's own
+                // Enter/Space-to-toggle handling.
+                if (e.target.closest('[data-brand-title][contenteditable="true"], [data-brand-slogan][contenteditable="true"]')) return;
                 const toggle = e.target.closest('[data-dropdown] > [role=button][aria-haspopup]');
                 if (!toggle) return;
                 e.preventDefault();
@@ -1330,14 +1361,25 @@
 <div id="page" class="admin-shell">
     <aside class="admin-aside">
         {% set hasUserMenu = admin_context is defined and admin_context.userMenu is not empty %}
-        <div class="admin-account"{% if hasUserMenu %} data-dropdown{% endif %}>
+        {% set canEditBrand = is_granted('ROLE_SUPERADMIN') %}
+        <div class="admin-account"{% if hasUserMenu %} data-dropdown{% endif %}{% if canEditBrand %} data-csrf-token="{{ csrf_token('admin-settings-quick') }}"{% endif %}>
             <div class="brand"{% if hasUserMenu %} role="button" tabindex="0" aria-haspopup="true" aria-expanded="false"{% endif %}>
                 {% block brand %}
                     {% if app.site.logo is not empty %}
                         <img class="brand-logo" src="{{ app.site.logo|thumbnail(64, 64) }}" alt="">
                     {% endif %}
                     <div class="brand-text">
-                        <span class="brand-title">{% block brand_title %}{{ app.site.title ?? 'Administration' }}{% endblock %}</span>
+                        <span class="brand-title" data-brand-title>{% block brand_title %}{{ app.site.title ?? 'Administration' }}{% endblock %}</span>
+                        {# Rendered even when empty for a superadmin - customize
+                           mode is the only way to GIVE the site a slogan through
+                           this shortcut, so an empty span still needs to be
+                           there to click into (see refreshTitleEditability()
+                           below for what actually makes it editable). A regular
+                           user gets nothing here rather than a mysteriously
+                           blank line. #}
+                        {% if app.site.slogan is not empty or canEditBrand %}
+                            <span class="brand-slogan" data-brand-slogan>{{ app.site.slogan }}</span>
+                        {% endif %}
                         {% if app.user %}<span class="brand-user">{{ app.user }}</span>{% endif %}
                     </div>
                     {% if hasUserMenu %}<i class="fa-solid fa-chevron-down account-caret"></i>{% endif %}
@@ -1657,14 +1699,16 @@
         var sortablesInitialized = false;
 
         // Applies the CURRENT customize-mode state to every
-        // [data-analytics-title] in the document - called from
+        // [data-analytics-title] (plus the sidebar's own [data-brand-title]/
+        // [data-brand-slogan], same in-place-edit pattern - see the blur
+        // handler further below) in the document - called from
         // setCustomizing() AND after every insertion point that can add a
         // fresh one (palette add / merge / split, right next to their
         // existing window.AdminCharts.init() calls below) since a node
         // inserted mid-session never goes through setCustomizing() itself.
         function refreshTitleEditability() {
             var on = body.classList.contains('is-customizing');
-            document.querySelectorAll('[data-analytics-title]').forEach(function (el) {
+            document.querySelectorAll('[data-analytics-title], [data-brand-title], [data-brand-slogan]').forEach(function (el) {
                 el.contentEditable = on ? 'true' : 'false';
             });
         }
@@ -2223,10 +2267,12 @@
         }
 
         // Enter commits (blurs) instead of inserting a newline - this is a
-        // single-line heading, not a text area.
+        // single-line heading, not a text area. Covers the sidebar's own
+        // brand title/slogan too (same in-place-edit pattern, see the blur
+        // handler further below for how THEY persist).
         document.addEventListener('keydown', function (e) {
             if (e.key !== 'Enter') return;
-            var title = e.target.closest('[data-analytics-title][contenteditable="true"]');
+            var title = e.target.closest('[data-analytics-title][contenteditable="true"], [data-brand-title][contenteditable="true"], [data-brand-slogan][contenteditable="true"]');
             if (!title) return;
             e.preventDefault();
             title.blur();
@@ -2243,6 +2289,29 @@
             ensureCustomizableWidget(widgetBlock);
             widgetBlock.dataset.widgetLabel = title.textContent.trim();
         });
+
+        // Brand title/slogan: unlike a widget title (captured into a
+        // data-attribute above, only actually persisted later via
+        // "Terminé"/admin_layout_save), there's no encompassing save step
+        // for the sidebar - each edit POSTs for itself the instant the
+        // field loses focus, same "commit immediately" behavior as the
+        // boolean-switch PATCH near the top of this file. Delegated on
+        // 'blur' in the CAPTURE phase - unlike 'input'/'click', 'blur'
+        // does not bubble, so a plain document-level listener would never
+        // see it fire on a field nested this deep.
+        document.addEventListener('blur', function (e) {
+            var field = e.target.closest('[data-brand-title][contenteditable="true"], [data-brand-slogan][contenteditable="true"]');
+            if (!field) return;
+            var path = field.hasAttribute('data-brand-title') ? 'base.settings.title' : 'base.settings.slogan';
+            var value = field.textContent.trim();
+            var account = document.querySelector('.admin-account[data-csrf-token]');
+            if (!account) return;
+            fetch('{{ path("admin_settings_quick") }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': account.dataset.csrfToken },
+                body: JSON.stringify({ path: path, value: value }),
+            }).catch(function () {});
+        }, true);
 
         // The chart's own legend IS the series-visibility control now (see
         // admin-charts.js's legendOnClick - Chart.js already toggles a
