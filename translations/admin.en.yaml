@@ -32,6 +32,13 @@ customize:
     done: Done
     saved: Layout saved.
 
+composite:
+    settings:
+        title: Card settings
+        ratio_label: Pane width ratio
+        cancel: Cancel
+        apply: Apply
+
 field:
     translatable: Translatable field
     video: video

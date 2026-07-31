@@ -30,6 +30,21 @@ class DashboardWidgetController extends AbstractController
     // gesture (drop onto a small existing card) gets fiddly to target.
     private const MAX_PANES = 4;
 
+    // A pane's relative width within a 2-pane composite (see
+    // sanitizePaneDefinition()'s 'size' handling and composite.html.twig's
+    // grid-template-columns) - bounds are generous but not unbounded
+    // (arbitrary client input), same defensive posture as
+    // LayoutConfig::MIN_SIZE/MAX_HEIGHT etc.
+    private const MIN_PANE_SIZE = 1;
+    private const MAX_PANE_SIZE = 6;
+
+    // Merge/split have no direct line to the dashboard's own configured
+    // column count (LayoutConfig lives one layer up, only consulted on
+    // the batched admin_layout_save) - this is the fallback when the
+    // client's own ?columns= is missing/malformed, matching
+    // LayoutConfig::DEFAULT_COLUMNS.
+    private const DEFAULT_COLUMNS = 5;
+
     public function __construct(
         protected readonly PaletteWidgetTypeRegistry $paletteRegistry,
         protected readonly TranslatorInterface $translator,
@@ -81,15 +96,24 @@ class DashboardWidgetController extends AbstractController
             throw $this->createNotFoundException('At least two valid widget definitions are required to merge.');
         }
 
+        $columns = \filter_var($request->query->get('columns'), \FILTER_VALIDATE_INT);
+        if (false === $columns || null === $columns || $columns < 1) {
+            $columns = self::DEFAULT_COLUMNS;
+        }
+
+        // Sum of what each pane already was, not a fixed count-based
+        // heuristic - a 1-wide and a 2-wide widget merge into a 3-wide
+        // composite instead of both being forced to whatever the pane
+        // COUNT happened to imply. Clamped to the dashboard's own column
+        // count so the live preview (before "Done" ever saves/re-clamps
+        // it, see LayoutConfig::sanitizeItems()) can't overflow the grid.
+        $size = \min($columns, \array_sum(\array_column($panes, 'size')));
+
         $widget = (new MenuItem(MenuItem::TYPE_BLOCK, null, null))
             ->setBlockName('composite')
             ->setParams(['panes' => $panes])
             ->setKey('adhoc.' . \bin2hex(\random_bytes(6)))
-            // 2 panes reads fine at the default 2-wide composite; 3-4
-            // wrapping into a 2x2 grid (see composite.html.twig's CSS)
-            // wants the extra room - still just a starting point, the
-            // resize handle can always widen/narrow it afterwards.
-            ->setSize(\count($panes) > 2 ? 3 : 2)
+            ->setSize($size)
             ->setAdHoc(true);
 
         return $this->render('@Admin/widget/_block.html.twig', [
@@ -131,7 +155,12 @@ class DashboardWidgetController extends AbstractController
                     ->setBlockName($pane['type'])
                     ->setParams($pane['params'])
                     ->setKey($key)
-                    ->setSize(1)
+                    // Restores whatever this pane's own relative width was
+                    // inside the composite (see sanitizePaneDefinition()'s
+                    // 'size') rather than resetting every split-out widget
+                    // to size 1 - a 1:2 merge splits back into a 1-wide and
+                    // a 2-wide card, not two 1-wide ones.
+                    ->setSize($pane['size'])
                     ->setAdHoc(true);
 
                 $html .= $this->renderView('@Admin/widget/_block.html.twig', [
@@ -149,7 +178,7 @@ class DashboardWidgetController extends AbstractController
             $widget = (new MenuItem(MenuItem::TYPE_SECTION, $pane['label'], $pane['icon']))
                 ->setSubItems($subItems)
                 ->setKey($key)
-                ->setSize(1)
+                ->setSize($pane['size'])
                 ->setAdHoc(true);
 
             $html .= $this->renderView('@Admin/widget/_group.html.twig', [
@@ -174,7 +203,7 @@ class DashboardWidgetController extends AbstractController
      * ({label, icon, subItems}) shape. Same defensive style as
      * LayoutConfig::fromArray().
      *
-     * @return array{type: string, label: ?string, icon: ?string, params: array, sourceKey: ?string}|array{label: ?string, icon: ?string, subItems: array, sourceKey: ?string}|null
+     * @return array{type: string, label: ?string, icon: ?string, params: array, sourceKey: ?string, size: int}|array{label: ?string, icon: ?string, subItems: array, sourceKey: ?string, size: int}|null
      */
     private function sanitizePaneDefinition(mixed $data): ?array
     {
@@ -184,6 +213,16 @@ class DashboardWidgetController extends AbstractController
 
         $label = \is_string($data['label'] ?? null) ? $data['label'] : '';
         $icon = \is_string($data['icon'] ?? null) ? $data['icon'] : null;
+        // This pane's relative width within a 2-pane composite (see
+        // composite.html.twig's grid-template-columns) - defaults to 1
+        // both for a genuinely new equal-share merge AND for every
+        // composite persisted before this field existed (an absent 'size'
+        // in already-stored params.panes[] is indistinguishable from "was
+        // never sized", and 1 is the correct fallback for both: it's what
+        // every pane already behaved as under the old fixed repeat(2,
+        // 1fr) CSS).
+        $size = \filter_var($data['size'] ?? null, \FILTER_VALIDATE_INT);
+        $size = (false === $size || null === $size) ? 1 : \max(self::MIN_PANE_SIZE, \min(self::MAX_PANE_SIZE, $size));
         // The pane's ORIGINAL widget key, if it had one (data-merge-def
         // carries the sortable key of whatever card it was captured from -
         // see layout.html.twig's captureMergeDefinition()). Round-tripped
@@ -210,6 +249,7 @@ class DashboardWidgetController extends AbstractController
                 'icon' => $icon,
                 'params' => \is_array($data['params'] ?? null) ? $data['params'] : [],
                 'sourceKey' => $sourceKey,
+                'size' => $size,
             ];
         }
 
@@ -229,7 +269,7 @@ class DashboardWidgetController extends AbstractController
                 return null;
             }
 
-            return ['label' => $label, 'icon' => $icon, 'subItems' => $subItems, 'sourceKey' => $sourceKey];
+            return ['label' => $label, 'icon' => $icon, 'subItems' => $subItems, 'sourceKey' => $sourceKey, 'size' => $size];
         }
 
         return null;

@@ -10,8 +10,16 @@
 
    'widget' here is the OUTER composite MenuItem (from _block.html.twig's
    own include) - not shadowed by 'pane' below. #}
-<div class="card composite-card">
-    <div class="composite-panes">
+<div class="card composite-card" data-composite-card>
+    {# Proportional widths (each pane's own .size, see CompositeWidgetType -
+       reused from MenuItem's normal grid-column-span meaning, just applied
+       to THIS inner grid instead of the dashboard's own) only for exactly
+       2 panes - a 1-wide + 2-wide merge becomes a 1fr/2fr split instead of
+       forced 50/50. 3-4 panes keep the CSS default repeat(2, 1fr) 2x2 wrap
+       (see layout.html.twig) unchanged: "proportion" stops having one
+       obvious meaning once panes wrap across two rows, so that case isn't
+       covered here. #}
+    <div class="composite-panes" data-composite-panes{% if panes|length == 2 %} style="grid-template-columns: {{ panes|map(pane => pane.size ~ 'fr')|join(' ') }}"{% endif %}>
         {% for pane in panes %}
             <div class="composite-pane">
                 {% set paneType = pane.blockName ? dashboard_widget_type(pane.blockName) : null %}
@@ -45,4 +53,24 @@
             </div>
         {% endfor %}
     </div>
+    {% if panes|length == 2 %}
+        {# Pre-filled from the CURRENT ratio on open (see the JS handler),
+           not baked in server-side - this panel doesn't need to know its
+           own current state at render time, only how to build the option
+           list and where to write the result back on apply. #}
+        <div class="widget-settings-panel" data-composite-settings-panel hidden>
+            <label class="widget-settings-field">
+                <span>{{ 'composite.settings.ratio_label'|trans({}, 'admin') }}</span>
+                <select data-composite-settings-ratio>
+                    {% for ratio in ['1:3', '1:2', '1:1', '2:1', '3:1'] %}
+                        <option value="{{ ratio }}">{{ ratio }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <div class="widget-settings-actions">
+                <button type="button" class="analytics-range-btn" data-composite-settings-cancel>{{ 'composite.settings.cancel'|trans({}, 'admin') }}</button>
+                <button type="button" class="analytics-range-btn is-active" data-composite-settings-apply>{{ 'composite.settings.apply'|trans({}, 'admin') }}</button>
+            </div>
+        </div>
+    {% endif %}
 </div>

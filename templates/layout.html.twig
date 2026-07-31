@@ -768,13 +768,17 @@
            live. This is the CSS-level fallback: even if some future exit
            path forgets to reset `hidden` again, the panel still can't
            render outside body.is-customizing. #}
-        .analytics-settings-panel { display: none; }
-        body.is-customizing .analytics-settings-panel:not([hidden]) { border: 1px solid var(--admin-border); border-radius: var(--admin-radius); padding: 1rem; margin-bottom: 1rem; display: flex; flex-direction: column; gap: .9rem; background: var(--admin-surface); }
-        .analytics-settings-field { display: flex; flex-direction: column; gap: .4rem; font-size: .78rem; color: var(--admin-muted); text-transform: uppercase; letter-spacing: .03em; }
-        .analytics-settings-field input[type="text"] { font: inherit; text-transform: none; letter-spacing: normal; color: var(--admin-text); background: var(--admin-bg); border: 1px solid var(--admin-border); border-radius: 6px; padding: .4rem .6rem; }
+        {# Generic per-instance settings panel shell - shared by any widget
+           type that offers one (analytics_card's title+series today,
+           composite's pane-ratio selector below), rather than a separate
+           near-identical panel style per widget type. #}
+        .widget-settings-panel { display: none; }
+        body.is-customizing .widget-settings-panel:not([hidden]) { border: 1px solid var(--admin-border); border-radius: var(--admin-radius); padding: 1rem; margin-bottom: 1rem; display: flex; flex-direction: column; gap: .9rem; background: var(--admin-surface); }
+        .widget-settings-field { display: flex; flex-direction: column; gap: .4rem; font-size: .78rem; color: var(--admin-muted); text-transform: uppercase; letter-spacing: .03em; }
+        .widget-settings-field input[type="text"], .widget-settings-field select { font: inherit; text-transform: none; letter-spacing: normal; color: var(--admin-text); background: var(--admin-bg); border: 1px solid var(--admin-border); border-radius: 6px; padding: .4rem .6rem; }
         .analytics-settings-series { display: flex; flex-wrap: wrap; gap: .4rem .9rem; }
         .analytics-settings-series-item { display: inline-flex; align-items: center; gap: .4rem; font-size: .85rem; text-transform: none; letter-spacing: normal; color: var(--admin-text); cursor: pointer; }
-        .analytics-settings-actions { display: flex; justify-content: flex-end; gap: .5rem; }
+        .widget-settings-actions { display: flex; justify-content: flex-end; gap: .5rem; }
         {# Elementary info only (just the 3 numbers) once the widget is
            shrunk down to a single grid track - the chart needs real width
            to be legible and just clips awkwardly otherwise. Queries the
@@ -1569,21 +1573,24 @@
             if (on) initSortables();
             // Every way OUT of customize mode (Terminé, the toolbar toggle,
             // whatever else calls this with on=false) must also close any
-            // analytics settings panel left open - its own `hidden` state
+            // widget settings panel left open (analytics_card's or
+            // composite's - both share this same open/close mechanics,
+            // just different toggle attributes) - its own `hidden` state
             // otherwise has nothing tying it to customize mode at all, and
             // stayed stuck open outside customize mode once entered, found
             // live. Discards whatever was mid-edit, same as clicking the
             // panel's own Cancel would - leaving customize mode is already
             // an implicit "never mind" for everything else here too.
             if (!on) {
-                document.querySelectorAll('[data-analytics-settings-panel]:not([hidden])').forEach(function (panel) {
+                document.querySelectorAll('[data-analytics-settings-panel]:not([hidden]), [data-composite-settings-panel]:not([hidden])').forEach(function (panel) {
                     panel.hidden = true;
                     // The toggle button lives in _block.html.twig's shared
-                    // top-right .item-controls row, a SIBLING of
-                    // .analytics-card, not a descendant of it - both are
-                    // reachable from the common .widget-block ancestor.
+                    // top-right .item-controls row, a SIBLING of the
+                    // widget's own content (.analytics-card/.composite-
+                    // card), not a descendant of it - both are reachable
+                    // from the common .widget-block ancestor.
                     var widgetBlock = panel.closest('[data-sortable-item]');
-                    var toggle = widgetBlock && widgetBlock.querySelector('[data-analytics-settings-toggle]');
+                    var toggle = widgetBlock && widgetBlock.querySelector('[data-analytics-settings-toggle], [data-composite-settings-toggle]');
                     if (toggle) toggle.classList.remove('is-active');
                 });
             }
@@ -1632,6 +1639,12 @@
                 // merged into a composite" and skip re-appending it as a
                 // separate standalone card on the next save/reload.
                 def.sourceKey = el.dataset.sortableKey || null;
+                // This widget's CURRENT dashboard-grid width, carried into
+                // the pane as its relative width WITHIN the composite (see
+                // composite.html.twig's grid-template-columns) - a 1-wide
+                // and a 2-wide card merge into a 1fr/2fr split instead of
+                // both being forced to an equal share.
+                def.size = parseInt(el.dataset.widgetSize || '1', 10) || 1;
                 return def;
             } catch (err) {
                 return null;
@@ -1692,7 +1705,12 @@
             markPending(draggedEl);
             markPending(targetEl);
 
-            var url = '{{ path("admin_dashboard_widget_merge") }}?panes=' + encodeURIComponent(JSON.stringify(panes));
+            // columns lets merge() clamp the composite's own summed size
+            // (see DashboardWidgetController::merge()) to what the grid
+            // can actually fit, same upper bound the resize handle itself
+            // already respects (currentColumns(), defined below - a
+            // function DECLARATION, hoisted, safe to call from here).
+            var url = '{{ path("admin_dashboard_widget_merge") }}?panes=' + encodeURIComponent(JSON.stringify(panes)) + '&columns=' + currentColumns();
 
             fetch(url)
                 .then(function (r) { if (!r.ok) throw new Error('merge failed: ' + r.status); return r.text(); })
@@ -2137,6 +2155,85 @@
 
             applyCard.querySelector('[data-analytics-settings-panel]').hidden = true;
             var applyToggle = applyBlock.querySelector('[data-analytics-settings-toggle]');
+            if (applyToggle) applyToggle.classList.remove('is-active');
+        });
+
+        function gcd(a, b) { return b ? gcd(b, a % b) : a; }
+
+        // Composite card settings panel (pane width ratio - exactly-2-pane
+        // composites only, see _block.html.twig's own comment on why).
+        // Same shape as the analytics settings panel above: open pre-fills
+        // from the CURRENT state, apply writes straight onto the widget-
+        // block's own data-widget-params (composite is always adHoc, so
+        // this round-trips through the existing save/load path with zero
+        // new server plumbing - see DashboardWidgetController::merge() and
+        // LayoutArranger's own docblock) and live-updates .composite-panes'
+        // grid-template-columns for an instant preview. Cancel and
+        // customize-mode-exit are both already handled generically by the
+        // shared [data-composite-settings-panel] selectors above/in
+        // setCustomizing() - only open/apply need type-specific logic.
+        document.addEventListener('click', function (e) {
+            var toggle = e.target.closest('[data-composite-settings-toggle]');
+            if (toggle) {
+                var toggleBlock = toggle.closest('[data-sortable-item]');
+                var toggleCard = toggleBlock && toggleBlock.querySelector('[data-composite-card]');
+                if (!toggleCard) return;
+                var togglePanel = toggleCard.querySelector('[data-composite-settings-panel]');
+                var opening = !!togglePanel.hidden;
+                if (opening) {
+                    var toggleParams = JSON.parse((toggleBlock && toggleBlock.dataset.widgetParams) || '{}');
+                    var togglePanes = Array.isArray(toggleParams.panes) ? toggleParams.panes : [];
+                    var a = (togglePanes[0] && togglePanes[0].size) || 1;
+                    var b = (togglePanes[1] && togglePanes[1].size) || 1;
+                    var g = gcd(a, b) || 1;
+                    var select = toggleCard.querySelector('[data-composite-settings-ratio]');
+                    // (a/g):(b/g) - the reduced ratio, so a 4:2 merge (two
+                    // widgets whose ORIGINAL dashboard widths summed to
+                    // that) still matches the 2:1 preset option instead of
+                    // leaving the select on whatever it defaults to for an
+                    // unrecognized value.
+                    select.value = (a / g) + ':' + (b / g);
+                }
+                togglePanel.hidden = !opening;
+                toggle.classList.toggle('is-active', opening);
+                return;
+            }
+
+            var cancel = e.target.closest('[data-composite-settings-cancel]');
+            if (cancel) {
+                cancel.closest('[data-composite-settings-panel]').hidden = true;
+                var cancelBlock = cancel.closest('[data-sortable-item]');
+                var cancelToggle = cancelBlock && cancelBlock.querySelector('[data-composite-settings-toggle]');
+                if (cancelToggle) cancelToggle.classList.remove('is-active');
+                return;
+            }
+
+            var apply = e.target.closest('[data-composite-settings-apply]');
+            if (!apply) return;
+
+            var applyCard = apply.closest('[data-composite-card]');
+            var applyBlock = applyCard && applyCard.closest('[data-sortable-item]');
+            if (!applyBlock) return;
+
+            var select = applyCard.querySelector('[data-composite-settings-ratio]');
+            var parts = (select.value || '1:1').split(':');
+            var left = parseInt(parts[0], 10) || 1;
+            var right = parseInt(parts[1], 10) || 1;
+
+            var params = JSON.parse(applyBlock.dataset.widgetParams || '{}');
+            var panes = Array.isArray(params.panes) ? params.panes : [];
+            if (panes.length === 2) {
+                panes[0] = Object.assign({}, panes[0], { size: left });
+                panes[1] = Object.assign({}, panes[1], { size: right });
+                params.panes = panes;
+                applyBlock.dataset.widgetParams = JSON.stringify(params);
+
+                var panesEl = applyCard.querySelector('[data-composite-panes]');
+                if (panesEl) panesEl.style.gridTemplateColumns = left + 'fr ' + right + 'fr';
+            }
+
+            applyCard.querySelector('[data-composite-settings-panel]').hidden = true;
+            var applyToggle = applyBlock.querySelector('[data-composite-settings-toggle]');
             if (applyToggle) applyToggle.classList.remove('is-active');
         });
 

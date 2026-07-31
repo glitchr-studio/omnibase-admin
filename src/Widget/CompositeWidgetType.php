@@ -62,7 +62,18 @@ final class CompositeWidgetType implements DashboardWidgetTypeInterface
 
                 $paneWidgets[] = (new MenuItem(MenuItem::TYPE_BLOCK, $pane['label'] ?? null, $pane['icon'] ?? null))
                     ->setBlockName($type)
-                    ->setParams(\is_array($pane['params'] ?? null) ? $pane['params'] : []);
+                    ->setParams(\is_array($pane['params'] ?? null) ? $pane['params'] : [])
+                    // Reuses MenuItem's own $size (normally a dashboard
+                    // grid-column span) as this pane's relative width
+                    // WITHIN the composite instead - a different grid
+                    // entirely (composite.html.twig's own
+                    // grid-template-columns, not the dashboard's), but the
+                    // same "how wide relative to its siblings" concept, so
+                    // no second property needed on MenuItem for it. Absent
+                    // 'size' (every composite persisted before this field
+                    // existed) defaults to 1, matching what every pane
+                    // already behaved as under the old fixed 1fr-each CSS.
+                    ->setSize(\is_int($pane['size'] ?? null) ? $pane['size'] : 1);
                 continue;
             }
 
@@ -89,7 +100,8 @@ final class CompositeWidgetType implements DashboardWidgetTypeInterface
             }
 
             $paneWidgets[] = (new MenuItem(MenuItem::TYPE_SECTION, $pane['label'] ?? null, $pane['icon'] ?? null))
-                ->setSubItems($paneSubItems);
+                ->setSubItems($paneSubItems)
+                ->setSize(\is_int($pane['size'] ?? null) ? $pane['size'] : 1);
         }
 
         return ['panes' => $paneWidgets];

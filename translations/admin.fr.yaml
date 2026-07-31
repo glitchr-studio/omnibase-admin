@@ -32,6 +32,13 @@ customize:
     done: Terminé
     saved: Mise en page enregistrée.
 
+composite:
+    settings:
+        title: Paramètres de la carte
+        ratio_label: Proportion des panneaux
+        cancel: Annuler
+        apply: Appliquer
+
 field:
     translatable: Champ traduisible
     video: vidéo

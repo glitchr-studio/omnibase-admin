@@ -57,12 +57,12 @@
            widget with a blockName (code-defined or ad-hoc alike, see
            _block.html.twig), so this panel doesn't need its own copy of
            that data baked in twice. #}
-        <div class="analytics-settings-panel" data-analytics-settings-panel hidden>
-            <label class="analytics-settings-field">
+        <div class="widget-settings-panel" data-analytics-settings-panel hidden>
+            <label class="widget-settings-field">
                 <span>{{ 'analytics.settings.title_label'|trans({}, 'admin') }}</span>
                 <input type="text" data-analytics-settings-title maxlength="200">
             </label>
-            <div class="analytics-settings-field">
+            <div class="widget-settings-field">
                 <span>{{ 'analytics.settings.series_label'|trans({}, 'admin') }}</span>
                 <div class="analytics-settings-series">
                     {% for key, meta in palette %}
@@ -74,7 +74,7 @@
                     {% endfor %}
                 </div>
             </div>
-            <div class="analytics-settings-actions">
+            <div class="widget-settings-actions">
                 <button type="button" class="analytics-range-btn" data-analytics-settings-cancel>{{ 'analytics.settings.cancel'|trans({}, 'admin') }}</button>
                 <button type="button" class="analytics-range-btn is-active" data-analytics-settings-apply>{{ 'analytics.settings.apply'|trans({}, 'admin') }}</button>
             </div>
