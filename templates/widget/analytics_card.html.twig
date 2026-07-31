@@ -4,13 +4,29 @@
    reusable across multiple analytics_card instances with different params
    (see MenuItem::block()'s $instanceKey/$params).
 
-   One shared-axis chart, series togglable per instance (params.series,
-   edited via the widget's own settings panel - see the edit-mode markup
-   below) rather than a fixed small-multiples split: human-scale traffic
-   and bot/AI-scale traffic DO flatten each other on one linear axis when
-   plotted together, but that's now something the admin curates by turning
-   a series off (e.g. hide Human to actually see Bot/AI's shape) instead of
-   something this template forces on every instance unconditionally.
+   One shared-axis chart, series togglable per instance (params.series) -
+   human-scale traffic and bot/AI-scale traffic DO flatten each other on
+   one linear axis when plotted together, but that's now something the
+   admin curates by turning a series off (e.g. hide Human to actually see
+   Bot/AI's shape) instead of something this template forces on every
+   instance unconditionally.
+
+   Editing is fully in-place, no separate settings form: the title is a
+   contenteditable heading (see data-analytics-title, made editable by
+   layout.html.twig's setCustomizing() while body.is-customizing), and
+   which series show is just the chart's own legend - Chart.js already
+   toggles a series on a legend click for free, admin-charts.js only adds
+   a DOM event on top so layout.html.twig can persist the new hidden/shown
+   set. Tried a separate gear-icon settings panel (title input + a
+   checkbox per series) first; it duplicated controls that already exist
+   right there in the widget (the title text itself, the chart's own
+   legend) instead of just making them editable directly.
+
+   ALL 5 series are always sent to the chart (datasets never omit a
+   series just because params.series doesn't currently include it) with
+   Chart.js's own per-dataset `hidden` flag instead - an OMITTED series
+   would have no legend entry to click back on, which is exactly how a
+   hidden series gets re-shown.
 
    'embedded' (set by composite.html.twig when this renders as one pane of
    a CompositeWidgetType, unset/false at the top level) drops the .card
@@ -50,36 +66,6 @@
             {% endfor %}
         </div>
     </div>
-    {% if embedded is not defined or not embedded %}
-        {# Pre-filled from this instance's CURRENT label/params on open, not
-           server-rendered into the form itself - data-merge-def already
-           carries {blockName, label (translated), icon, params} for any
-           widget with a blockName (code-defined or ad-hoc alike, see
-           _block.html.twig), so this panel doesn't need its own copy of
-           that data baked in twice. #}
-        <div class="widget-settings-panel" data-analytics-settings-panel hidden>
-            <label class="widget-settings-field">
-                <span>{{ 'analytics.settings.title_label'|trans({}, 'admin') }}</span>
-                <input type="text" data-analytics-settings-title maxlength="200">
-            </label>
-            <div class="widget-settings-field">
-                <span>{{ 'analytics.settings.series_label'|trans({}, 'admin') }}</span>
-                <div class="analytics-settings-series">
-                    {% for key, meta in palette %}
-                        <label class="analytics-settings-series-item">
-                            <input type="checkbox" value="{{ key }}" data-analytics-settings-series checked>
-                            <span class="analytics-source-dot" style="--chip-color: {{ meta.color }}; --chip-color-dark: {{ meta.colorDark }}"></span>
-                            {{ meta.label }}
-                        </label>
-                    {% endfor %}
-                </div>
-            </div>
-            <div class="widget-settings-actions">
-                <button type="button" class="analytics-range-btn" data-analytics-settings-cancel>{{ 'analytics.settings.cancel'|trans({}, 'admin') }}</button>
-                <button type="button" class="analytics-range-btn is-active" data-analytics-settings-apply>{{ 'analytics.settings.apply'|trans({}, 'admin') }}</button>
-            </div>
-        </div>
-    {% endif %}
     {# Range picker only swaps the chart below - the stat row above stays
        a fixed "this week vs last week" summary regardless of which window
        the chart is showing, so the two never contradict each other. #}
@@ -97,12 +83,13 @@
     <div class="analytics-chart-wrap">
         <canvas data-admin-chart="{{ {
             labels: series|map(day => day.date|date('d/m')),
-            datasets: visibleSeries|map(key => {
+            datasets: palette|map((meta, key) => {
                 key: key,
-                label: palette[key].label,
+                label: meta.label,
                 data: series|map(day => day[key]),
-                color: palette[key].color,
-                colorDark: palette[key].colorDark,
+                color: meta.color,
+                colorDark: meta.colorDark,
+                hidden: key not in visibleSeries,
             }),
             events: events|default([]),
         }|json_encode }}"></canvas>

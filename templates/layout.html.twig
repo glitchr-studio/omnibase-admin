@@ -775,16 +775,22 @@
            path forgets to reset `hidden` again, the panel still can't
            render outside body.is-customizing. #}
         {# Generic per-instance settings panel shell - shared by any widget
-           type that offers one (analytics_card's title+series today,
-           composite's pane-ratio selector below), rather than a separate
-           near-identical panel style per widget type. #}
+           type that offers one (composite's pane-ratio selector below,
+           article_views' article picker) - analytics_card no longer uses
+           this at all (title edits in place, series toggle is the chart's
+           own legend - see that template's own comment), but the shell
+           stays generic rather than reverting to an analytics-specific
+           name now that two OTHER consumers exist. #}
         .widget-settings-panel { display: none; }
         body.is-customizing .widget-settings-panel:not([hidden]) { border: 1px solid var(--admin-border); border-radius: var(--admin-radius); padding: 1rem; margin-bottom: 1rem; display: flex; flex-direction: column; gap: .9rem; background: var(--admin-surface); }
         .widget-settings-field { display: flex; flex-direction: column; gap: .4rem; font-size: .78rem; color: var(--admin-muted); text-transform: uppercase; letter-spacing: .03em; }
         .widget-settings-field input[type="text"], .widget-settings-field select { font: inherit; text-transform: none; letter-spacing: normal; color: var(--admin-text); background: var(--admin-bg); border: 1px solid var(--admin-border); border-radius: 6px; padding: .4rem .6rem; }
-        .analytics-settings-series { display: flex; flex-wrap: wrap; gap: .4rem .9rem; }
-        .analytics-settings-series-item { display: inline-flex; align-items: center; gap: .4rem; font-size: .85rem; text-transform: none; letter-spacing: normal; color: var(--admin-text); cursor: pointer; }
         .widget-settings-actions { display: flex; justify-content: flex-end; gap: .5rem; }
+        {# The traffic widget's title, in place: contenteditable is toggled
+           by JS (see refreshTitleEditability()), not rendered conditionally
+           server-side - a plain focus ring is enough affordance, no other
+           chrome change needed to signal "editable" here. #}
+        [data-analytics-title][contenteditable="true"]:focus { outline: 2px solid var(--admin-accent); outline-offset: 2px; border-radius: 4px; }
         {# Elementary info only (just the 3 numbers) once the widget is
            shrunk down to a single grid track - the chart needs real width
            to be legible and just clips awkwardly otherwise. Queries the
@@ -1571,33 +1577,57 @@
         var doneBtn = document.getElementById('admin-customize-done');
         var sortablesInitialized = false;
 
+        // Applies the CURRENT customize-mode state to every
+        // [data-analytics-title] in the document - called from
+        // setCustomizing() AND after every insertion point that can add a
+        // fresh one (palette add / merge / split, right next to their
+        // existing window.AdminCharts.init() calls below) since a node
+        // inserted mid-session never goes through setCustomizing() itself.
+        function refreshTitleEditability() {
+            var on = body.classList.contains('is-customizing');
+            document.querySelectorAll('[data-analytics-title]').forEach(function (el) {
+                el.contentEditable = on ? 'true' : 'false';
+            });
+        }
+
         function setCustomizing(on) {
             body.classList.toggle('is-customizing', on);
             if (toggleBtn) toggleBtn.classList.toggle('is-active', on);
             if (toggleBtn) toggleBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
             try { localStorage.setItem(STORAGE_KEY, on ? '1' : '0'); } catch (e) {}
             if (on) initSortables();
+            // The traffic widget's title edits in place now (contenteditable
+            // heading, see analytics_card.html.twig's own comment) - toggled
+            // here rather than rendered server-side, since customize_enabled
+            // (a superadmin PERMISSION check, true on every page load for
+            // one) and is-customizing (this CLIENT-toggled UI state) are
+            // different things - a permission-gated contenteditable would
+            // stay clickable-into on a normal, non-customizing dashboard
+            // view too. article_views' own title shares data-analytics-title
+            // (same heading pattern, see that widget's own template) and
+            // gets the exact same treatment for free.
+            refreshTitleEditability();
             // Every way OUT of customize mode (Terminé, the toolbar toggle,
             // whatever else calls this with on=false) must also close any
-            // widget settings panel left open (analytics_card's,
-            // composite's, or article_views' - all three share this same
-            // open/close mechanics, just different toggle attributes) -
-            // its own `hidden` state otherwise has nothing tying it to
-            // customize mode at all, and stayed stuck open outside
+            // widget settings panel left open (composite's or article_views'
+            // - both share this same open/close mechanics, just different
+            // toggle attributes; analytics_card has no panel of its own
+            // anymore) - its own `hidden` state otherwise has nothing tying
+            // it to customize mode at all, and stayed stuck open outside
             // customize mode once entered, found live. Discards whatever
             // was mid-edit, same as clicking the panel's own Cancel would -
             // leaving customize mode is already an implicit "never mind"
             // for everything else here too.
             if (!on) {
-                document.querySelectorAll('[data-analytics-settings-panel]:not([hidden]), [data-composite-settings-panel]:not([hidden]), [data-article-views-settings-panel]:not([hidden])').forEach(function (panel) {
+                document.querySelectorAll('[data-composite-settings-panel]:not([hidden]), [data-article-views-settings-panel]:not([hidden])').forEach(function (panel) {
                     panel.hidden = true;
                     // The toggle button lives in _block.html.twig's shared
                     // top-right .item-controls row, a SIBLING of the
-                    // widget's own content (.analytics-card/.composite-
-                    // card), not a descendant of it - both are reachable
+                    // widget's own content (.composite-card/article_views'
+                    // own card), not a descendant of it - both are reachable
                     // from the common .widget-block ancestor.
                     var widgetBlock = panel.closest('[data-sortable-item]');
-                    var toggle = widgetBlock && widgetBlock.querySelector('[data-analytics-settings-toggle], [data-composite-settings-toggle], [data-article-views-settings-toggle]');
+                    var toggle = widgetBlock && widgetBlock.querySelector('[data-composite-settings-toggle], [data-article-views-settings-toggle]');
                     if (toggle) toggle.classList.remove('is-active');
                 });
             }
@@ -1729,6 +1759,7 @@
                     // below: a plain DOM insertion never triggers either of
                     // admin-charts.js's own init paths.
                     if (window.AdminCharts && window.AdminCharts.init) window.AdminCharts.init();
+                    refreshTitleEditability();
                 })
                 .catch(function () {
                     // Leave both cards exactly as they were - clearing
@@ -1764,6 +1795,7 @@
                     item.insertAdjacentHTML('beforebegin', html);
                     item.remove();
                     if (window.AdminCharts && window.AdminCharts.init) window.AdminCharts.init();
+                    refreshTitleEditability();
                 })
                 .catch(function () {
                     button.disabled = false;
@@ -2005,11 +2037,13 @@
         // by the picker's markup): only the chart re-renders.
         //
         // The endpoint always returns all 5 datasets, each tagged with its
-        // source `key` - the picker only keeps whichever ones are CURRENTLY
-        // plotted (read straight off the live Chart.js instance's own
-        // dataset keys) before handing the swap to admin-charts.js, so a
-        // range change never reintroduces a series the admin turned off in
-        // this instance's settings.
+        // source `key`. All 5 always get handed to admin-charts.js too
+        // (never filtered down to a subset - see analytics_card.html.twig's
+        // own comment on why an OMITTED dataset would have no legend entry
+        // to click back on) - what the picker DOES preserve across the
+        // swap is each series' CURRENT hidden/shown state (read straight
+        // off the live Chart.js instance's per-dataset meta), so a range
+        // change never re-shows a series the admin hid via the legend.
         //
         // requestId guards against out-of-order responses: two ranges fetched
         // in quick succession aren't guaranteed to RESOLVE in click order (the
@@ -2038,12 +2072,15 @@
                     if (requestId !== picker._analyticsRequestId) return;
                     if (window.AdminCharts) {
                         var currentChart = canvas._adminChart;
-                        var visibleKeys = currentChart
-                            ? currentChart.data.datasets.map(function (ds) { return ds.key; })
-                            : null;
-                        var datasets = visibleKeys
-                            ? (data.datasets || []).filter(function (ds) { return visibleKeys.indexOf(ds.key) !== -1; })
-                            : data.datasets;
+                        var hiddenKeys = {};
+                        if (currentChart) {
+                            currentChart.data.datasets.forEach(function (ds, i) {
+                                if (currentChart.getDatasetMeta(i).hidden) hiddenKeys[ds.key] = true;
+                            });
+                        }
+                        var datasets = (data.datasets || []).map(function (ds) {
+                            return Object.assign({}, ds, { hidden: !!hiddenKeys[ds.key] });
+                        });
                         window.AdminCharts.update(canvas, { labels: data.labels, datasets: datasets, events: data.events });
                     }
                     // "Depuis toujours" only covers days actually tracked, so
@@ -2061,108 +2098,89 @@
                 });
         });
 
-        // Analytics card settings panel (title + which series it plots).
-        // Applying writes data-block-name/data-widget-label/data-widget-
-        // params straight onto the SAME widget-block node captureLevel()
-        // already knows how to read (see its own comment, above) - "Done"
-        // then round-trips this through the existing save/load path with
-        // zero new server plumbing. LayoutArranger::applyLevel() applies
-        // the stored override onto the matched CODE-DEFINED item in place
-        // (see its own docblock) rather than spawning an ad-hoc duplicate
-        // alongside the built-in card - tried the duplicate-friendly
-        // approach first and it does exactly that, since
-        // configureDashboardBlockItems() re-offers the built-in key every
-        // request regardless of what's stored under a DIFFERENT key.
+        // Analytics card editing is fully in-place now (no settings panel -
+        // see analytics_card.html.twig's own comment on why): the title is
+        // a contenteditable heading, and which series show is just the
+        // chart's own legend. Both still land on the SAME widget-block
+        // data-block-name/data-widget-label/data-widget-params attributes
+        // captureLevel() already knows how to read (see LayoutArranger's
+        // own docblock for how a code-defined widget's override applies in
+        // place on "Done") - only WHEN they get written changed, not where.
         //
-        // data-merge-def (see _block.html.twig) is the one existing source
-        // of "this instance's current blockName/label/icon/params" for
-        // ANY widget with a blockName, code-defined or ad-hoc alike - read
-        // on open (to pre-fill the form) and again on apply (to preserve
-        // any OTHER params this instance already carries, e.g. 'days',
-        // instead of clobbering them with just {series: [...]}).
-        document.addEventListener('click', function (e) {
-            var toggle = e.target.closest('[data-analytics-settings-toggle]');
-            if (toggle) {
-                // The toggle button lives in _block.html.twig's shared
-                // top-right .item-controls row (uniform with drag/eye/
-                // split/remove), a SIBLING of .analytics-card rather than
-                // a descendant of it - both reachable from the common
-                // .widget-block ancestor.
-                var toggleBlock = toggle.closest('[data-sortable-item]');
-                var toggleCard = toggleBlock && toggleBlock.querySelector('[data-analytics-card]');
-                if (!toggleCard) return;
-                var togglePanel = toggleCard.querySelector('[data-analytics-settings-panel]');
-                var opening = !!togglePanel.hidden;
-                if (opening) {
-                    var toggleDef = JSON.parse((toggleBlock && toggleBlock.dataset.mergeDef) || '{}');
-                    var toggleSeries = (toggleDef.params && toggleDef.params.series) || null;
-                    toggleCard.querySelector('[data-analytics-settings-title]').value = toggleDef.label || '';
-                    toggleCard.querySelectorAll('[data-analytics-settings-series]').forEach(function (cb) {
-                        cb.checked = toggleSeries ? toggleSeries.indexOf(cb.value) !== -1 : true;
-                    });
-                }
-                togglePanel.hidden = !opening;
-                toggle.classList.toggle('is-active', opening);
-                return;
-            }
+        // ensureCustomizableWidget() is the one-time "first edit" step
+        // (was each apply handler's first few lines, inlined 3x - factored
+        // out here since continuous inline edits need to call it on every
+        // keystroke/click, not once on a batch Apply): if this widget-block
+        // was never customized before (no data-block-name yet), seed its
+        // data-widget-label/-params/-icon from data-merge-def (the one
+        // existing source of "this instance's current definition" for any
+        // widget with a blockName, code-defined or ad-hoc alike) before any
+        // partial edit tries to merge into them.
+        function ensureCustomizableWidget(widgetBlock) {
+            if (widgetBlock.dataset.blockName) return;
+            var def = JSON.parse(widgetBlock.dataset.mergeDef || '{}');
+            widgetBlock.dataset.blockName = def.blockName || '';
+            widgetBlock.dataset.widgetLabel = def.label || '';
+            widgetBlock.dataset.widgetIcon = def.icon || '';
+            widgetBlock.dataset.widgetParams = JSON.stringify(def.params || {});
+        }
 
-            var cancel = e.target.closest('[data-analytics-settings-cancel]');
-            if (cancel) {
-                cancel.closest('[data-analytics-settings-panel]').hidden = true;
-                var cancelBlock = cancel.closest('[data-sortable-item]');
-                var cancelToggle = cancelBlock && cancelBlock.querySelector('[data-analytics-settings-toggle]');
-                if (cancelToggle) cancelToggle.classList.remove('is-active');
-                return;
-            }
+        // Enter commits (blurs) instead of inserting a newline - this is a
+        // single-line heading, not a text area.
+        document.addEventListener('keydown', function (e) {
+            if (e.key !== 'Enter') return;
+            var title = e.target.closest('[data-analytics-title][contenteditable="true"]');
+            if (!title) return;
+            e.preventDefault();
+            title.blur();
+        });
 
-            var apply = e.target.closest('[data-analytics-settings-apply]');
-            if (!apply) return;
+        // 'input' (not 'blur') so a title edit survives even if the user
+        // never blurs it before clicking "Terminé" directly - contenteditable
+        // fires 'input' on every keystroke, same event a real <input> would.
+        document.addEventListener('input', function (e) {
+            var title = e.target.closest('[data-analytics-title][contenteditable="true"]');
+            if (!title || !document.body.classList.contains('is-customizing')) return;
+            var widgetBlock = title.closest('[data-sortable-item]');
+            if (!widgetBlock) return;
+            ensureCustomizableWidget(widgetBlock);
+            widgetBlock.dataset.widgetLabel = title.textContent.trim();
+        });
 
-            var applyCard = apply.closest('[data-analytics-card]');
-            var applyBlock = applyCard.closest('[data-sortable-item]');
-            var applyDef = JSON.parse((applyBlock && applyBlock.dataset.mergeDef) || '{}');
-            var titleInput = applyCard.querySelector('[data-analytics-settings-title]');
-            var title = titleInput.value.trim();
-            var series = Array.prototype.map.call(
-                applyCard.querySelectorAll('[data-analytics-settings-series]:checked'),
-                function (cb) { return cb.value; }
-            );
-            // At least one series - an empty chart is never a useful state,
-            // and AnalyticsCardWidgetType already falls back to "all" server-
-            // side for an empty/unknown selection, so this just keeps the
-            // CLIENT-side preview honest with what a reload would actually show.
-            if (!series.length) {
-                series = Array.prototype.map.call(
-                    applyCard.querySelectorAll('[data-analytics-settings-series]'),
-                    function (cb) { return cb.value; }
-                );
-            }
+        // The chart's own legend IS the series-visibility control now (see
+        // admin-charts.js's legendOnClick - Chart.js already toggles a
+        // series for free on legend click, this just also dispatches a DOM
+        // event so the currently-visible set can be persisted here).
+        // data-analytics-card scopes this to the site-wide traffic widget
+        // specifically - article_views' own chart dispatches the exact
+        // same generic event (admin-charts.js has no idea which widget
+        // type is listening), but that widget hardcodes its 3 series
+        // unconditionally and has no params.series concept to write one
+        // into, so a legend click there stays a harmless temporary view
+        // preference instead of attempting to persist something that
+        // doesn't exist.
+        document.addEventListener('admin-chart:legend-toggle', function (e) {
+            if (!document.body.classList.contains('is-customizing')) return;
+            var card = e.target.closest('[data-analytics-card]');
+            if (!card) return;
+            var widgetBlock = card.closest('[data-sortable-item]');
+            var chart = e.target._adminChart;
+            if (!widgetBlock || !chart) return;
 
-            applyBlock.dataset.blockName = applyDef.blockName || 'analytics_card';
-            applyBlock.dataset.widgetLabel = title || applyDef.label || '';
-            applyBlock.dataset.widgetIcon = applyDef.icon || '';
-            applyBlock.dataset.widgetParams = JSON.stringify(Object.assign({}, applyDef.params, { series: series }));
+            ensureCustomizableWidget(widgetBlock);
 
-            var titleEl = applyCard.querySelector('[data-analytics-title]');
-            if (titleEl) titleEl.textContent = title || applyDef.label || '';
+            var visible = [];
+            chart.data.datasets.forEach(function (ds, i) {
+                if (!chart.getDatasetMeta(i).hidden) visible.push(ds.key);
+            });
+            // At least one series - an all-hidden chart is never a useful
+            // saved state (Chart.js itself allows toggling every series
+            // off at once, but that's not a state worth persisting).
+            if (!visible.length) return;
 
-            var applyCanvas = applyCard.querySelector('[data-admin-chart]');
-            var applyPicker = applyCard.querySelector('[data-analytics-range-picker]');
-            var applyActiveBtn = applyPicker && (applyPicker.querySelector('[data-range].is-active') || applyPicker.querySelector('[data-range]'));
-            var applyEndpoints = applyPicker ? JSON.parse(applyPicker.dataset.analyticsEndpoints || '{}') : {};
-            var applyUrl = applyActiveBtn ? applyEndpoints[applyActiveBtn.dataset.range] : null;
-            if (applyCanvas && applyUrl && window.AdminCharts) {
-                fetch(applyUrl, { headers: { Accept: 'application/json' } })
-                    .then(function (res) { return res.json(); })
-                    .then(function (data) {
-                        var datasets = (data.datasets || []).filter(function (ds) { return series.indexOf(ds.key) !== -1; });
-                        window.AdminCharts.update(applyCanvas, { labels: data.labels, datasets: datasets, events: data.events });
-                    });
-            }
-
-            applyCard.querySelector('[data-analytics-settings-panel]').hidden = true;
-            var applyToggle = applyBlock.querySelector('[data-analytics-settings-toggle]');
-            if (applyToggle) applyToggle.classList.remove('is-active');
+            var params = JSON.parse(widgetBlock.dataset.widgetParams || '{}');
+            params.series = visible;
+            widgetBlock.dataset.widgetParams = JSON.stringify(params);
         });
 
         function gcd(a, b) { return b ? gcd(b, a % b) : a; }
@@ -2368,6 +2386,7 @@
                     // in admin-charts.js ever sees a plain DOM insertion
                     // like this one - the new canvas needs an explicit push.
                     if (window.AdminCharts && window.AdminCharts.init) window.AdminCharts.init();
+                    refreshTitleEditability();
                 });
         });
 
