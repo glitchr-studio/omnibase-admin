@@ -536,6 +536,39 @@
         form.admin-form .input-group .form-password-revealer:hover { color: var(--admin-accent); }
         form.admin-form .form-password-strength { display: flex; gap: .2rem; margin-top: .4rem; }
         form.admin-form .form-password-strength .strength { flex: 1; height: 3px; border-radius: 2px; background: var(--admin-border); }
+        {# Same "raw Bootstrap-shaped markup, no Bootstrap CSS" issue as the
+           comment above, ported from how EasyAdmin's own stylesheet (still
+           live in production, see vendor/glitchr/base-bundle/assets/styles/
+           css/easyadmin/stylesheet.css there) boxed these two: a password
+           field on its own reads as just a bare input stack without one,
+           and a flat list of unrelated named settings (the API keys page's
+           5 fields, all siblings inside one "collection") reads as an
+           undifferentiated wall of fields without a panel to group them. #}
+        form.admin-form .form-password { border: 1px solid var(--admin-border); border-radius: var(--admin-radius); padding: 1rem; }
+        form.admin-form .form-collection-items { border: 1px solid var(--admin-border); border-radius: var(--admin-radius); padding: 1rem; }
+        form.admin-form .form-collection-items > .form-association:last-child,
+        form.admin-form .form-collection-items > .form-group:last-child { margin-bottom: 0; }
+        {# Multi-locale field tabs (LayoutSettingListType's translatable_widget
+           branch for >1 locale - e.g. the Settings page's title/slogan/logo,
+           each translatable into fr-FR/en-GB/de-DE) - same raw Bootstrap
+           markup again (nav-tabs/tab-content/tab-pane, data-bs-toggle="tab")
+           with no Bootstrap CSS OR JS behind it: every locale's pane
+           rendered simultaneously, stacked, showing the whole field set 3x
+           in a row, with tab buttons that did nothing when clicked -
+           arguably the single worst-looking thing on that page. EasyAdmin
+           got this for free from Bootstrap's own tabs component; the click
+           handler right below is this admin's from-scratch equivalent (see
+           that stylesheet's own .form-translatable rules for the padding
+           EasyAdmin gave the active pane, mirrored in tab-pane.active below). #}
+        form.admin-form .nav-tabs { display: flex; gap: .25rem; list-style: none; margin: 0 0 1rem; padding: 0; border-bottom: 1px solid var(--admin-border); }
+        form.admin-form .nav-tabs .nav-link { display: flex; align-items: center; margin-bottom: -1px; padding: .4rem .7rem;
+                                               border: 1px solid transparent; border-bottom: none; border-radius: 6px 6px 0 0;
+                                               background: none; cursor: pointer; opacity: .55; }
+        form.admin-form .nav-tabs .nav-link.active { opacity: 1; border-color: var(--admin-border); background: var(--admin-surface); }
+        form.admin-form .nav-tabs .nav-link.muted:not(.active) { opacity: .3; }
+        form.admin-form .nav-tabs .country-flag { width: 20px; height: 14px; object-fit: cover; border-radius: 2px; }
+        form.admin-form .tab-content .tab-pane { display: none; }
+        form.admin-form .tab-content .tab-pane.active { display: block; padding-top: .5rem; }
         form.admin-form .form-text { font-size: .82rem; color: var(--admin-muted); margin-top: .35rem; }
         form.admin-form .form-text.text-danger { color: var(--admin-danger); display: flex; align-items: center; gap: .35rem; }
         form.admin-form .form-text.text-danger::before { content: "\f071"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
@@ -1256,6 +1289,34 @@
             document.addEventListener('focusin', function (e) {
                 var group = e.target.closest('.section-group');
                 if (group) positionFlyout(group);
+            });
+
+            // Multi-locale field tabs (see the .nav-tabs/.tab-pane CSS
+            // comment above) - Bootstrap's own data-bs-toggle="tab" markup,
+            // no Bootstrap JS behind it to act on a click. Event-delegated
+            // like every other toggle on this page - this script runs in
+            // <head>, before the form itself exists in the DOM yet.
+            document.addEventListener('click', function (e) {
+                var tabBtn = e.target.closest('[data-bs-toggle="tab"]');
+                if (!tabBtn) return;
+                e.preventDefault();
+                var target = document.querySelector(tabBtn.dataset.bsTarget);
+                if (!target) return;
+
+                var tabList = tabBtn.closest('.nav-tabs');
+                if (tabList) {
+                    tabList.querySelectorAll('.nav-link').forEach(function (btn) {
+                        btn.classList.toggle('active', btn === tabBtn);
+                    });
+                }
+
+                var tabContent = target.closest('.tab-content');
+                if (tabContent) {
+                    tabContent.querySelectorAll(':scope > .tab-pane').forEach(function (pane) {
+                        pane.classList.toggle('active', pane === target);
+                        pane.classList.toggle('show', pane === target);
+                    });
+                }
             });
 
         </script>
