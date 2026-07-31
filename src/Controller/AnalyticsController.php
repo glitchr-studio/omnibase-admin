@@ -51,6 +51,16 @@ class AnalyticsController extends AbstractController
             $series,
         );
 
+        // The stat row above the chart (page views/visitors/users totals +
+        // period-over-period change) used to stay pinned to whatever window
+        // it was first rendered with, contradicting the chart the instant a
+        // different range got picked - see layout.html.twig's range-picker
+        // handler for where these two land back in the DOM.
+        $totals = [];
+        foreach (['pageViews', 'uniqueVisitors', 'uniqueUsers'] as $key) {
+            $totals[$key] = \array_sum(\array_column($series, $key));
+        }
+
         return $this->json([
             'labels' => $formattedLabels,
             'datasets' => \array_map(
@@ -65,6 +75,8 @@ class AnalyticsController extends AbstractController
                 \array_values(AnalyticsSeriesPalette::SERIES),
             ),
             'events' => $this->timelineEvents->getFormattedEvents($series, $formattedLabels, $dateFormat),
+            'totals' => $totals,
+            'change' => $this->analytics->periodOverPeriodChange(self::RANGES[$range]),
         ]);
     }
 }

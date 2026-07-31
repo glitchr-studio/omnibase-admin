@@ -40,7 +40,7 @@
     <div class="analytics-card-header">
         <h2 class="analytics-card-title" data-analytics-title>{{ widget.label|trans({}, 'admin') }}</h2>
         <div class="analytics-stat-row">
-            <div class="analytics-stat">
+            <div class="analytics-stat" data-stat="pageViews">
                 <span class="analytics-stat-value">
                     {{ totalPageViews }}
                     {%- if change.pageViews is not null %}
@@ -52,7 +52,7 @@
                 <span class="analytics-stat-label">{{ 'analytics.label.page_views'|trans({}, 'admin') }}</span>
             </div>
             {% for key in ['uniqueVisitors', 'uniqueUsers'] %}
-                <div class="analytics-stat">
+                <div class="analytics-stat" data-stat="{{ key }}">
                     <span class="analytics-stat-value">
                         {{ series|reduce((carry, day) => carry + day[key], 0) }}
                         {%- if change[key] is not null %}
@@ -66,9 +66,12 @@
             {% endfor %}
         </div>
     </div>
-    {# Range picker only swaps the chart below - the stat row above stays
-       a fixed "this week vs last week" summary regardless of which window
-       the chart is showing, so the two never contradict each other. #}
+    {# The range picker below now re-renders this stat row too (see
+       layout.html.twig's own handler, keyed off each [data-stat]) instead
+       of only ever swapping the chart underneath it - the two used to
+       silently contradict each other the instant a different range got
+       picked (chart showing 30 days of data next to a stat row still
+       captioned with whatever window the page happened to load with). #}
     <div class="analytics-range-picker" data-analytics-range-picker data-analytics-endpoints="{{ {
         today: path('admin_analytics_breakdown', {range: 'today'}),
         '7d': path('admin_analytics_breakdown', {range: '7d'}),

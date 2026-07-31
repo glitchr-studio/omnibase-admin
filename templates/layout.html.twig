@@ -2198,13 +2198,36 @@
         // would otherwise leave the chart showing stale data under a pill
         // that says something else. Only the response matching the picker's
         // latest click is ever applied.
+        // Rebuilds each [data-stat]'s value + change badge from scratch
+        // (innerHTML, not a text-node tweak) - mirrors analytics_card.
+        // html.twig's own conditional markup exactly (no badge at all when
+        // change[key] is null, e.g. a prior period with zero traffic to
+        // compare against) rather than leaving a stale badge from whatever
+        // range was showing before.
+        function updateStatRow(card, totals, change) {
+            if (!totals || !change) return;
+            var row = card.querySelector('.analytics-stat-row');
+            if (!row) return;
+            Object.keys(totals).forEach(function (key) {
+                var value = row.querySelector('[data-stat="' + key + '"] .analytics-stat-value');
+                if (!value) return;
+                var html = String(totals[key]);
+                var pct = change[key];
+                if (pct !== null && pct !== undefined) {
+                    var cls = pct >= 0 ? 'is-up' : 'is-down';
+                    html += ' <span class="analytics-stat-change ' + cls + '">' + (pct >= 0 ? '+' : '') + pct + '%</span>';
+                }
+                value.innerHTML = html;
+            });
+        }
         document.addEventListener('click', function (e) {
             var btn = e.target.closest('[data-analytics-range-picker] [data-range]');
             if (!btn || btn.classList.contains('is-active')) return;
             var picker = btn.closest('[data-analytics-range-picker]');
             var endpoints = JSON.parse(picker.dataset.analyticsEndpoints || '{}');
             var url = endpoints[btn.dataset.range];
-            var canvas = picker.closest('.analytics-card').querySelector('[data-admin-chart]');
+            var card = picker.closest('.analytics-card');
+            var canvas = card && card.querySelector('[data-admin-chart]');
             if (!url || !canvas) return;
 
             picker.querySelectorAll('[data-range]').forEach(function (b) { b.classList.remove('is-active'); });
@@ -2230,6 +2253,7 @@
                         });
                         window.AdminCharts.update(canvas, { labels: data.labels, datasets: datasets, events: data.events });
                     }
+                    updateStatRow(card, data.totals, data.change);
                     // "Depuis toujours" only covers days actually tracked, so
                     // it can show a SHORTER span than "30 jours" (which
                     // zero-fills days before tracking even began) - a title

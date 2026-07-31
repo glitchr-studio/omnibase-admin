@@ -75,7 +75,12 @@ final class AnalyticsCardWidgetType implements PaletteDashboardWidgetTypeInterfa
 
         return [
             'series' => $series,
-            'change' => $this->analytics->weekOverWeekChange(),
+            // Matches the SAME window the chart itself is showing (was a
+            // hardcoded week-over-week regardless of $days, wrong even on
+            // this very first render whenever $days != 7 - see the range
+            // picker's own live-refetch in layout.html.twig for how this
+            // stays in sync after the initial load too).
+            'change' => $this->analytics->periodOverPeriodChange($days),
             'events' => $this->timelineEvents->getFormattedEvents($series, $labels, $dateFormat),
             'palette' => \array_map(
                 fn (array $entry) => \array_merge($entry, ['label' => $this->translator->trans($entry['label'], [], 'admin')]),
