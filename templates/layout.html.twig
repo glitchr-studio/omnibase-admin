@@ -726,36 +726,43 @@
            graceful-degradation the @media override below already does
            for a phone-sized viewport specifically, just continuous
            instead of a single hard breakpoint. #}
-        .widget-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(max(240px, calc((100% - (var(--widget-columns, 5) - 1) * 1.5rem) / var(--widget-columns, 5))), 1fr)); gap: 1.5rem; }
-        {# auto-fit picks however many 240px-minimum tracks actually FIT the
-           container - which is not always --widget-columns itself: a
-           narrower container (this admin opened inside transparentJS's
-           nested overlay, capped at max-width:1600px with overflow:hidden -
-           see @glitchr/transparent's own CSS - rather than the full
-           viewport a standalone /admin page gets) can genuinely fit fewer.
-           A widget whose OWN span equals or exceeds however many tracks
-           auto-fit actually created can't just wrap onto a new row like a
-           flex item would - grid instead silently EXTENDS the grid with
-           extra implicit tracks to satisfy that span, making the whole row
-           wider than the container itself, with the nest panel's own
-           overflow:hidden then cropping every card in that row rather than
-           showing a scrollbar. Found live: the dashboard's own full-width
-           "welcome" widget (span 5, deliberately matching the default
-           --widget-columns) inside the nested overlay at a plain desktop
-           width, where the panel's 1600px cap left less room than 5 real
-           240px tracks need.
-           --widget-max-span (only ever lowered below the unconstrained
-           default here, via the media query right below) is what actually
-           prevents this - min() against a widget's own --widget-span
-           (see _block.html.twig/_group.html.twig) rather than clamping
-           every widget to one fixed span the way the 720px/mobile rule
-           further down does (that one's correct there BECAUSE every
-           column collapses to exactly 1 anyway; here smaller widgets must
-           stay their own size, only ones too big for the room actually
-           left get clamped down). #}
-        .widget-block, .widget-group { grid-column: span min(var(--widget-span, 1), var(--widget-max-span, 999)); }
-        @media (max-width: 1600px) {
-            .widget-grid { --widget-max-span: 4; }
+        {# flex + wrap, not CSS Grid's repeat(auto-fit, ...) - tried that
+           first, it does not actually work here. auto-fit only creates as
+           many 240px-minimum tracks as fit the container, and a widget
+           whose OWN span equals or exceeds however many tracks it actually
+           created can't wrap onto a new row the way a flex item would -
+           grid instead EXTENDS the grid with extra implicit tracks to
+           satisfy that span, making the whole row wider than the container.
+           Tried clamping each widget's span against a --widget-max-span
+           lowered via @media next: wrong tool for this - @media reads the
+           browser VIEWPORT's width, but this admin opened inside
+           transparentJS's nested overlay renders in a PANEL capped at
+           max-width:1600px (see @glitchr/transparent's own CSS) that can be
+           narrower than the viewport by any amount depending on the actual
+           window size - a wide desktop window still overflows the (much
+           narrower) panel with zero @media rule ever matching, since it's
+           the viewport that's wide, not the panel. flex-wrap has no such
+           mismatch: it always measures the real immediate container,
+           whatever ancestor actually constrains it, panel or viewport
+           alike - a widget that doesn't fit the current line simply starts
+           a new one, full stop, with no fixed track count to get wrong. #}
+        .widget-grid { display: flex; flex-wrap: wrap; gap: 1.5rem;
+                       --widget-col-width: max(240px, calc((100% - (var(--widget-columns, 5) - 1) * 1.5rem) / var(--widget-columns, 5))); }
+        {# A widget's flex-basis is its own --widget-col-width times however
+           many columns it spans, plus the gaps BETWEEN those columns (span
+           3 = 3 columns' width + 2 internal gaps) - same size grid's own
+           `span N` produced, just reached through flex-basis instead of a
+           track count. min-width wrapped in min(...,100%) is the actual
+           overflow guard: without it, a widget on a container narrower than
+           even one full --widget-col-width (a phone, or this panel resized
+           very small) would still refuse to shrink past its own natural
+           minimum and overflow anyway - capping the FLOOR itself at 100%
+           means it can never demand more than the container actually has,
+           full width becoming its own single column of one on that line. #}
+        .widget-block, .widget-group {
+            flex-grow: 0; flex-shrink: 1;
+            flex-basis: calc(var(--widget-col-width) * var(--widget-span, 1) + (var(--widget-span, 1) - 1) * 1.5rem);
+            min-width: min(var(--widget-col-width), 100%);
         }
         {# Widgets span 1-N tracks (N = --widget-columns, superadmin-
            adjustable via both the resize control AND the columns select
@@ -765,25 +772,27 @@
            the viewport - see the analytics_card @container rules below
            for what that unlocks at size 1. #}
         .widget-block, .widget-group { container-type: inline-size; }
-        {# .widget-group IS its own visible card (one div, both the grid
-           item AND the bordered/backgrounded box) - CSS Grid's default
-           align-items:stretch already makes it fill its row's full height
-           (matched to the tallest sibling in the same row) with no extra
-           work. .widget-block is different: it's a plain wrapper around
-           whatever the resolved widget type actually renders (.analytics-
-           card, or composite's .card) - the WRAPPER stretches to the row
-           height by the same grid default, but its child does NOT, since
-           nothing tells it to. That left a real visible bug: a short
-           block-type card (e.g. a narrow analytics_card instance showing
-           just its stat row, chart/picker hidden by the @container rule
-           below) sitting next to a taller sibling in the same row shows
-           its own white card ending early, with the PAGE's grey
-           background visible underneath, all the way down to the row's
-           actual height - it looks broken because the visible box
-           doesn't fill the space it was actually given. flex:1 on the
+        {# .widget-group IS its own visible card (one div, both the flex
+           item AND the bordered/backgrounded box) - .widget-grid's default
+           align-items:stretch (flexbox's own, same keyword/behavior as CSS
+           Grid's own default this used to rely on before the switch to
+           flex-wrap above) already makes it fill its own LINE's full
+           height (matched to the tallest sibling wrapped onto the same
+           line) with no extra work. .widget-block is different: it's a
+           plain wrapper around whatever the resolved widget type actually
+           renders (.analytics-card, or composite's .card) - the WRAPPER
+           stretches to the line height by that same default, but its child
+           does NOT, since nothing tells it to. That left a real visible
+           bug: a short block-type card (e.g. a narrow analytics_card
+           instance showing just its stat row, chart/picker hidden by the
+           @container rule below) sitting next to a taller sibling on the
+           same line shows its own white card ending early, with the
+           PAGE's grey background visible underneath, all the way down to
+           the line's actual height - it looks broken because the visible
+           box doesn't fill the space it was actually given. flex:1 on the
            child makes it stretch to fill instead, exactly matching how
-           .widget-group already behaves. A no-op whenever nothing in the
-           row is taller than this widget's own natural height. #}
+           .widget-group already behaves. A no-op whenever nothing on the
+           line is taller than this widget's own natural height. #}
         .widget-block { display: flex; }
         {# min-height here reads --widget-height (set inline alongside the
            wrapper's own min-height whenever widget.height is stored/set,
@@ -797,14 +806,19 @@
            custom height show up at all, both right after a drag AND on
            a fresh page load of a previously-saved custom height. #}
         .widget-block > .analytics-card, .widget-block > .card { flex: 1 1 auto; min-height: var(--widget-height, 0); }
-        {# Every column collapses to exactly 1 at mobile width - a flat
-           !important here (rather than folding into --widget-max-span
-           above) is deliberately simpler: nothing NEEDS to keep its own
-           relative size at this width the way it does at the intermediate
-           1600px breakpoint, so there's no reason to preserve one. #}
+        {# Every widget collapses to one full-width column at mobile width,
+           regardless of its own configured span - a deliberate stricter
+           simplification on top of flex-wrap's own already-continuous
+           reflow above (that alone would still fit 2+ narrow spans side by
+           side on a ~600px phone; this forces a single stacked column
+           instead). --widget-columns:1 alone is enough to do it, with no
+           !important needed the way grid's own span property used to: it
+           feeds the very same --widget-col-width formula above, which
+           resolves to ~100% once there's only one column to divide by -
+           every widget's min-width floor becomes the full container width
+           no matter what --widget-span it was actually given. #}
         @media (max-width: 720px) {
             .widget-grid { --widget-columns: 1; }
-            .widget-block, .widget-group { grid-column: span 1 !important; }
         }
         .widget-group { padding: 1.25rem 1.5rem; }
         .widget-group h2, .composite-pane h2 { margin: .6rem 0 .7rem; font-size: 1.25rem; }
@@ -2532,7 +2546,10 @@
 
             var applyDef = JSON.parse(applyBlock.dataset.mergeDef || '{}');
             var articleSelect = applyCard.querySelector('[data-article-views-settings-article]');
-            var articleId = articleSelect.value ? parseInt(articleSelect.value, 10) : null;
+            // 'all' (every published article, summed - see the widget
+            // type's own ALL_ARTICLES constant) is the one non-numeric
+            // option value; everything else is a real article id.
+            var articleId = articleSelect.value === 'all' ? 'all' : (articleSelect.value ? parseInt(articleSelect.value, 10) : null);
 
             // Label is NOT touched here - the heading's own contenteditable
             // input handler (generic over any [data-analytics-title]) owns
