@@ -36,14 +36,6 @@
                widget's normal rendered content, nothing needed in this
                shared controls row for it. #}
             {% if widget.blockName == 'composite' %}
-                {% if (widget.params.panes|default([])|length) == 2 %}
-                    {# Opens composite.html.twig's own settings panel (pane
-                       width ratio) - proportional sizing only has one
-                       obvious meaning for exactly 2 panes side by side
-                       (see composite.html.twig's own comment on why 3-4
-                       panes keep the fixed 2x2 equal-share grid). #}
-                    <button type="button" class="item-settings" data-composite-settings-toggle title="{{ 'composite.settings.title'|trans({}, 'admin') }}"><i class="fa-solid fa-gear"></i></button>
-                {% endif %}
                 {# Rebuilds each pane as its own standalone card again (see
                    layout.html.twig's [data-split-item] handler +
                    DashboardWidgetController::split()) - reads this

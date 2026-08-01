@@ -15,11 +15,14 @@
        reused from MenuItem's normal grid-column-span meaning, just applied
        to THIS inner grid instead of the dashboard's own) only for exactly
        2 panes - a 1-wide + 2-wide merge becomes a 1fr/2fr split instead of
-       forced 50/50. 3-4 panes keep the CSS default repeat(2, 1fr) 2x2 wrap
-       (see layout.html.twig) unchanged: "proportion" stops having one
-       obvious meaning once panes wrap across two rows, so that case isn't
-       covered here. #}
-    <div class="composite-panes" data-composite-panes{% if panes|length == 2 %} style="grid-template-columns: {{ panes|map(pane => pane.size ~ 'fr')|join(' ') }}"{% endif %}>
+       forced 50/50, adjustable directly via the drag divider between them
+       (see layout.html.twig's own [data-composite-pane-divider] handler -
+       no separate settings form, dragging IS the control). 3-4 panes keep
+       the CSS default repeat(2, 1fr) 2x2 wrap (see layout.html.twig)
+       unchanged: "proportion" stops having one obvious meaning once panes
+       wrap across two rows, so that case isn't covered here - no divider
+       either, same condition as the ratio control it replaced. #}
+    <div class="composite-panes" data-composite-panes{% if panes|length == 2 %} style="grid-template-columns: {{ panes[0].size }}fr 10px {{ panes[1].size }}fr"{% endif %}>
         {% for pane in panes %}
             <div class="composite-pane">
                 {% set paneType = pane.blockName ? dashboard_widget_type(pane.blockName) : null %}
@@ -51,26 +54,16 @@
                     </ul>
                 {% endif %}
             </div>
+            {% if panes|length == 2 and not loop.last %}
+                {# Sits in DOM order between the two panes, which combined
+                   with the 3-track grid-template-columns above (left pane
+                   fr / this 10px / right pane fr) is what actually lands
+                   it visually between them - a real grid item, not an
+                   absolutely-positioned overlay, so it never needs to
+                   track the panes' own size independently. #}
+                <div class="composite-pane-divider" data-composite-pane-divider data-pane-sizes="{{ panes[0].size }},{{ panes[1].size }}"
+                     role="separator" aria-orientation="vertical" tabindex="0" title="{{ 'composite.settings.ratio_label'|trans({}, 'admin') }}"></div>
+            {% endif %}
         {% endfor %}
     </div>
-    {% if panes|length == 2 %}
-        {# Pre-filled from the CURRENT ratio on open (see the JS handler),
-           not baked in server-side - this panel doesn't need to know its
-           own current state at render time, only how to build the option
-           list and where to write the result back on apply. #}
-        <div class="widget-settings-panel" data-composite-settings-panel hidden>
-            <label class="widget-settings-field">
-                <span>{{ 'composite.settings.ratio_label'|trans({}, 'admin') }}</span>
-                <select data-composite-settings-ratio>
-                    {% for ratio in ['1:3', '1:2', '1:1', '2:1', '3:1'] %}
-                        <option value="{{ ratio }}">{{ ratio }}</option>
-                    {% endfor %}
-                </select>
-            </label>
-            <div class="widget-settings-actions">
-                <button type="button" class="analytics-range-btn" data-composite-settings-cancel>{{ 'composite.settings.cancel'|trans({}, 'admin') }}</button>
-                <button type="button" class="analytics-range-btn is-active" data-composite-settings-apply>{{ 'composite.settings.apply'|trans({}, 'admin') }}</button>
-            </div>
-        </div>
-    {% endif %}
 </div>
