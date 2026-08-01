@@ -31,7 +31,7 @@ class TimelineEventRegistry
      * @param array<int, array{date: string, ...}> $series
      * @param string[] $labels
      *
-     * @return array<int, array{label: string, title: string, description: ?string, color: ?string}>
+     * @return array<int, array{label: string, title: string, description: ?string, color: ?string, url: ?string}>
      */
     public function getFormattedEvents(array $series, array $labels, string $dateFormat): array
     {
@@ -56,6 +56,7 @@ class TimelineEventRegistry
                     'title' => $event['title'],
                     'description' => $event['description'] ?? null,
                     'color' => $event['color'] ?? null,
+                    'url' => $event['url'] ?? null,
                 ];
             }
         }
