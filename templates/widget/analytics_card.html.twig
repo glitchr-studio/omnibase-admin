@@ -84,14 +84,24 @@
         {% endfor %}
     </div>
     <div class="analytics-chart-wrap">
+        {# palette|keys, not palette itself - Twig's map() preserves an
+           associative source's own keys (verified: {a:.., b:..}|map(...)
+           json_encodes as {"a":..,"b":..}, not [..,..]), and PHP's
+           json_encode in turn renders ANY string-keyed array as a JS
+           object, not an array. admin-charts.js's chartDatasets() calls
+           .map() on config.datasets, which objects don't have - the
+           whole chart silently failed to construct at all. palette|keys
+           is a plain sequential list (0,1,2...) the same way
+           article_views.html.twig's own hardcoded key list already is,
+           so mapping over THAT keeps datasets a real JSON array. #}
         <canvas data-admin-chart="{{ {
             labels: series|map(day => day.date|date('d/m')),
-            datasets: palette|map((meta, key) => {
+            datasets: palette|keys|map(key => {
                 key: key,
-                label: meta.label,
+                label: palette[key].label,
                 data: series|map(day => day[key]),
-                color: meta.color,
-                colorDark: meta.colorDark,
+                color: palette[key].color,
+                colorDark: palette[key].colorDark,
                 hidden: key not in visibleSeries,
             }),
             events: events|default([]),
