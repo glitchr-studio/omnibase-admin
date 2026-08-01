@@ -130,29 +130,23 @@
            either one's actual content (logo vs. icon buttons are
            different sizes) - align-items:center on both handles the
            vertical centering that the removed padding used to. #}
-        {# min-height (was a hard height) - still lines up with .admin-topbar
-           in the common single-line case (no slogan shown), same as before,
-           but now genuinely needs to grow when a slogan IS shown (either
-           set, or an empty one exposed by customize mode below) rather than
-           clipping it. Some vertical padding too - a flush 0-top/bottom
-           padding relying purely on a fixed height + centering read fine
-           for one line, cramped once a second/third line needs to fit. #}
-        .admin-aside .brand { display: flex; align-items: center; gap: .6rem; min-height: 3.3rem; padding: .5rem 1.25rem; border-bottom: 1px solid var(--admin-border); }
+        .admin-aside .brand { display: flex; align-items: center; gap: .6rem; height: 3.3rem; padding: 0 1.25rem; border-bottom: 1px solid var(--admin-border); }
         .admin-aside .brand-logo { width: 2.25rem; height: 2.25rem; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
-        .admin-aside .brand-text { display: flex; flex-direction: column; min-width: 0; gap: .1rem; }
+        .admin-aside .brand-text { display: flex; flex-direction: column; min-width: 0; }
         .admin-aside .brand-title { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .admin-aside .brand-slogan { font-size: .78rem; color: var(--admin-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        {# Not set today (or cleared back to empty via the same edit-in-place
-           flow) - hidden at rest rather than sitting there as a dead blank
-           line, but still needs to exist and be clickable-into while
-           customize mode is on (see refreshTitleEditability()) so a
-           superadmin has something to type a first slogan into instead of
-           being sent to the full Settings form. #}
-        .admin-aside .brand-slogan:empty { display: none; }
-        body.is-customizing .admin-aside .brand-slogan:empty { display: block; }
         .admin-aside .brand-user { font-size: .8rem; color: var(--admin-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        [data-brand-title][contenteditable="true"]:focus, [data-brand-slogan][contenteditable="true"]:focus {
+        [data-brand-title][contenteditable="true"]:focus {
             outline: 2px solid var(--admin-accent); outline-offset: 2px; border-radius: 4px;
+        }
+        {# Focus-only feedback meant "editable" was invisible until AFTER
+           you'd already clicked in - nothing distinguished this text from
+           any other while customizing, so there was no way to tell it was
+           clickable at all short of trying. A lighter dashed outline (plus
+           a text-input cursor) on hover gives that cue up front, same
+           treatment for the sidebar's own brand title. #}
+        body.is-customizing [data-analytics-title][contenteditable="true"]:hover,
+        body.is-customizing [data-brand-title][contenteditable="true"]:hover {
+            outline: 1px dashed var(--admin-accent); outline-offset: 2px; border-radius: 4px; cursor: text;
         }
         .admin-menu { list-style: none; margin: .75rem 0 0; padding: 0; }
         {# prod-style vertical rhythm: quick links (dashboard) stay at the
@@ -179,11 +173,25 @@
         .admin-menu .section-label { display: flex; align-items: center; flex: 1; min-width: 0; gap: .3rem; }
         .admin-menu .section-label i { width: 1.1rem; text-align: center; }
         .admin-menu .section-group > ul { list-style: none; margin: 0; padding: 0; }
-        .admin-menu a { display: flex; align-items: center; padding: .45rem 1.25rem; color: inherit; text-decoration: none; border-left: 3px solid transparent; }
+        .admin-menu a { display: flex; align-items: center; padding: .45rem 1.25rem; color: inherit; text-decoration: none; border-left: 3px solid transparent; min-width: 0; }
         .admin-menu li:hover > a { background: var(--admin-bg); }
         .admin-menu .selected > a { border-left-color: var(--admin-accent); color: var(--admin-accent); font-weight: 600; }
-        .admin-menu a i { width: 1.1rem; text-align: center; margin-right: .3rem; }
+        .admin-menu a i { width: 1.1rem; text-align: center; margin-right: .3rem; flex-shrink: 0; }
+        {# A long French label ("Super administrateurs", "Réponses aux
+           commentaires") had nothing stopping it from wrapping to a second
+           line - min-width:0 above is what lets this actually shrink (a
+           flex item's default min-width is its own content size, which
+           blocks any child from ever truncating below that), title=""
+           already carries the full text (see main_menu below) so nothing
+           is lost by cutting it off visually. #}
+        .admin-menu .label-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .admin-menu .sub a { padding-left: 2.75rem; font-size: .92rem; }
+        {# Customize mode's own handle/toggle icons used to land flush
+           against the label the instant it grew long enough to leave no
+           space for justify-content:space-between to distribute - a fixed
+           gap is a floor that holds regardless of how much (or how little)
+           the label ends up needing. #}
+        .admin-menu li { gap: .4rem; }
         .admin-menu li.is-hidden, .widget-group.is-hidden, .widget-block.is-hidden { display: none; }
         body.is-customizing .admin-menu li.is-hidden, body.is-customizing .widget-group.is-hidden, body.is-customizing .widget-block.is-hidden {
             display: block; opacity: .45;
@@ -806,6 +814,20 @@
            custom height show up at all, both right after a drag AND on
            a fresh page load of a previously-saved custom height. #}
         .widget-block > .analytics-card, .widget-block > .card { flex: 1 1 auto; min-height: var(--widget-height, 0); }
+        {# --widget-height is only ever a FLOOR (min-height above) - the row's
+           own align-items:stretch default can still pull a widget TALLER
+           than that floor to match a taller sibling on the same line,
+           which made a height-resize silently look like it did nothing:
+           shrink a widget shorter than its neighbor and stretch just
+           pulls it right back up to match. Once a widget has an explicit
+           height at all (data-widget-height, set the instant a resize
+           drag ever touches height - see applyWidgetHeight()), it opts
+           out of that shared-row stretching entirely and sits at exactly
+           its own height instead, even if that means a shorter card next
+           to a taller one - deliberately, since a resize the admin
+           performed on purpose should stick, not get silently overridden
+           by whatever else happens to share its row. #}
+        .widget-block[data-widget-height], .widget-group[data-widget-height] { align-self: flex-start; }
         {# Every widget collapses to one full-width column at mobile width,
            regardless of its own configured span - a deliberate stricter
            simplification on top of flex-wrap's own already-continuous
@@ -1227,7 +1249,7 @@
                 // (see the blur handler further below) - while actually
                 // editing one, a click to place the cursor must not ALSO
                 // toggle the account dropdown open underneath it.
-                if (e.target.closest('[data-brand-title][contenteditable="true"], [data-brand-slogan][contenteditable="true"]')) return;
+                if (e.target.closest('[data-brand-title][contenteditable="true"]')) return;
 
                 const toggle = e.target.closest('[data-dropdown] > .admin-icon-btn, [data-dropdown] > [aria-haspopup]');
                 if (toggle) {
@@ -1261,7 +1283,7 @@
                 // space into the editable slogan, or pressing Enter to
                 // commit it, must not also fire the dropdown's own
                 // Enter/Space-to-toggle handling.
-                if (e.target.closest('[data-brand-title][contenteditable="true"], [data-brand-slogan][contenteditable="true"]')) return;
+                if (e.target.closest('[data-brand-title][contenteditable="true"]')) return;
                 const toggle = e.target.closest('[data-dropdown] > [role=button][aria-haspopup]');
                 if (!toggle) return;
                 e.preventDefault();
@@ -1418,16 +1440,6 @@
                     {% endif %}
                     <div class="brand-text">
                         <span class="brand-title" data-brand-title>{% block brand_title %}{{ app.site.title ?? 'Administration' }}{% endblock %}</span>
-                        {# Rendered even when empty for a superadmin - customize
-                           mode is the only way to GIVE the site a slogan through
-                           this shortcut, so an empty span still needs to be
-                           there to click into (see refreshTitleEditability()
-                           below for what actually makes it editable). A regular
-                           user gets nothing here rather than a mysteriously
-                           blank line. #}
-                        {% if app.site.slogan is not empty or canEditBrand %}
-                            <span class="brand-slogan" data-brand-slogan>{{ app.site.slogan }}</span>
-                        {% endif %}
                         {% if app.user %}<span class="brand-user">{{ app.user }}</span>{% endif %}
                     </div>
                     {% if hasUserMenu %}<i class="fa-solid fa-chevron-down account-caret"></i>{% endif %}
@@ -1747,16 +1759,16 @@
         var sortablesInitialized = false;
 
         // Applies the CURRENT customize-mode state to every
-        // [data-analytics-title] (plus the sidebar's own [data-brand-title]/
-        // [data-brand-slogan], same in-place-edit pattern - see the blur
-        // handler further below) in the document - called from
+        // [data-analytics-title] (plus the sidebar's own [data-brand-title],
+        // same in-place-edit pattern - see the blur handler further below)
+        // in the document - called from
         // setCustomizing() AND after every insertion point that can add a
         // fresh one (palette add / merge / split, right next to their
         // existing window.AdminCharts.init() calls below) since a node
         // inserted mid-session never goes through setCustomizing() itself.
         function refreshTitleEditability() {
             var on = body.classList.contains('is-customizing');
-            document.querySelectorAll('[data-analytics-title], [data-brand-title], [data-brand-slogan]').forEach(function (el) {
+            document.querySelectorAll('[data-analytics-title], [data-brand-title]').forEach(function (el) {
                 el.contentEditable = on ? 'true' : 'false';
             });
         }
@@ -2344,7 +2356,7 @@
         // handler further below for how THEY persist).
         document.addEventListener('keydown', function (e) {
             if (e.key !== 'Enter') return;
-            var title = e.target.closest('[data-analytics-title][contenteditable="true"], [data-brand-title][contenteditable="true"], [data-brand-slogan][contenteditable="true"]');
+            var title = e.target.closest('[data-analytics-title][contenteditable="true"], [data-brand-title][contenteditable="true"]');
             if (!title) return;
             e.preventDefault();
             title.blur();
@@ -2362,19 +2374,19 @@
             widgetBlock.dataset.widgetLabel = title.textContent.trim();
         });
 
-        // Brand title/slogan: unlike a widget title (captured into a
-        // data-attribute above, only actually persisted later via
-        // "Terminé"/admin_layout_save), there's no encompassing save step
-        // for the sidebar - each edit POSTs for itself the instant the
-        // field loses focus, same "commit immediately" behavior as the
-        // boolean-switch PATCH near the top of this file. Delegated on
-        // 'blur' in the CAPTURE phase - unlike 'input'/'click', 'blur'
-        // does not bubble, so a plain document-level listener would never
-        // see it fire on a field nested this deep.
+        // Brand title: unlike a widget title (captured into a data-attribute
+        // above, only actually persisted later via "Terminé"/
+        // admin_layout_save), there's no encompassing save step for the
+        // sidebar - the edit POSTs for itself the instant the field loses
+        // focus, same "commit immediately" behavior as the boolean-switch
+        // PATCH near the top of this file. Delegated on 'blur' in the
+        // CAPTURE phase - unlike 'input'/'click', 'blur' does not bubble,
+        // so a plain document-level listener would never see it fire on a
+        // field nested this deep.
         document.addEventListener('blur', function (e) {
-            var field = e.target.closest('[data-brand-title][contenteditable="true"], [data-brand-slogan][contenteditable="true"]');
+            var field = e.target.closest('[data-brand-title][contenteditable="true"]');
             if (!field) return;
-            var path = field.hasAttribute('data-brand-title') ? 'base.settings.title' : 'base.settings.slogan';
+            var path = 'base.settings.title';
             var value = field.textContent.trim();
             var account = document.querySelector('.admin-account[data-csrf-token]');
             if (!account) return;
