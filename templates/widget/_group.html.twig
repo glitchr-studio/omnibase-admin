@@ -20,9 +20,7 @@
         <div class="item-controls widget-controls">
             <button type="button" class="item-handle" data-sortable-handle title="{{ 'customize.reorder'|trans({}, 'admin') }}"><i class="fa-solid fa-grip-vertical"></i></button>
             <button type="button" class="item-toggle" data-toggle-hidden title="{{ 'customize.toggle_visibility'|trans({}, 'admin') }}"><i class="fa-solid fa-eye{{ widget.hidden ? '-slash' }}"></i></button>
-            {% if widget.adHoc %}
-                <button type="button" class="item-remove" data-remove-item title="{{ 'customize.remove'|trans({}, 'admin') }}"><i class="fa-solid fa-trash"></i></button>
-            {% endif %}
+            <button type="button" class="item-remove" data-remove-item title="{{ 'customize.remove'|trans({}, 'admin') }}"><i class="fa-solid fa-trash"></i></button>
         </div>
         {# Standalone sibling, not nested in .widget-controls - see
            _block.html.twig's own comment on why (an absolutely-positioned

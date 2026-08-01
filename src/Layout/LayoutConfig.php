@@ -4,13 +4,17 @@ namespace Base\Admin\Layout;
 
 /**
  * One persisted layout: an ordered, hide/show-annotated tree of item keys.
- * Shape: {version, items: [{key, visible, size, height, children: [...]}]},
- * plus four OPTIONAL keys (blockName, label, icon, params) present only on
- * ad-hoc/palette-added widgets - a self-contained widget definition with
- * no code-defined counterpart to re-skin. An item without blockName is
- * byte-identical to the pre-widening 4-key shape (every pre-existing
- * stored config, and every sidebar-scope item, which never carries
- * blockName at all).
+ * Shape: {version, items: [{key, visible, size, height, deleted, children:
+ * [...]}]}, plus four OPTIONAL keys (blockName, label, icon, params)
+ * present only on ad-hoc/palette-added widgets - a self-contained widget
+ * definition with no code-defined counterpart to re-skin. An item without
+ * blockName is otherwise byte-identical to the pre-widening 4-key shape
+ * (every pre-existing stored config, and every sidebar-scope item, which
+ * never carries blockName at all) - deleted only ever matters for a
+ * code-defined item (see LayoutArranger's own comment on why an ad-hoc
+ * one needs no such flag), but is always present/false rather than one
+ * more OPTIONAL key, since unlike blockName's group it isn't tied to
+ * whether this entry has its own self-contained widget definition.
  * fromArray() is the validation boundary for data coming back out of
  * SettingBag (itself reachable and hand-editable via the generic settings
  * CRUD) - it must never throw or produce something LayoutArranger can't
@@ -51,7 +55,7 @@ class LayoutConfig
     protected int $version = 1;
     protected int $columns = self::DEFAULT_COLUMNS;
 
-    /** @var array<int, array{key: string, visible: bool, size: int, height: ?int, children: array, blockName?: string, label?: string, icon?: ?string, params?: array}> */
+    /** @var array<int, array{key: string, visible: bool, size: int, height: ?int, deleted: bool, children: array, blockName?: string, label?: string, icon?: ?string, params?: array}> */
     protected array $items = [];
 
     public static function new(): static
@@ -99,6 +103,15 @@ class LayoutConfig
                 'visible' => !\array_key_exists('visible', $item) || (bool) $item['visible'],
                 'size' => max(self::MIN_SIZE, min($maxSize, $size)),
                 'height' => $height,
+                // A code-defined item (no blockName carried on ITS OWN
+                // entry - an ad-hoc one is already truly gone the moment a
+                // save simply omits its key, see LayoutArranger's own
+                // comment) has no other way to be permanently removed: the
+                // app's own configureWidgetItems()/etc. still yields it
+                // every request regardless of what's stored, so without
+                // this flag omitting its key would just make it reappear
+                // fresh next load instead of staying gone.
+                'deleted' => (bool) ($item['deleted'] ?? false),
                 'children' => self::sanitizeItems($item['children'] ?? [], $depthRemaining - 1, $maxSize),
             ];
 
@@ -165,7 +178,7 @@ class LayoutConfig
     }
 
     /**
-     * @return array<int, array{key: string, visible: bool, size: int, height: ?int, children: array, blockName?: string, label?: string, icon?: ?string, params?: array}>
+     * @return array<int, array{key: string, visible: bool, size: int, height: ?int, deleted: bool, children: array, blockName?: string, label?: string, icon?: ?string, params?: array}>
      */
     public function getItems(): array
     {
@@ -173,7 +186,7 @@ class LayoutConfig
     }
 
     /**
-     * @param array<int, array{key: string, visible: bool, size: int, height: ?int, children: array, blockName?: string, label?: string, icon?: ?string, params?: array}> $items
+     * @param array<int, array{key: string, visible: bool, size: int, height: ?int, deleted: bool, children: array, blockName?: string, label?: string, icon?: ?string, params?: array}> $items
      */
     public function setItems(array $items): static
     {

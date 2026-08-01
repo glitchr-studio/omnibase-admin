@@ -192,6 +192,37 @@ class LayoutArrangerTest extends TestCase
         $this->assertSame([], $result);
     }
 
+    public function testDeletedCodeDefinedItemIsOmittedAndNeverReappended(): void
+    {
+        // Unlike an ad-hoc widget (removal falls out for free from
+        // omitting its key, see testAnAdHocWidgetOmittedFromTheNextSave
+        // AgainAbove), a code-defined item is yielded fresh by the app's
+        // own configureWidgetItems() every request regardless of storage -
+        // without an explicit 'deleted' flag it would just be treated as
+        // "never customized" and reappended by the trailing pass below,
+        // not actually removed.
+        $a = MenuItem::linkToUrl('A', null, '/a')->setKey('a');
+        $b = MenuItem::linkToUrl('B', null, '/b')->setKey('b');
+
+        $config = LayoutConfig::fromArray(['items' => [
+            ['key' => 'a', 'visible' => true, 'deleted' => true],
+        ]]);
+        $result = $this->arranger->apply([$a, $b], $config);
+
+        $this->assertSame(['b'], array_map(fn ($i) => $i->getKey(), $result));
+    }
+
+    public function testDeletedFlagOnAnAdHocEntryIsAlsoHonored(): void
+    {
+        $config = LayoutConfig::fromArray(['items' => [
+            ['key' => 'adhoc.1', 'visible' => true, 'blockName' => 'analytics_card', 'deleted' => true],
+        ]]);
+
+        $result = $this->arranger->apply([], $config);
+
+        $this->assertSame([], $result);
+    }
+
     public function testAppliesAStoredHeight(): void
     {
         $a = MenuItem::linkToUrl('A', null, '/a')->setKey('a');

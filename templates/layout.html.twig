@@ -196,6 +196,13 @@
         body.is-customizing .admin-menu li.is-hidden, body.is-customizing .widget-group.is-hidden, body.is-customizing .widget-block.is-hidden {
             display: block; opacity: .45;
         }
+        {# Unlike .is-hidden (faded but still there/re-toggleable while
+           customizing, see above) - deleted stays gone even mid-session,
+           no faded placeholder to click back on. The node itself is still
+           in the DOM either way (see the [data-remove-item] handler
+           further below), just never shown; body.is-customizing isn't
+           part of this selector on purpose. #}
+        .widget-group.is-deleted, .widget-block.is-deleted { display: none; }
         {# Handle/toggle controls: invisible and inert outside customize
            mode (not just hidden - the drag handle must not intercept
            clicks or show a grab cursor on a normal page). #}
@@ -2008,17 +2015,24 @@
             if (icon) icon.classList.toggle('fa-eye', !item.classList.contains('is-hidden'));
         });
 
-        // Remove (ad-hoc/palette-added widgets only - see _block.html.twig's
-        // own comment on why a code-defined widget only ever gets hide/show).
-        // Immediate DOM removal, no confirmation: the next captureLevel()
-        // simply won't see this node anymore, and LayoutArranger's
-        // synthesis pass never re-creates a key nothing mentions - that
-        // absence IS the removal, nothing else to signal server-side.
+        // Remove - every widget now, code-defined or ad-hoc alike (see
+        // LayoutConfig's own 'deleted' flag). Marks the node rather than
+        // actually removing it from the DOM: captureLevel() below just
+        // walks whatever [data-sortable-item]s are still direct children
+        // of its container, so a node that's still there (just hidden via
+        // .is-deleted, and carrying data-deleted for captureLevel() to
+        // read) gets swept up into the save payload exactly like any
+        // other entry - no separate "remember what got deleted"
+        // bookkeeping needed. No confirmation dialog: nothing is actually
+        // persisted until "Terminé", the same safety net every other
+        // customize-mode edit already relies on.
         document.addEventListener('click', function (e) {
             var button = e.target.closest('[data-remove-item]');
             if (!button || !body.classList.contains('is-customizing')) return;
             var item = button.closest('[data-sortable-item]');
-            if (item) item.remove();
+            if (!item) return;
+            item.classList.add('is-deleted');
+            item.dataset.deleted = '1';
         });
 
         // resize drag, with an explicit live preview: dragging the corner
@@ -2657,6 +2671,14 @@
                     // height back to auto if that's ever wired up client-
                     // side, rather than the key just silently vanishing.
                     height: el.dataset.widgetHeight ? parseInt(el.dataset.widgetHeight, 10) : null,
+                    // Only ever true once [data-remove-item] has marked
+                    // this node (see that handler's own comment) - a
+                    // code-defined widget needs this to actually stay
+                    // gone (LayoutArranger re-offers it every request
+                    // otherwise); an ad-hoc one doesn't strictly need it
+                    // (omitting the key already works) but gets it too,
+                    // for free, since this walk doesn't distinguish them.
+                    deleted: el.dataset.deleted === '1',
                     children: childContainer ? captureLevel(childContainer) : [],
                 };
                 // Ad-hoc/palette-added widgets carry their own definition in

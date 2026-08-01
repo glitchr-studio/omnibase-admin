@@ -23,7 +23,7 @@ class LayoutArranger
 
     /**
      * @param MenuItem[] $items
-     * @param array<int, array{key: string, visible: bool, children: array}> $stored
+     * @param array<int, array{key: string, visible: bool, deleted?: bool, children: array}> $stored
      * @return MenuItem[]
      */
     private function applyLevel(array $items, array $stored, int $columns): array
@@ -44,6 +44,22 @@ class LayoutArranger
         // stored keys, in stored order, each carrying its matching code item
         foreach ($stored as $entry) {
             $key = $entry['key'];
+
+            if ($entry['deleted'] ?? false) {
+                // Marking $seen (not just skipping) is what actually makes
+                // this stick for a code-defined item: without it, the
+                // "anything the stored config never mentioned" pass below
+                // would treat this key as never having been stored at all
+                // and re-append it fresh, same as any other never-
+                // customized item. An ad-hoc entry never reaches here with
+                // deleted:true in practice (the client just omits the key
+                // instead, see synthesizeAdHocWidget()'s own comment) but
+                // honoring the flag for one too is harmless - the result
+                // is identical either way.
+                $seen[$key] = true;
+                continue;
+            }
+
             $item = $byKey[$key] ?? null;
             if (null === $item) {
                 if (empty($entry['blockName'])) {

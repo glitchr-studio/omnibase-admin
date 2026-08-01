@@ -35,15 +35,6 @@
                is just the chart's own legend, both directly in the
                widget's normal rendered content, nothing needed in this
                shared controls row for it. #}
-            {# Only ad-hoc/palette-added widgets get a remove button - a
-               code-defined widget (e.g. the built-in analytics_card) keeps
-               only hide/show: LayoutArranger always re-offers it even when
-               storage doesn't mention it, so true deletion isn't meaningful
-               for it without a much bigger tombstone mechanism. An ad-hoc
-               widget has no code fallback, so true removal is exactly
-               "stop mentioning this key next save" - no confirmation
-               dialog, immediate DOM removal (see layout.html.twig's
-               [data-remove-item] handler). #}
             {% if widget.blockName == 'composite' %}
                 {% if (widget.params.panes|default([])|length) == 2 %}
                     {# Opens composite.html.twig's own settings panel (pane
@@ -61,9 +52,18 @@
                    is always adHoc. #}
                 <button type="button" class="item-split" data-split-item title="{{ 'customize.split'|trans({}, 'admin') }}"><i class="fa-solid fa-object-ungroup"></i></button>
             {% endif %}
-            {% if widget.adHoc %}
-                <button type="button" class="item-remove" data-remove-item title="{{ 'customize.remove'|trans({}, 'admin') }}"><i class="fa-solid fa-trash"></i></button>
-            {% endif %}
+            {# Every widget gets a remove button now, code-defined or
+               ad-hoc alike (see LayoutConfig's own 'deleted' flag +
+               LayoutArranger's own comment on why a code-defined item
+               needed one at all - it's re-offered by code every request
+               regardless of storage, so omitting its key was never
+               enough on its own). No confirmation dialog, immediate
+               (visual) removal either way (see layout.html.twig's
+               [data-remove-item] handler) - nothing is actually
+               persisted until "Terminé", so the safety net is the same
+               one every other customize-mode edit already has: just
+               don't save. #}
+            <button type="button" class="item-remove" data-remove-item title="{{ 'customize.remove'|trans({}, 'admin') }}"><i class="fa-solid fa-trash"></i></button>
         </div>
         {# A standalone sibling of .item-controls, NOT nested inside it:
            .widget-controls is itself position:absolute, so an absolutely-

@@ -16,14 +16,16 @@ class LayoutConfigTest extends TestCase
             ],
         ]);
 
-        // 'height' is new (added alongside 'size') and always present -
-        // an old stored config predating it simply degrades to null
-        // ("auto"), same as any other missing field already does.
+        // 'height' and 'deleted' are newer additions and always present -
+        // an old stored config predating them simply degrades to null/
+        // false ("auto" / "not deleted"), same as any other missing field
+        // already does.
         $this->assertSame([
             'key' => 'a',
             'visible' => true,
             'size' => 2,
             'height' => null,
+            'deleted' => false,
             'children' => [],
         ], $config->getItems()[0]);
     }
@@ -46,6 +48,7 @@ class LayoutConfigTest extends TestCase
             'visible' => true,
             'size' => 1,
             'height' => null,
+            'deleted' => false,
             'children' => [],
             'blockName' => 'analytics_card',
             'label' => 'Second card',
@@ -54,18 +57,34 @@ class LayoutConfigTest extends TestCase
         ], $config->getItems()[0]);
     }
 
-    public function testAnItemWithoutBlockNameStaysTheFiveKeyShape(): void
+    public function testAnItemWithoutBlockNameStaysTheSixKeyShape(): void
     {
         $config = LayoutConfig::fromArray(['items' => [['key' => 'a', 'visible' => true]]]);
 
-        $this->assertSame(['key', 'visible', 'size', 'height', 'children'], array_keys($config->getItems()[0]));
+        $this->assertSame(['key', 'visible', 'size', 'height', 'deleted', 'children'], array_keys($config->getItems()[0]));
     }
 
     public function testNonStringBlockNameIsIgnored(): void
     {
         $config = LayoutConfig::fromArray(['items' => [['key' => 'a', 'visible' => true, 'blockName' => 42]]]);
 
-        $this->assertSame(['key', 'visible', 'size', 'height', 'children'], array_keys($config->getItems()[0]));
+        $this->assertSame(['key', 'visible', 'size', 'height', 'deleted', 'children'], array_keys($config->getItems()[0]));
+    }
+
+    public function testDeletedFlagRoundTrips(): void
+    {
+        $config = LayoutConfig::fromArray(['items' => [
+            ['key' => 'a', 'visible' => true, 'deleted' => true],
+        ]]);
+
+        $this->assertTrue($config->getItems()[0]['deleted']);
+    }
+
+    public function testMissingDeletedDefaultsToFalse(): void
+    {
+        $config = LayoutConfig::fromArray(['items' => [['key' => 'a', 'visible' => true]]]);
+
+        $this->assertFalse($config->getItems()[0]['deleted']);
     }
 
     public function testHeightRoundTripsWhenProvided(): void
