@@ -67,6 +67,17 @@ class MenuItem
     protected ?string $key = null;
     /** runtime state, set by the layout arranger - hidden items still render (greyed, in customize mode) so they can be un-hidden */
     protected bool $hidden = false;
+    /**
+     * Whether this widget-block/widget-group keeps its own card chrome
+     * (background/border/shadow) - a dashboard-wide toggle any widget
+     * type can offer, same "generic, works everywhere" status as $hidden
+     * above (see LayoutConfig/LayoutArranger's own matching field, and
+     * layout.html.twig's [data-toggle-background] handler mirroring
+     * [data-toggle-hidden]). True by default: every widget already had
+     * its card chrome before this existed, so an unset/missing stored
+     * value must never silently strip it.
+     */
+    protected bool $background = true;
 
     /**
      * True when this item has no code-defined counterpart - it exists
@@ -121,6 +132,46 @@ class MenuItem
     public function setLabel(TranslatableInterface|string|null $label): static
     {
         $this->label = $label;
+        return $this;
+    }
+
+    /**
+     * True when the label came from a superadmin's stored customization
+     * (LayoutArranger) rather than code - lets a page heading show the
+     * customized label while keeping its own code-defined default
+     * otherwise (a menu label and a page title legitimately differ until
+     * someone explicitly renames one - see system.html.twig).
+     */
+    protected bool $labelCustomized = false;
+
+    public function isLabelCustomized(): bool
+    {
+        return $this->labelCustomized;
+    }
+
+    public function setLabelCustomized(bool $labelCustomized): static
+    {
+        $this->labelCustomized = $labelCustomized;
+        return $this;
+    }
+
+    /**
+     * Free-text page description a superadmin typed in customize mode
+     * (see layout.html.twig's data-page-desc handler) - carried on the
+     * page's own menu item, same storage the customized label uses. Null
+     * means "never customized": the page falls back to its code-defined
+     * description.
+     */
+    protected ?string $description = null;
+
+    public function getDescription(): ?string
+    {
+        return $this->description;
+    }
+
+    public function setDescription(?string $description): static
+    {
+        $this->description = $description;
         return $this;
     }
 
@@ -352,7 +403,17 @@ class MenuItem
             $label = method_exists($label, 'getMessage') ? $label->getMessage() : $label::class;
         }
 
-        return 'auto.' . substr(sha1(implode('|', [
+        // MEMOIZED (??=), not recomputed per call: the hash includes the
+        // label, and LayoutArranger overrides the label with a stored
+        // customization AFTER building its own key map from the
+        // code-defined value. Live recomputation made a renamed item's key
+        // silently change mid-request (found live: renaming "Clés API"
+        // re-keyed it auto.86a9... -> auto.0976...), so the NEXT full save
+        // captured a key that matches nothing and the rename dropped
+        // itself. First computation always happens against the
+        // code-defined label (the arranger's byKey pass), which is exactly
+        // the stable identity this docblock promises.
+        return $this->key ??= 'auto.' . substr(sha1(implode('|', [
             $this->type,
             $this->entityFqcn ?? '',
             $this->crudActionName ?? '',
@@ -371,6 +432,17 @@ class MenuItem
     public function setHidden(bool $hidden): static
     {
         $this->hidden = $hidden;
+        return $this;
+    }
+
+    public function hasBackground(): bool
+    {
+        return $this->background;
+    }
+
+    public function setBackground(bool $background): static
+    {
+        $this->background = $background;
         return $this;
     }
 

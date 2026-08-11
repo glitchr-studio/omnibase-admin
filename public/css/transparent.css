@@ -263,6 +263,32 @@ html.nested { overflow: hidden; }
 	.transparent-nest-busy { border-color: rgba(255, 255, 255, 0.2); border-top-color: #ddd; }
 }
 
+/* Wider alternative to the spinner above (Settings.nest_progress_bar,
+   default true - see transparent.js) - same .is-busy trigger, a full-
+   width bar along the chrome's own bottom edge instead of a small icon.
+   top:40px matches .transparent-nest-chrome's own fixed height (see that
+   rule above) - a sibling of the chrome bar rather than a child of it,
+   so it isn't clipped by anything the chrome's own flex row might do to
+   an internal child's overflow. Same gradient/animation as the admin
+   dashboard's own native top bar (transparent-nest-bar keyframes,
+   already defined below) for visual consistency between the two -
+   deliberately not shown at the same time as that one, see
+   nest_progress_bar's own doc comment for when a consumer turns this
+   off instead. */
+.transparent-nest-progress-bar {
+	display: none;
+	position: absolute;
+	top: 40px; left: 0;
+	height: 3px;
+	width: 100%;
+	z-index: 3;
+	background: linear-gradient(90deg, transparent, #2563eb, transparent);
+	background-size: 50% 100%;
+	background-repeat: no-repeat;
+	pointer-events: none;
+}
+#transparent-nest.is-busy .transparent-nest-progress-bar { display: block; animation: transparent-nest-bar 1s linear infinite; }
+
 /* ── Panel interactions: move / resize / magnetic snap ─────────────────
    The first drag "frees" the panel out of flex centering into explicit
    absolute px geometry (inline styles set by openShell's handlers). */
@@ -669,6 +695,8 @@ html.nested.nest-docked { overflow: visible; }
 /* first-open feedback: progress cursor + slim animated top bar on the host */
 html.nest-loading, html.nest-loading body { cursor: progress; }
 html.nest-loading body::before {
+	display: block;
+	visibility: visible;
 	content: '';
 	position: fixed;
 	top: 0; left: 0;
@@ -698,17 +726,50 @@ html.nest-loading body::before {
    alone is deliberately NOT styled (would double up with nest-loading's
    own bar during a fresh nest open, and would fire for the very first
    page load too where `html.first` is also present and nothing should
-   show yet) - gated to fire only once the app is past its first paint. */
-html.progress-bar-native.ready:not(.first).loading body::before {
+   show yet) - gated to fire only once the app is past its first paint.
+
+   Gated on `.progress-bar-active`, NOT `.loading` directly: reported live
+   as imperceptible - this beta environment's own navigations are fast
+   enough that `.loading` came and went inside a single ~15ms polling
+   tick, well under what a human eye registers. `.progress-bar-active` is
+   a separate class transparent.js adds alongside `.loading` but removes
+   on its OWN minimum-duration timer (see MIN_PROGRESS_BAR_MS there) - so
+   the underlying navigation/transition timing is completely untouched,
+   only this bar's own visible window is stretched. Thicker (4px, was
+   3px) and given its own drop-shadow for the same "easy to miss"
+   reason. */
+html.progress-bar-native.ready:not(.first).progress-bar-active body::before {
+	/* An unrelated inline <style> block (the @glitchr/breakpoints device
+	   probe, injected per-page for JS breakpoint detection) sets a bare
+	   `body:before { display:none; visibility:hidden; }` with no class
+	   gate. This rule outranks it on `content`/`background`/etc via
+	   specificity, but never touched `display`/`visibility` itself - so
+	   those two properties still fell through to the probe's rule and
+	   the bar computed correctly yet never painted. Must be re-declared
+	   here explicitly. */
+	display: block;
+	visibility: visible;
 	content: '';
 	position: fixed;
 	top: 0; left: 0;
-	height: 3px;
+	height: 4px;
 	width: 100%;
 	z-index: 100001;
 	background: linear-gradient(90deg, transparent, #2563eb, transparent);
 	background-size: 50% 100%;
 	background-repeat: no-repeat;
+	/* drop-shadow, NOT box-shadow. box-shadow is cast by the element's
+	   BOX, and this element is the full width of the viewport (only its
+	   background paints a moving 50%-wide segment with transparent ends,
+	   via the background-position animation below). So the glow rendered
+	   as a static blue haze along the entire top edge, sitting there for
+	   the bar's whole visible window instead of travelling with it -
+	   reported live, twice. A filter drop-shadow is generated from the
+	   painted alpha channel rather than the box, so it follows the moving
+	   gradient and fades out with it at both ends. Keep the two in sync if
+	   the colour changes; the intent (make an easy-to-miss 4px bar
+	   noticeable) is unchanged. */
+	filter: drop-shadow(0 0 6px rgba(37,99,235,.6));
 	animation: transparent-nest-bar 1s linear infinite;
 }
 /* Same gap as the bar above, for the cursor: the nested overlay already

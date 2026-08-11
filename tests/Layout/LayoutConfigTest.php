@@ -16,15 +16,16 @@ class LayoutConfigTest extends TestCase
             ],
         ]);
 
-        // 'height' and 'deleted' are newer additions and always present -
-        // an old stored config predating them simply degrades to null/
-        // false ("auto" / "not deleted"), same as any other missing field
-        // already does.
+        // 'height', 'background', and 'deleted' are newer additions and
+        // always present - an old stored config predating them simply
+        // degrades to null/true/false ("auto" / "keep the card chrome" /
+        // "not deleted"), same as any other missing field already does.
         $this->assertSame([
             'key' => 'a',
             'visible' => true,
             'size' => 2,
             'height' => null,
+            'background' => true,
             'deleted' => false,
             'children' => [],
         ], $config->getItems()[0]);
@@ -48,6 +49,7 @@ class LayoutConfigTest extends TestCase
             'visible' => true,
             'size' => 1,
             'height' => null,
+            'background' => true,
             'deleted' => false,
             'children' => [],
             'blockName' => 'analytics_card',
@@ -57,18 +59,52 @@ class LayoutConfigTest extends TestCase
         ], $config->getItems()[0]);
     }
 
-    public function testAnItemWithoutBlockNameStaysTheSixKeyShape(): void
+    /**
+     * A code-defined (non-ad-hoc) item's title, edited in place - no
+     * blockName/icon/params, just the new label. This is what makes a
+     * plain link-list card's own title editable (Blog/Photos/Destinations/
+     * ...), not just analytics_card's/entity_views' - see
+     * LayoutArranger::applyLevel()'s own matching half.
+     */
+    public function testLabelAloneWithNoBlockNameRoundTrips(): void
+    {
+        $config = LayoutConfig::fromArray(['items' => [
+            ['key' => 'auto.1', 'visible' => true, 'label' => 'Renamed section'],
+        ]]);
+
+        $this->assertSame([
+            'key' => 'auto.1',
+            'visible' => true,
+            'size' => 1,
+            'height' => null,
+            'background' => true,
+            'deleted' => false,
+            'children' => [],
+            'label' => 'Renamed section',
+        ], $config->getItems()[0]);
+    }
+
+    public function testEmptyLabelWithNoBlockNameIsOmittedNotStoredAsBlank(): void
+    {
+        $config = LayoutConfig::fromArray(['items' => [
+            ['key' => 'auto.1', 'visible' => true, 'label' => ''],
+        ]]);
+
+        $this->assertArrayNotHasKey('label', $config->getItems()[0]);
+    }
+
+    public function testAnItemWithoutBlockNameStaysTheSevenKeyShape(): void
     {
         $config = LayoutConfig::fromArray(['items' => [['key' => 'a', 'visible' => true]]]);
 
-        $this->assertSame(['key', 'visible', 'size', 'height', 'deleted', 'children'], array_keys($config->getItems()[0]));
+        $this->assertSame(['key', 'visible', 'size', 'height', 'background', 'deleted', 'children'], array_keys($config->getItems()[0]));
     }
 
     public function testNonStringBlockNameIsIgnored(): void
     {
         $config = LayoutConfig::fromArray(['items' => [['key' => 'a', 'visible' => true, 'blockName' => 42]]]);
 
-        $this->assertSame(['key', 'visible', 'size', 'height', 'deleted', 'children'], array_keys($config->getItems()[0]));
+        $this->assertSame(['key', 'visible', 'size', 'height', 'background', 'deleted', 'children'], array_keys($config->getItems()[0]));
     }
 
     public function testDeletedFlagRoundTrips(): void
@@ -85,6 +121,30 @@ class LayoutConfigTest extends TestCase
         $config = LayoutConfig::fromArray(['items' => [['key' => 'a', 'visible' => true]]]);
 
         $this->assertFalse($config->getItems()[0]['deleted']);
+    }
+
+    public function testRestoreItemClearsTheDeletedFlagForItsKey(): void
+    {
+        $config = LayoutConfig::fromArray(['items' => [
+            ['key' => 'a', 'visible' => true, 'deleted' => true],
+            ['key' => 'b', 'visible' => true, 'deleted' => true],
+        ]]);
+
+        $config->restoreItem('a');
+
+        $this->assertFalse($config->getItems()[0]['deleted']);
+        $this->assertTrue($config->getItems()[1]['deleted'], 'restoring one key must not touch another');
+    }
+
+    public function testRestoreItemIsANoOpForAnUnknownKey(): void
+    {
+        $config = LayoutConfig::fromArray(['items' => [
+            ['key' => 'a', 'visible' => true, 'deleted' => true],
+        ]]);
+
+        $config->restoreItem('does-not-exist');
+
+        $this->assertTrue($config->getItems()[0]['deleted']);
     }
 
     public function testHeightRoundTripsWhenProvided(): void
@@ -223,5 +283,39 @@ class LayoutConfigTest extends TestCase
         $config = LayoutConfig::fromArray(['columns' => 7, 'items' => []]);
 
         $this->assertSame(['version' => 1, 'columns' => 7, 'items' => []], $config->toArray());
+    }
+
+    public function testIntlMapSurvivesSanitizationPerLocale(): void
+    {
+        $config = LayoutConfig::fromArray(['items' => [
+            ['key' => 'k', 'intl' => [
+                'en-GB' => ['label' => 'API keys', 'description' => 'Desc'],
+                'de-DE' => ['label' => 'API-Schlüssel'],
+            ]],
+        ]]);
+
+        $this->assertSame([
+            'en-GB' => ['label' => 'API keys', 'description' => 'Desc'],
+            'de-DE' => ['label' => 'API-Schlüssel'],
+        ], $config->getItems()[0]['intl']);
+    }
+
+    public function testIntlDropsEmptyValuesMalformedLocalesAndEmptyMaps(): void
+    {
+        $config = LayoutConfig::fromArray(['items' => [
+            // '' values = clear-to-reset per locale, bad locale keys and
+            // non-array values are hostile/garbage input - all dropped,
+            // and a locale (or the whole map) left empty vanishes.
+            ['key' => 'a', 'intl' => [
+                'en-GB' => ['label' => '', 'description' => ''],
+                'EN_GB' => ['label' => 'bad locale key'],
+                'de-DE' => 'not an array',
+                5 => ['label' => 'numeric locale'],
+            ]],
+            ['key' => 'b', 'intl' => 'not an array'],
+        ]]);
+
+        $this->assertArrayNotHasKey('intl', $config->getItems()[0]);
+        $this->assertArrayNotHasKey('intl', $config->getItems()[1]);
     }
 }

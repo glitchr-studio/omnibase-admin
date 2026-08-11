@@ -196,6 +196,14 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
         "nest_move": true,
         "nest_resize": true,
         "nest_snap": true,
+        // Full-width bar across the chrome, replacing the small spinner
+        // (.transparent-nest-busy) - same .is-busy signal (mirrored from
+        // the nested page's own html.loading), just a wider indicator.
+        // Set false when the nested content already shows its OWN loading
+        // feedback (e.g. the admin dashboard's native top progress bar,
+        // see transparent.css) - two bars for the same "navigating inside
+        // the nest" moment would double up.
+        "nest_progress_bar": true,
         // For resize (its own separate flush-to-edge clamp): how close
         // counts as close enough. For dock (see nest_dock below): how far
         // PAST the viewport boundary counts as genuinely "pushed out" -
@@ -1139,6 +1147,17 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
     }
     var activeInTime = 0;
     var activeInRemainingTime = 0;
+    // Top progress bar's own minimum visible window (see the
+    // .progress-bar-active CSS in transparent.css) - independent of the
+    // real transition timing above: on a fast environment the actual
+    // .loading state can come and go faster than a human eye registers
+    // (reported live: imperceptible). progressBarStartedAt is stamped the
+    // instant .loading goes on; removal of .progress-bar-active is
+    // deferred to top it up to MIN_PROGRESS_BAR_MS if the real transition
+    // finished sooner, WITHOUT touching when .loading itself (or anything
+    // else in the state machine) actually gets removed.
+    var MIN_PROGRESS_BAR_MS = 400;
+    var progressBarStartedAt = 0;
     Transparent.activeIn = function(activeCallback = function() {}) {
 
         if(!Transparent.html.hasClass(Transparent.state.PREACTIVE)) {
@@ -1203,6 +1222,17 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
 
                     Object.values(Transparent.state).forEach(e => Transparent.html.removeClass(e));
                     Transparent.html.addClass(Transparent.state.ROOT + " " + Transparent.state.READY);
+                    // 'progress-bar-active' isn't one of Transparent.state's
+                    // own values, so the forEach above never touches it -
+                    // removed here on its own timer instead, topped up to
+                    // MIN_PROGRESS_BAR_MS if the real transition (everything
+                    // above) finished faster. Real state-machine timing is
+                    // completely unaffected either way.
+                    (function() {
+                        var elapsed = Date.now() - progressBarStartedAt;
+                        var remaining = Math.max(0, MIN_PROGRESS_BAR_MS - elapsed);
+                        setTimeout(function() { Transparent.html.removeClass('progress-bar-active'); }, remaining);
+                    })();
                 }
                 
                 Transparent.html.addClass(Transparent.state.POSTACTIVE);
@@ -2307,6 +2337,25 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
         // Determine link
         const link = Transparent.findLink(e);
         if (link == null) {
+
+            // findLink() returning null means "this click is not a
+            // navigation" - but the branch below then called
+            // preventDefault() on it anyway, which suppressed the DEFAULT
+            // ACTION of every non-link interactive element on the page.
+            // Two confirmed casualties in the admin: the create-button
+            // <details>/<summary> dropdown on inheritance-tree entities
+            // (Comment, Thread...) never opened, and datagrid row
+            // checkboxes never ticked - both reported live as "click does
+            // nothing". Anything whose default action IS its behaviour has
+            // to be left alone here; for those elements transparentJS has
+            // nothing to do in the first place, since there is no link to
+            // follow. Buttons are deliberately NOT in this list: a submit
+            // button's default is a form submission, which findLink() does
+            // recognise and route through the swap pipeline, so exempting
+            // them would double-fire real navigations.
+            const t = e.target;
+            if (t && t.closest && t.closest('summary, details, input, select, textarea, option, label, [contenteditable]')) return;
+
             e.preventDefault();
             return;
         }
@@ -2439,6 +2488,8 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
         $(Transparent.html).stop();
 
         Transparent.html.addClass(Transparent.state.LOADING);
+        Transparent.html.addClass('progress-bar-active');
+        progressBarStartedAt = Date.now();
         Transparent.activeIn();
 
         function isJsonResponse(str) {
@@ -2586,7 +2637,24 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                     try {
                         var stillWithinNestScope = !Settings.nest || !Settings.nest.length || matchesPatternList(new URL(responseURL).pathname, Settings.nest);
                         if (parent.Transparent && parent.Transparent.nest && parent.Transparent.nest.isOpen() && stillWithinNestScope) {
-                            parent.history.pushState({ nest: { href: responseURL } }, '', parent.location.href);
+                            // Normally keeps the HOST's own URL unchanged
+                            // (parent.location.href, i.e. a no-op as far as
+                            // the visible address bar goes) - the overlay is
+                            // "just a panel" floating over the real page, so
+                            // its own address isn't the page's address.
+                            // Once expanded to full-page (the share/"expand"
+                            // button, see shareBtn's own click handler -
+                            // container.classList.add('is-full')), it visibly
+                            // IS the whole page at that point, so this now
+                            // tracks every subsequent in-admin navigation
+                            // into the address bar too, not just the one
+                            // snapshot share() itself committed - reported
+                            // live as the URL staying frozen on whatever
+                            // admin page was open at the moment "expand" was
+                            // clicked, never updating again after that.
+                            var nestContainer = parent.Transparent.nest.getContainer && parent.Transparent.nest.getContainer();
+                            var isFullPage = nestContainer && nestContainer.classList.contains('is-full');
+                            parent.history.pushState({ nest: { href: responseURL } }, '', isFullPage ? responseURL : parent.location.href);
                         }
                     } catch (err) {
                         if (Settings.debug) console.error('Transparent: parent.history.pushState failed from inside nest', err);
@@ -2884,6 +2952,25 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
             busySpinner.className = 'transparent-nest-busy';
             busySpinner.setAttribute('aria-hidden', 'true');
             chromeBar.appendChild(busySpinner);
+
+            // Wider alternative to the spinner above - a full-width bar
+            // along the chrome's own bottom edge, same .is-busy trigger.
+            // Settings-gated (nest_progress_bar) rather than always both:
+            // a consumer nesting content that already shows its own
+            // loading feedback (see the setting's own comment) turns this
+            // OFF entirely instead of stacking a second indicator on top
+            // of the first. A plain sibling of the chrome bar (not nested
+            // inside it) so its full-width CSS positions against the
+            // PANEL, not the chrome's own narrower content box - same
+            // reasoning as .item-resize-handle in the admin dashboard's
+            // own CSS for why an absolutely-positioned child anchors to
+            // its immediate parent's box, not a distant ancestor's.
+            if (Settings["nest_progress_bar"] !== false) {
+                var progressBar = document.createElement('div');
+                progressBar.className = 'transparent-nest-progress-bar';
+                progressBar.setAttribute('aria-hidden', 'true');
+                panel.appendChild(progressBar);
+            }
 
             // resets the panel to its pristine centered default geometry -
             // shared by the dock/restore/share state switches so freed
@@ -3240,6 +3327,12 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                 // last pointerdown ourselves sidesteps that entirely.
                 var lastDownAt = 0, lastDownX = 0, lastDownY = 0;
                 var DBLCLICK_MS = 400, DBLCLICK_PX = 10;
+                // How far a drag has to pull a DOCKED panel away from its
+                // edge, as a fraction of the remaining distance to the
+                // opposite edge, before release commits to full page
+                // instead of springing back to the normal clamped dock
+                // depth - see the pointerdown handler's peel-drag branch.
+                var PEEL_COMMIT_RATIO = 0.45;
                 // A plain click's hide/show toggle can't fire immediately on
                 // pointerup - it has to wait out the double-click window
                 // first, since the SAME click is also candidate #1 of a
@@ -3249,7 +3342,6 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                 var pendingClickTimer = null;
                 chromeBar.addEventListener('pointerdown', function(e) {
                     if (e.button !== 0) return;
-                    if (container.classList.contains('is-full')) return; // fullscreen (shared) isn't draggable
                     if (isMobile()) return; // always-fullscreen breakpoint - swipe handles dismissal instead
                     if (e.target.closest && e.target.closest('button')) return;
 
@@ -3261,34 +3353,57 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                     if (isDoubleClick) {
                         lastDownAt = 0; // consumed - a third rapid click starts fresh, isn't a triple-trigger
                         if (pendingClickTimer) { clearTimeout(pendingClickTimer); pendingClickTimer = null; }
-                        restoreDefault();
+                        // Three-way toggle, not always "restore": docked -
+                        // pick it up and recenter (unchanged, original
+                        // behavior); already fullscreen - collapse back to
+                        // default (reuses collapseBtn's own handler, same
+                        // "exit full page" as clicking its small arrow);
+                        // otherwise (free-floating default position
+                        // already) - go fullscreen instead of a no-op
+                        // restore, matching a double-click-title-bar-to-
+                        // maximize gesture. Checked BEFORE the is-full
+                        // drag-disable bailout below, since fullscreen must
+                        // still be reachable by double-click even though
+                        // fullscreen itself isn't draggable.
+                        if (container.classList.contains('is-docked')) {
+                            restoreDefault();
+                        } else if (container.classList.contains('is-full')) {
+                            collapseBtn.click();
+                        } else {
+                            shareBtn.click();
+                        }
                         return;
                     }
 
+                    if (container.classList.contains('is-full')) return; // fullscreen (shared) isn't draggable
+
                     var sx = e.clientX, sy = e.clientY;
                     var sl, st, started = false;
+                    // Set only when a drag STARTS from a docked grab tab -
+                    // the edge it was picked up from, kept while the panel
+                    // is being pulled progressively away from that edge
+                    // ("peeled" open) rather than undocked outright. null
+                    // for every other kind of drag (free-floating move).
+                    var peelEdge = null, peelStartDepth = 0;
                     container.classList.add('is-dragging');
                     try { chromeBar.setPointerCapture(e.pointerId); } catch (err) {}
 
-                    // Picking a docked panel up needs its own snapshot, NOT
-                    // plain toFree(): a docked panel's SPAN dimension is
-                    // deliberately oversized (100vh for left/right,
-                    // 100vw for top/bottom) as part of what docking means -
-                    // carrying that straight into a free-floating box would
-                    // hand the drag a panel whose height/width already
-                    // reaches (or exceeds, given the move itself shifts
-                    // top/left too) the opposite viewport edge, so the
-                    // edge-proximity check at release would false-positive
-                    // "still touching" almost immediately, regardless of
-                    // where it's actually dropped. Undocking gives the span
-                    // dimension a normal, moderate size instead - only the
-                    // depth (the dimension that was actually meaningful
-                    // while docked) carries over.
+                    // Picking a docked panel up no longer undocks it
+                    // outright - it stays docked (CSS keeps the span
+                    // dimension at 100vw/100vh and the panel pinned to its
+                    // edge) while onMove grows the DEPTH dimension live as
+                    // the pointer pulls away, like a pull-up sheet. onUp
+                    // then decides, based on how far it got pulled, whether
+                    // that commits to full page or springs back to the
+                    // normal clamped dock depth (see the peelEdge branches
+                    // in onMove/onUp below). A plain (non-docked) drag is
+                    // unaffected - still goes through toFree()/
+                    // enterPassthrough() exactly as before.
                     var beginDrag = function() {
                         started = true;
                         var wasDocked = container.classList.contains('is-docked');
                         if (wasDocked) {
-                            var edgeAtPickup = container.dataset.dockEdge;
+                            peelEdge = container.dataset.dockEdge;
                             // drop is-hidden BEFORE measuring - its
                             // transform pushes the panel fully off-screen,
                             // so a rect taken while it's still applied would
@@ -3296,28 +3411,23 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                             // coordinates
                             container.classList.remove('is-hidden');
                             var rect = panel.getBoundingClientRect();
-                            clearDock();
-                            panel.classList.add('is-free');
-                            if (edgeAtPickup === 'left' || edgeAtPickup === 'right') {
-                                panel.style.width = rect.width + 'px';
-                                panel.style.height = Math.round(window.innerHeight * 0.7) + 'px';
-                            } else {
-                                panel.style.height = rect.height + 'px';
-                                panel.style.width = Math.round(window.innerWidth * 0.7) + 'px';
-                            }
-                            panel.style.left = rect.left + 'px';
-                            panel.style.top = rect.top + 'px';
+                            peelStartDepth = (peelEdge === 'left' || peelEdge === 'right') ? rect.width : rect.height;
+                            // is-docked's own CSS IS the passthrough state
+                            // already (transparent, pointer-events:none) -
+                            // no clearDock()/enterPassthrough() needed here;
+                            // that only happens once onUp actually commits
+                            // to full page or a genuine free position.
                         } else {
                             toFree();
+                            // "if it's not in its default position we
+                            // should go into docking mode" - a genuine drag
+                            // starting drops the modal backdrop immediately,
+                            // not just once it happens to land pushed
+                            // against an edge
+                            enterPassthrough();
+                            sl = parseFloat(panel.style.left);
+                            st = parseFloat(panel.style.top);
                         }
-                        // "if it's not in its default position we should go
-                        // into docking mode" - a genuine drag starting (or
-                        // resuming from a prior dock) drops the modal
-                        // backdrop immediately, not just once it happens to
-                        // land pushed against an edge
-                        enterPassthrough();
-                        sl = parseFloat(panel.style.left);
-                        st = parseFloat(panel.style.top);
                     };
 
                     var onMove = function(ev) {
@@ -3344,6 +3454,25 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                             if (pendingClickTimer) { clearTimeout(pendingClickTimer); pendingClickTimer = null; }
                             beginDrag();
                         }
+                        if (peelEdge) {
+                            // Distance pulled AWAY from the edge it's
+                            // docked to, in the direction that grows the
+                            // panel (not raw pointer delta - "up" grows a
+                            // bottom dock but shrinks a top dock). Clamped
+                            // so it never shrinks below the normal docked
+                            // depth (that's what the resize handle is for)
+                            // nor grows past the opposite viewport edge.
+                            var pulled;
+                            if (peelEdge === 'top') pulled = ev.clientY - sy;
+                            else if (peelEdge === 'bottom') pulled = sy - ev.clientY;
+                            else if (peelEdge === 'left') pulled = ev.clientX - sx;
+                            else pulled = sx - ev.clientX;
+                            var maxDepth = (peelEdge === 'left' || peelEdge === 'right') ? window.innerWidth : window.innerHeight;
+                            var depth = Math.min(Math.max(peelStartDepth + pulled, peelStartDepth), maxDepth);
+                            if (peelEdge === 'left' || peelEdge === 'right') panel.style.width = depth + 'px';
+                            else panel.style.height = depth + 'px';
+                            return;
+                        }
                         panel.style.left = (sl + ev.clientX - sx) + 'px';
                         panel.style.top = (st + ev.clientY - sy) + 'px';
                     };
@@ -3352,6 +3481,26 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                         chromeBar.removeEventListener('pointerup', onUp);
                         chromeBar.removeEventListener('pointercancel', onUp);
                         container.classList.remove('is-dragging');
+                        if (peelEdge) {
+                            var maxDepth = (peelEdge === 'left' || peelEdge === 'right') ? window.innerWidth : window.innerHeight;
+                            var depth = (peelEdge === 'left' || peelEdge === 'right') ? panel.getBoundingClientRect().width : panel.getBoundingClientRect().height;
+                            var committed = (depth - peelStartDepth) >= (maxDepth - peelStartDepth) * PEEL_COMMIT_RATIO;
+                            var edge = peelEdge;
+                            peelEdge = null;
+                            if (committed) {
+                                // same "expand to full page" path as the
+                                // button and the double-click gesture -
+                                // clears dock state and commits the URL
+                                shareBtn.click();
+                            } else {
+                                // didn't pull far enough - spring back to
+                                // the normal clamped dock depth (re-derives
+                                // it from the current, partially-pulled
+                                // rect, same clamp applyDock always uses)
+                                applyDock(edge);
+                            }
+                            return;
+                        }
                         if (started) {
                             var edge = pushedOutEdge(panel.getBoundingClientRect());
                             // Pushed past an edge -> full edge-fit dock.

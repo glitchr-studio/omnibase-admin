@@ -223,6 +223,47 @@ class LayoutArrangerTest extends TestCase
         $this->assertSame([], $result);
     }
 
+    public function testDeletedItemsReturnsTheRealCodeDefinedItemForEachDeletedKey(): void
+    {
+        $a = MenuItem::linkToUrl('A', 'fa-solid fa-a', '/a')->setKey('a');
+        $b = MenuItem::linkToUrl('B', null, '/b')->setKey('b');
+
+        $config = LayoutConfig::fromArray(['items' => [
+            ['key' => 'a', 'visible' => true, 'deleted' => true],
+            ['key' => 'b', 'visible' => true],
+        ]]);
+
+        $result = $this->arranger->deletedItems([$a, $b], $config);
+
+        $this->assertSame(['a'], array_map(fn ($i) => $i->getKey(), $result));
+        // the real code-defined item, not a reconstruction - label/icon
+        // come straight from $a, never touched by the stored entry
+        $this->assertSame('A', $result[0]->getLabel());
+        $this->assertSame('fa-solid fa-a', $result[0]->getIcon());
+    }
+
+    public function testDeletedItemsIsEmptyWhenNothingIsDeleted(): void
+    {
+        $a = MenuItem::linkToUrl('A', null, '/a')->setKey('a');
+
+        $config = LayoutConfig::fromArray(['items' => [['key' => 'a', 'visible' => true]]]);
+
+        $this->assertSame([], $this->arranger->deletedItems([$a], $config));
+    }
+
+    public function testDeletedItemsIgnoresAnAdHocEntryWithNoCodeDefinedCounterpart(): void
+    {
+        // An ad-hoc widget's own deleted:true (see
+        // testDeletedFlagOnAnAdHocEntryIsAlsoHonored above) has no
+        // code-defined MenuItem to restore in the first place - nothing
+        // for the restore picker to offer.
+        $config = LayoutConfig::fromArray(['items' => [
+            ['key' => 'adhoc.1', 'visible' => true, 'blockName' => 'analytics_card', 'deleted' => true],
+        ]]);
+
+        $this->assertSame([], $this->arranger->deletedItems([], $config));
+    }
+
     public function testAppliesAStoredHeight(): void
     {
         $a = MenuItem::linkToUrl('A', null, '/a')->setKey('a');
@@ -301,6 +342,38 @@ class LayoutArrangerTest extends TestCase
         $this->assertSame(['adhoc.composite', 'b'], array_map(fn ($i) => $i->getKey(), $result));
     }
 
+    /**
+     * Same generic mechanism as visible/hidden - any widget, block or
+     * section, code-defined or ad-hoc, can have its own card chrome
+     * toggled off (see MenuItem::$background's own docblock).
+     */
+    public function testAppliesAStoredBackgroundFlagOntoAMatchedCodeDefinedItem(): void
+    {
+        $card = MenuItem::block('analytics_card', 'dashboard.analytics_title');
+        $this->assertTrue($card->hasBackground(), 'true by default, same as every widget already had before this existed');
+
+        $config = LayoutConfig::fromArray(['items' => [
+            ['key' => $card->getKey(), 'visible' => true, 'background' => false],
+        ]]);
+
+        $result = $this->arranger->apply([$card], $config);
+
+        $this->assertFalse($result[0]->hasBackground());
+    }
+
+    public function testMissingBackgroundKeyDefaultsToTrue(): void
+    {
+        $card = MenuItem::block('analytics_card', 'dashboard.analytics_title');
+
+        $config = LayoutConfig::fromArray(['items' => [
+            ['key' => $card->getKey(), 'visible' => true],
+        ]]);
+
+        $result = $this->arranger->apply([$card], $config);
+
+        $this->assertTrue($result[0]->hasBackground());
+    }
+
     public function testAppliesAStoredLabelAndParamsOverrideOntoAMatchedCodeDefinedItem(): void
     {
         $card = MenuItem::block('analytics_card', 'dashboard.analytics_title', 'fa-solid fa-chart-line', null, ['days' => 14]);
@@ -351,6 +424,30 @@ class LayoutArrangerTest extends TestCase
         $this->assertSame('Renamed', $result[0]->getLabel());
     }
 
+    /**
+     * A plain link-list ("section") widget - Blog/Photos/Destinations/...
+     * - never has a blockName of its own (it's not blockName-dispatched
+     * rendering the way analytics_card is), so its title-edit's stored
+     * entry never carries one either. Found live: only Trafic/Vues could
+     * ever have their title changed before this - every section widget
+     * couldn't, because the label override used to live entirely inside
+     * the blockName-only branch.
+     */
+    public function testAppliesAStoredLabelOverrideEvenWithNoBlockNameForASectionWidget(): void
+    {
+        $section = MenuItem::section('Blog', 'fa-solid fa-newspaper')->setKey('auto.blog');
+
+        $config = LayoutConfig::fromArray(['items' => [
+            ['key' => 'auto.blog', 'visible' => true, 'label' => 'News'],
+        ]]);
+
+        $result = $this->arranger->apply([$section], $config);
+
+        $this->assertSame('News', $result[0]->getLabel());
+        $this->assertFalse($result[0]->isAdHoc());
+        $this->assertSame($section, $result[0]);
+    }
+
     public function testAStoredEntryWithNoBlockNameLeavesAMatchedCodeDefinedItemsLabelAndParamsAlone(): void
     {
         // Every pre-existing stored config (saved before this feature
@@ -367,5 +464,98 @@ class LayoutArrangerTest extends TestCase
 
         $this->assertSame('dashboard.analytics_title', $result[0]->getLabel());
         $this->assertSame(['days' => 14], $result[0]->getParams());
+    }
+
+    public function testDefaultLocaleReadsPlainLabelAndDescriptionIgnoringIntl(): void
+    {
+        $item = MenuItem::linkToUrl('menu.item.api_keys', null, '/admin/api-key')->setKey('k');
+
+        $config = LayoutConfig::fromArray(['items' => [
+            ['key' => 'k', 'visible' => true, 'label' => 'Clés API (fr)', 'description' => 'Desc fr',
+             'intl' => ['en-GB' => ['label' => 'API keys (en)']]],
+        ]]);
+
+        $result = $this->arranger->apply([$item], $config, 'fr-FR', 'fr-FR');
+
+        $this->assertSame('Clés API (fr)', $result[0]->getLabel());
+        $this->assertSame('Desc fr', $result[0]->getDescription());
+        $this->assertTrue($result[0]->isLabelCustomized());
+    }
+
+    public function testNonDefaultLocaleReadsItsOwnIntlEntry(): void
+    {
+        $item = MenuItem::linkToUrl('menu.item.api_keys', null, '/admin/api-key')->setKey('k');
+
+        $config = LayoutConfig::fromArray(['items' => [
+            ['key' => 'k', 'visible' => true, 'label' => 'Clés API (fr)',
+             'intl' => ['en-GB' => ['label' => 'API keys (en)', 'description' => 'Desc en']]],
+        ]]);
+
+        $result = $this->arranger->apply([$item], $config, 'en-GB', 'fr-FR');
+
+        $this->assertSame('API keys (en)', $result[0]->getLabel());
+        $this->assertSame('Desc en', $result[0]->getDescription());
+        $this->assertTrue($result[0]->isLabelCustomized());
+    }
+
+    public function testNonDefaultLocaleWithoutOwnIntlEntryKeepsTheCodeDefinedDefaults(): void
+    {
+        // An untouched language must fall through to its own code-defined
+        // translation - never show another locale's custom text.
+        $item = MenuItem::linkToUrl('menu.item.api_keys', null, '/admin/api-key')->setKey('k');
+
+        $config = LayoutConfig::fromArray(['items' => [
+            ['key' => 'k', 'visible' => true, 'label' => 'Clés API (fr)', 'description' => 'Desc fr'],
+        ]]);
+
+        $result = $this->arranger->apply([$item], $config, 'de-DE', 'fr-FR');
+
+        $this->assertSame('menu.item.api_keys', $result[0]->getLabel());
+        $this->assertNull($result[0]->getDescription());
+        $this->assertFalse($result[0]->isLabelCustomized());
+    }
+
+    public function testNoLocalePairKeepsHistoricalLocaleAgnosticBehavior(): void
+    {
+        $item = MenuItem::linkToUrl('menu.item.api_keys', null, '/admin/api-key')->setKey('k');
+
+        $config = LayoutConfig::fromArray(['items' => [
+            ['key' => 'k', 'visible' => true, 'label' => 'Renamed'],
+        ]]);
+
+        $result = $this->arranger->apply([$item], $config);
+
+        $this->assertSame('Renamed', $result[0]->getLabel());
+        $this->assertTrue($result[0]->isLabelCustomized());
+    }
+
+    public function testAppliesAStoredIconAloneOverrideOntoAMatchedCodeDefinedItem(): void
+    {
+        // Locale-agnostic on purpose: an icon isn't language-specific, so
+        // the same override applies whatever locale pair is passed.
+        $item = MenuItem::linkToUrl('menu.item.api_keys', null, '/admin/api-key')->setKey('k')->setIcon('fa-solid fa-key');
+
+        $config = LayoutConfig::fromArray(['items' => [
+            ['key' => 'k', 'visible' => true, 'icon' => 'fa-solid fa-lock'],
+        ]]);
+
+        $result = $this->arranger->apply([$item], $config, 'en-GB', 'fr-FR');
+
+        $this->assertSame('fa-solid fa-lock', $result[0]->getIcon());
+    }
+
+    public function testAStoredIconOnABlockNameEntryStillNeverOverridesAMatchedCodeDefinedWidget(): void
+    {
+        // The historical "icon is widget identity" rule for blockName-
+        // carrying entries must survive the icon-alone feature.
+        $card = MenuItem::block('analytics_card', 'title', 'fa-solid fa-chart-line');
+
+        $config = LayoutConfig::fromArray(['items' => [
+            ['key' => $card->getKey(), 'visible' => true, 'blockName' => 'analytics_card', 'icon' => 'fa-solid fa-lock'],
+        ]]);
+
+        $result = $this->arranger->apply([$card], $config);
+
+        $this->assertSame('fa-solid fa-chart-line', $result[0]->getIcon());
     }
 }

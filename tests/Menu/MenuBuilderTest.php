@@ -4,6 +4,7 @@ namespace Tests\Base\Admin\Menu;
 
 use Base\Admin\Config\MenuItem;
 use Base\Admin\Layout\LayoutArranger;
+use Base\Admin\Layout\LayoutConfig;
 use Base\Admin\Layout\LayoutStore;
 use Base\Admin\Menu\MenuBuilder;
 use Base\Admin\Router\AdminRouteRegistry;
@@ -79,5 +80,42 @@ class MenuBuilderTest extends TestCase
 
         $this->assertSame([$section, $block], $result);
         $this->assertSame([], $section->getSubItems());
+    }
+
+    public function testDeletedItemsFiltersPermissionDeniedItemsThenDelegatesToLayoutArranger(): void
+    {
+        // Same filterGranted() pass resolve() itself does - a
+        // permission-gated item the current user can't see shouldn't show
+        // up in the restore picker just because a superadmin deleted it.
+        $granted = MenuItem::linkToUrl('A', null, '/a')->setKey('a');
+        $denied = MenuItem::linkToUrl('B', null, '/b')->setKey('b')->setPermission('SOME_PERM');
+
+        $authChecker = $this->createMock(AuthorizationCheckerInterface::class);
+        $authChecker->method('isGranted')->with('SOME_PERM')->willReturn(false);
+
+        $config = LayoutConfig::new();
+        $layoutStore = $this->createMock(LayoutStore::class);
+        $layoutStore->expects($this->once())->method('get')->with('dashboard')->willReturn($config);
+
+        $layoutArranger = $this->createMock(LayoutArranger::class);
+        $layoutArranger->expects($this->once())
+            ->method('deletedItems')
+            ->with([$granted], $config)
+            ->willReturn([$granted]);
+
+        $builder = new MenuBuilder(
+            $this->createStub(AdminRouteRegistry::class),
+            $this->createStub(AdminUrlGenerator::class),
+            $this->createStub(UrlGeneratorInterface::class),
+            $this->createStub(RequestStack::class),
+            $this->createStub(TranslatorInterface::class),
+            $authChecker,
+            $layoutStore,
+            $layoutArranger,
+        );
+
+        $result = $builder->deletedItems([$granted, $denied], 'dashboard');
+
+        $this->assertSame([$granted], $result);
     }
 }

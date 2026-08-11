@@ -5,8 +5,91 @@
 {% block page_title %}{{ ('page.' ~ page ~ '.title')|trans({}, 'admin') }}{% endblock %}
 
 {% block content_header %}
+{# The page's own menu entry (selected state comes from MenuBuilder::
+   markSelected()) - one level of section nesting to walk, matching
+   groupIntoSections()'s tree. Two jobs: a superadmin-customized label/
+   description (stored on the menu item, see LayoutArranger) replaces the
+   code-defined default here, and customize mode gets the data-menu-key
+   hook it needs to persist an in-place edit back onto that same item -
+   which is what keeps the sidebar label in sync with the title (one
+   stored value, rendered in both places). #}
+{# _section, NOT _parent: Twig's compiled for-loops stash the enclosing
+   scope under the context key '_parent' - shadowing it with {% set %}
+   inside the loop corrupts the scope restore at {% endfor %}
+   (array_intersect_key() TypeError, found live). #}
+{% set _current = null %}
+{% set _section = null %}
+{% if admin_context is defined %}
+    {% for item in admin_context.mainMenu %}
+        {% if item.selected %}{% set _current = item %}{% set _section = null %}{% endif %}
+        {% for subItem in item.subItems %}
+            {% if subItem.selected %}{% set _current = subItem %}{% set _section = item %}{% endif %}
+        {% endfor %}
+    {% endfor %}
+{% endif %}
+{% set _editable = customize_enabled is defined and customize_enabled and _current %}
 <div class="admin-header">
-    <h1>{{ ('page.' ~ page ~ '.title')|trans({}, 'admin') }}</h1>
+    {# Same admin-header-titles/-subtitle pattern crud/_form.html.twig
+       already uses for an entity's own ID subtitle - system pages had no
+       description at all here, reported live as a stark difference from
+       production's own Clés API/Paramètres du site pages, each with a
+       one-line explanation right under the title. #}
+    {# Production's system pages lead with the page's own icon in a
+       rounded box next to the title (reported live as missing here) -
+       the menu item already carries the right icon, reuse it. In
+       customize mode the box doubles as the icon's own edit surface
+       (data-page-icon, see layout.html.twig's popover handler) - and
+       renders even icon-less then, as a placeholder, or there'd be
+       nothing to click to SET one. #}
+    {% if _current and (_current.icon or _editable) %}
+        <span class="admin-header-icon"{% if _editable %} data-page-icon data-page-icon-value="{{ _current.icon }}" data-menu-key="{{ _current.key }}"{% if _section %} data-menu-parent-key="{{ _section.key }}"{% endif %} title="{{ 'customize.icon_hint'|trans({}, 'admin') }}"{% endif %}>
+            <i class="{{ _current.icon ?: 'fa-solid fa-circle-question' }}"></i>
+        </span>
+    {% endif %}
+    <div class="admin-header-titles">
+        {# Which language an in-place title/description edit applies to
+           (edits are stored per admin locale, see LayoutController::
+           quickSave()) - only visible while customizing, and only when
+           there is more than one locale to disambiguate. EVERY available
+           locale shows as a flag (requested live: "french english and
+           german here as default"); the active one is highlighted, the
+           others are links through _switch_locale - clicking a flag IS
+           how you switch which language you're editing (customize mode
+           survives the reload via its localStorage flag). #}
+        <h1{% if _editable %} data-page-title data-menu-key="{{ _current.key }}"{% if _section %} data-menu-parent-key="{{ _section.key }}"{% endif %}{% endif %}>
+            {%- if _current and _current.labelCustomized -%}
+                {{- _current.label|trans({}, 'admin') -}}
+            {%- else -%}
+                {{- ('page.' ~ page ~ '.title')|trans({}, 'admin') -}}
+            {%- endif -%}
+        </h1>
+        <div class="admin-header-subtitle"{% if _editable %} data-page-desc data-menu-key="{{ _current.key }}"{% if _section %} data-menu-parent-key="{{ _section.key }}"{% endif %}{% endif %}>
+            {%- if _current and _current.description -%}
+                {{- _current.description -}}
+            {%- else -%}
+                {{- ('page.' ~ page ~ '.description')|trans({}, 'admin') -}}
+            {%- endif -%}
+        </div>
+        {# Below the title/description, not above them (moved on request).
+           These flags say which language an in-place edit of the two
+           editable texts right above will be saved under, so they read as
+           a footnote to that text - sitting above the <h1> they looked
+           like page chrome unrelated to it, and pushed the heading down.
+           Behaviour is unchanged: active locale highlighted, the others
+           are _switch_locale links, and customize mode survives the
+           reload via its localStorage flag. #}
+        {% if _editable and app.localizer.availableLocales|length > 1 %}
+            <span class="page-locale-badges" title="{{ 'customize.locale_hint'|trans({'%locale%': app.localizer.locale|lang_name|capitalize}, 'admin') }}">
+                {% for _locale in app.localizer.availableLocales %}
+                    {% if _locale == app.localizer.locale %}
+                        <span class="page-locale-badge is-active"><img alt="{{ _locale }}" src="{{ asset('bundles/base/images/flags/' ~ (_locale|country) ~ '.svg') }}"></span>
+                    {% else %}
+                        <a class="page-locale-badge" href="{{ path('_switch_locale', {_locale: _locale|lang}) }}" title="{{ _locale|lang_name|capitalize }}"><img alt="{{ _locale }}" src="{{ asset('bundles/base/images/flags/' ~ (_locale|country) ~ '.svg') }}"></a>
+                    {% endif %}
+                {% endfor %}
+            </span>
+        {% endif %}
+    </div>
 </div>
 {% endblock %}
 
@@ -25,8 +108,45 @@
                itself. Without it, the form previously rendered flush against
                the card's own border (.card has no padding of its own -
                form-grid supplies it everywhere else). #}
+            {# LayoutSettingListType::buildForm() always adds its own 'valid'
+               SubmitType child whenever the form has any fields at all - a
+               second, independent <button type="submit"> with completely
+               different wording ("Vérifier et sauvegarder les nouveaux
+               paramètres" vs this block's own "Enregistrer" below), that
+               form_rest() below would otherwise render buried inside the
+               generic field sweep instead of a proper footer - reported
+               live as two confusing, differently-worded submit buttons on
+               the same form. mapFormsToData() explicitly skips 'valid' when
+               reading submitted data (it carries no real value, purely a
+               click target), and this type has no consumer besides this
+               template, so hiding its own redundant button here is safe:
+               nothing else needs it visible or absent. Rendered (hidden),
+               not omitted, so form_rest() below doesn't re-render it. #}
+            {% if form.valid is defined %}{{ form_widget(form.valid, {attr: {style: 'display:none', tabindex: '-1'}}) }}{% endif %}
             <div class="system-form-body">
-                {{ form_rest(form) }}
+                {# Optional section headers for the form's own top-level
+                   intl/unv split (see SystemController::renderSystemPage()'s
+                   own doc comment for why this is only that split, not
+                   finer per-topic grouping) - 'groups' is empty on pages
+                   that don't pass it (e.g. apiKey()), which keeps the
+                   original blind form_rest() sweep exactly as before. #}
+                {% if groups is defined and groups|length > 0 %}
+                    {% if form.intl is defined and groups.intl is defined %}
+                        <h2 class="system-form-group-title">{{ ('page.' ~ page ~ '.group.' ~ groups.intl)|trans({}, 'admin') }}</h2>
+                        {{ form_row(form.intl) }}
+                    {% endif %}
+                    {% if form.unv is defined and groups.unv is defined %}
+                        <h2 class="system-form-group-title">{{ ('page.' ~ page ~ '.group.' ~ groups.unv)|trans({}, 'admin') }}</h2>
+                        {{ form_row(form.unv) }}
+                    {% endif %}
+                    {# Anything neither block above claimed (just 'valid',
+                       already rendered hidden above) still needs sweeping
+                       so nothing silently disappears if the form ever
+                       grows a new top-level child. #}
+                    {{ form_rest(form) }}
+                {% else %}
+                    {{ form_rest(form) }}
+                {% endif %}
             </div>
             <div class="form-footer">
                 <button class="btn btn-primary" type="submit">{{ 'action.save'|trans({}, 'admin') }}</button>

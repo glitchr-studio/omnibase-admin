@@ -28,21 +28,67 @@
     {% block head_stylesheets %}
     <style>
         :root {
+            {# Tells the browser which system palette to render native
+               chrome from. Without it the page is "light" as far as the UA
+               is concerned no matter how dark we paint it, so form-control
+               text (fieldtext/buttontext), scrollbars, autofill fills,
+               date/colour pickers and select popups all stayed light-mode
+               - the `color: inherit` on the control rules below fixes the
+               text, but nothing in CSS can reach the rest. Must be
+               re-declared in each dark block: it is a normal property, not
+               a custom one, so it does not follow --admin-* automatically. #}
+            color-scheme: light;
             --admin-bg: #f6f7f9; --admin-surface: #fff; --admin-border: #e3e6ea;
             --admin-text: #1f2429; --admin-muted: #6b7683; --admin-accent: #2563eb;
             --admin-danger: #dc2626; --admin-success: #16a34a; --admin-radius: 8px;
+            {# Not an admin token - base-async's own. It ships
+               `.text-muted{color:var(--text-muted)!important}` but only
+               DEFINES --text-muted inside a scope this admin never gets
+               (base-async.scss:914, `var(--gray-500)` off the Bootstrap
+               palette root). Undefined + no fallback = invalid at
+               computed-value time, and because `color` inherits, every
+               .text-muted element in the admin silently rendered at full
+               body-text strength - the `!important` also beating our own
+               `.form-text{color:var(--admin-muted)}`. Found via the file-
+               size hint under image uploads reading as loud as a label
+               next to production's gray, but it was never just that one
+               element. Aliasing the token here fixes .text-muted admin-
+               wide; it resolves per-theme since the dark blocks below
+               re-declare --admin-muted on this same :root.
+               !important is required, not defensive: base-async DOES
+               carry its own `:root{--text-muted:var(--gray-500)}` and its
+               stylesheet loads after this inline block, so at equal
+               specificity document order hands it the win - and it
+               resolves to nothing, since --gray-500 is equally undefined
+               here (both confirmed empty via getComputedStyle live). #}
+            --text-muted: var(--admin-muted) !important;
+            {# Same story, second token: base-async styles the ACTIVE locale
+               tab with `.form-translatable .nav-link.active{background:
+               var(--sidebar-bg)!important}`, and --sidebar-bg is another
+               token it never defines here. Undefined + no fallback made
+               `background` invalid at computed-value time, so it fell back
+               to its initial value - transparent - and the !important also
+               beat our own `.nav-tabs .nav-link.active{background:
+               var(--admin-surface)}`, leaving the selected tab with no fill
+               at all (production paints it #f8fafc). Surface, not bg: the
+               active tab should read as continuous with the pane beneath
+               it. No !important needed unlike --text-muted above - nothing
+               else declares --sidebar-bg on :root (verified live). #}
+            --sidebar-bg: var(--admin-surface);
         }
         {# "auto" (no data-theme attribute at all) follows the OS - explicit
            data-theme="dark"/"light" (set above from a saved preference)
            always wins regardless of OS setting. #}
         @media (prefers-color-scheme: dark) {
             :root:not([data-theme="light"]) {
+                color-scheme: dark;
                 --admin-bg: #16181d; --admin-surface: #1e2127; --admin-border: #2c3038;
                 --admin-text: #e6e8eb; --admin-muted: #8b94a1; --admin-accent: #6ea8fe;
                 --admin-danger: #f87171; --admin-success: #4ade80;
             }
         }
         :root[data-theme="dark"] {
+            color-scheme: dark;
             --admin-bg: #16181d; --admin-surface: #1e2127; --admin-border: #2c3038;
             --admin-text: #e6e8eb; --admin-muted: #8b94a1; --admin-accent: #6ea8fe;
             --admin-danger: #f87171; --admin-success: #4ade80;
@@ -58,6 +104,14 @@
            3.3rem) so both bars' bottom borders land on the same line. #}
         .admin-topbar { display: flex; align-items: center; gap: 1rem; height: 3.3rem; padding: 0 .9rem; margin: -1.5rem -2rem 1.25rem; border-bottom: 1px solid var(--admin-border);
                        position: sticky; top: 0; z-index: 15; background: var(--admin-bg); box-shadow: 0 2px 6px rgba(0,0,0,.1); }
+        {# During an in-page navigation (html.loading, plus the progress
+           bar's own minimum-duration window) the swapped-out topbar sits
+           momentarily EMPTY over the incoming page - with its resting
+           box-shadow it reads as an open dropdown panel flashing across
+           the top (reported live). The border-bottom alone carries the
+           separation for that brief window. #}
+        html.loading .admin-topbar,
+        html.progress-bar-active .admin-topbar { box-shadow: none; }
         .topbar-search { flex: 1; max-width: 420px; display: flex; align-items: center; gap: .5rem; padding: .4rem .8rem; border: 1px solid var(--admin-border);
                          border-radius: 999px; background: var(--admin-surface); color: var(--admin-muted); }
         .topbar-search i { flex: 0 0 auto; }
@@ -65,8 +119,15 @@
         .topbar-search input:focus { outline: none; }
         .admin-topbar-icons { margin-left: auto; display: flex; align-items: center; gap: .4rem; }
         .admin-icon-dropdown { position: relative; }
+        {# text-decoration:none because this class is used on BOTH <button>
+           and <a> (the sidebar footer's home and exit-admin icons are
+           links). Buttons carry no underline, so the omission was
+           invisible on the topbar's button-only icons and showed up only
+           on those two anchors - a bare underline sitting under the glyph
+           (reported live). Every other anchor component in this file
+           already resets it; this one was just missed. #}
         .admin-icon-btn { display: flex; align-items: center; justify-content: center; width: 2.1rem; height: 2.1rem; border-radius: 999px; border: 1px solid transparent;
-            background: none; color: var(--admin-muted); cursor: pointer; font: inherit; }
+            background: none; color: var(--admin-muted); cursor: pointer; font: inherit; text-decoration: none; }
         .admin-icon-btn:hover { border-color: var(--admin-border); color: var(--admin-accent); background: var(--admin-surface); }
         .admin-dropdown-menu { display: none; position: absolute; top: calc(100% + .3rem); right: 0; min-width: 150px; z-index: 20;
             background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: var(--admin-radius); box-shadow: 0 8px 24px rgba(0,0,0,.15); overflow: hidden; }
@@ -76,6 +137,7 @@
         .admin-dropdown-menu button:hover, .admin-dropdown-menu a:hover { background: var(--admin-bg); }
         .admin-dropdown-menu button.is-active, .admin-dropdown-menu a.is-active { color: var(--admin-accent); font-weight: 600; }
         .admin-dropdown-menu i { width: 1rem; text-align: center; }
+        .admin-dropdown-loading { display: block; padding: .5rem .8rem; font-size: .85rem; color: var(--admin-muted); }
         .admin-locale-flag { width: 1.15rem; height: .85rem; object-fit: cover; border-radius: 2px; flex-shrink: 0; }
         {# The avatar cluster IS the "shown by default" summary (not hidden
            behind opening the dropdown) - the dropdown itself is purely the
@@ -133,7 +195,16 @@
         .admin-aside .brand { display: flex; align-items: center; gap: .6rem; height: 3.3rem; padding: 0 1.25rem; border-bottom: 1px solid var(--admin-border); }
         .admin-aside .brand-logo { width: 2.25rem; height: 2.25rem; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
         .admin-aside .brand-text { display: flex; flex-direction: column; min-width: 0; }
-        .admin-aside .brand-title { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        {# The caret sits next to the TITLE specifically, in its own row -
+           it used to be a direct sibling of .brand-text out in .brand's
+           own flex row, so .brand's align-items:center centered it
+           against the full two-line title+username block instead of just
+           the title, landing it visibly low/disconnected (found live via
+           a user screenshot). This row is its own flex context, so the
+           caret's vertical center always tracks the title line only,
+           regardless of whether a username line exists below it at all. #}
+        .admin-aside .brand-title-row { display: flex; align-items: center; gap: .35rem; min-width: 0; }
+        .admin-aside .brand-title { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
         .admin-aside .brand-user { font-size: .8rem; color: var(--admin-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         [data-brand-title][contenteditable="true"]:focus {
             outline: 2px solid var(--admin-accent); outline-offset: 2px; border-radius: 4px;
@@ -145,16 +216,38 @@
            a text-input cursor) on hover gives that cue up front, same
            treatment for the sidebar's own brand title. #}
         body.is-customizing [data-analytics-title][contenteditable="true"]:hover,
-        body.is-customizing [data-brand-title][contenteditable="true"]:hover {
+        body.is-customizing [data-brand-title][contenteditable="true"]:hover,
+        body.is-customizing [data-widget-text][contenteditable="true"]:hover,
+        body.is-customizing [data-page-title][contenteditable="true"]:hover,
+        body.is-customizing [data-page-desc][contenteditable="true"]:hover {
             outline: 1px dashed var(--admin-accent); outline-offset: 2px; border-radius: 4px; cursor: text;
         }
+        [data-page-title][contenteditable="true"]:focus,
+        [data-page-desc][contenteditable="true"]:focus {
+            outline: 2px solid var(--admin-accent); outline-offset: 2px; border-radius: 4px;
+        }
         .admin-menu { list-style: none; margin: .75rem 0 0; padding: 0; }
-        {# prod-style vertical rhythm: quick links (dashboard) stay at the
-           top, the first section - and everything after it - is pushed to
-           the bottom of the aside, leaving the middle empty. Navigation
-           itself lives in the dashboard's central widget groups, NOT here. #}
-        aside.admin-aside > ul.admin-menu:first-of-type { flex: 1; display: flex; flex-direction: column; }
-        aside.admin-aside > ul.admin-menu:first-of-type > li:first-child { margin-bottom: auto; }
+        {# Used to push a standalone "Tableau de bord" quick-link away from
+           the sections below it (prod-style rhythm: quick link at the very
+           top, sections pushed to the bottom, empty middle). That link was
+           removed from App\Controller\Admin\DashboardController::
+           configureMenuItems() (superseded by the sidebar footer's own
+           home icon, see its own comment) - with no more standalone item
+           in front of them, :first-child now means the FIRST SECTION
+           itself, so the old margin-bottom:auto shoved just that one
+           section to the top and every other section down to the bottom,
+           opening a large empty gap in the middle of the list - fixed by
+           removing that child rule entirely (see git history/git blame
+           for the version that had it).
+
+           justify-content:flex-end below is a DIFFERENT, later request:
+           once the gap-in-the-middle was gone, the whole (now gapless)
+           section list sat pinned to the TOP of the aside, empty space
+           below it before the footer icons - asked to be pinned to the
+           BOTTOM instead, empty space above. flex-direction:column makes
+           this flex container's own main axis vertical, so flex-end here
+           means "bottom", not "right". #}
+        aside.admin-aside > ul.admin-menu:first-of-type { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; }
         {# .section-group (the <li>) holds the label row and its nested
            member <ul> stacked vertically - overrides the generic
            ".admin-menu li { display:flex }" row layout below, which is
@@ -219,14 +312,24 @@
            height regardless of how much text it holds. #}
         .admin-menu li { display: flex; align-items: stretch; justify-content: space-between; min-height: 2.4rem; }
         .admin-menu li a { flex: 1; }
-        .admin-menu li .item-controls { align-self: center; }
+        {# The right margin promised by the "No right padding here" comment
+           on .section above - never actually written until now. .aside has
+           0 right padding and .item-controls (a plain inline sibling of
+           <a> here, unlike the dashboard's position:absolute
+           .widget-controls reuse of this same class) carried no margin of
+           its own either, so the icon row landed flush against the
+           sidebar's own outer edge with no breathing room at all -
+           reported live. Scoped to .admin-menu specifically (not a bare
+           .item-controls rule) so this doesn't also nudge the dashboard
+           widget cards' own already-tuned .widget-controls positioning. #}
+        .admin-menu li .item-controls { align-self: center; margin-right: 1.25rem; }
         {# Icon glyph sized closer to its box (font-size raised from .78rem,
            box tightened from 1.6rem) - the FontAwesome glyph read as
            swimming in empty padding at the old ratio, found live. Still
            comfortably above a 24px touch target (1.5rem = 24px exactly). #}
-        .item-handle, .item-toggle, .item-remove, .item-split, .item-settings { display: flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; border: 0; border-radius: 6px;
+        .item-handle, .item-toggle, .item-remove, .item-split, .item-settings, .item-background { display: flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; border: 0; border-radius: 6px;
             background: none; color: var(--admin-muted); cursor: pointer; font-size: .88rem; flex-shrink: 0; }
-        .item-handle:hover, .item-toggle:hover, .item-split:hover, .item-settings:hover, .item-settings.is-active { background: var(--admin-bg); color: var(--admin-text); }
+        .item-handle:hover, .item-toggle:hover, .item-split:hover, .item-settings:hover, .item-settings.is-active, .item-background:hover, .item-background.is-active { background: var(--admin-bg); color: var(--admin-text); }
         {# Danger-tinted hover only, not a permanent color - only ad-hoc/
            palette-added widgets ever get this button (see _block.html.twig),
            and it deletes immediately with no confirmation step, so the
@@ -256,6 +359,21 @@
         html.is-sidebar-collapsed .admin-menu .section-label { flex: none; justify-content: center; }
         html.is-sidebar-collapsed .admin-menu a i { margin-right: 0; }
         html.is-sidebar-collapsed .admin-menu .label-text, html.is-sidebar-collapsed .admin-menu .sub { display: none; }
+        {# Collapsed, the icon is the ONLY thing identifying a row, and it was
+           still rendering at the expanded size - a ~16px glyph adrift in a
+           4.5rem column, hard to hit and hard to tell apart. Scale it up to
+           suit the icon-only column (asked for directly).
+           The reset on the flyout is required, not tidiness: the hover
+           flyout lives INSIDE .admin-menu, so `.admin-menu a i` matches its
+           icons too - but that panel is the expanded, labelled presentation
+           and its icons must stay text-sized next to their labels. Same for
+           the footer buttons: bigger glyphs need a bigger hit circle or
+           they crowd the 2.1rem default. #}
+        html.is-sidebar-collapsed .admin-menu a i,
+        html.is-sidebar-collapsed .admin-menu .section i { font-size: 1.15rem; }
+        html.is-sidebar-collapsed .section-group > ul a i { font-size: inherit; }
+        html.is-sidebar-collapsed .admin-sidebar-footer .admin-icon-btn { width: 2.3rem; height: 2.3rem; }
+        html.is-sidebar-collapsed .admin-sidebar-footer .admin-icon-btn i { font-size: 1.1rem; }
         {# Both halves must stay scoped to .admin-menu - .item-resize-handle
            on its own (no .admin-menu prefix) matched EVERY resize handle in
            the document, including the dashboard widget-grid's own ones
@@ -331,18 +449,34 @@
            position:relative), not to whatever row it's DOM-nested in, so
            it stays a standalone sibling of .item-controls either way.
 
-           Outlined, matching the surface/border/muted-icon look every
-           other control on this page uses (not a solid accent fill) - a
-           loud floating blue pill read as detached from the card rather
-           than one of its own controls, found live. Findability now
-           comes from the fixed bottom-right position + hover feedback,
-           not from being the one differently-colored thing on the page. #}
-        .item-resize-handle { display: none; width: 1.8rem; height: 1.8rem; border: 1px solid var(--admin-border); border-radius: 50%;
+           No border/background/circle chrome (dropped in favor of a
+           plain glyph, was a solid outlined circle before, read as a
+           separate floating button glued on top of the card rather than
+           part of it) - findability comes from the fixed bottom-right
+           position + a hover-only background swap below, not from
+           permanent chrome. Stays at the SAME position/mechanism as
+           before regardless (floating, absolutely anchored to the card's
+           own corner) - a previous round already tried grouping it
+           elsewhere and reverted (see this comment's own note two
+           paragraphs up), so only the visual weight changes here, not
+           where it lives or how it's found. #}
+        .item-resize-handle { display: none; width: 1.8rem; height: 1.8rem; border: 0; border-radius: 6px;
             align-items: center; justify-content: center; color: var(--admin-muted); cursor: ew-resize; touch-action: none;
-            background: var(--admin-surface); padding: 0; font: inherit; flex-shrink: 0;
-            position: absolute; bottom: .6rem; right: .6rem; z-index: 2; }
+            background: transparent; padding: 0; font: inherit; flex-shrink: 0;
+            position: absolute; bottom: .6rem; right: .6rem; z-index: 2; transition: background .15s ease, color .15s ease; }
         body.is-customizing .item-resize-handle { display: flex; }
-        .item-resize-handle:hover, .item-resize-handle.is-resizing { border-color: var(--admin-accent); color: var(--admin-accent); }
+        {# .item-settings (analytics_card's/article_views' own gear, see
+           each template's own comment) is a standalone sibling button
+           like .item-resize-handle above, not a descendant of the
+           generic .item-controls row (which already gates handle/toggle/
+           remove via `body.is-customizing` at its OWN container level) -
+           it needs this same display:none/is-customizing pair on its own
+           class, or it stays visible to every viewer at all times
+           (a permanent edit-only affordance leaking into the normal,
+           non-customizing dashboard view). #}
+        .item-settings { display: none; }
+        body.is-customizing .item-settings { display: flex; }
+        .item-resize-handle:hover, .item-resize-handle.is-resizing { background: var(--admin-bg); color: var(--admin-accent); }
         .item-resize-handle i { font-size: .85rem; }
         .admin-resize-ghost { position: fixed; border: 2px dashed var(--admin-accent); border-radius: var(--admin-radius);
             background: rgba(37,99,235,.08); pointer-events: none; z-index: 1000; }
@@ -411,6 +545,46 @@
             left: 100%; right: auto; top: 0; margin-left: .5rem; min-width: 13rem;
         }
         .admin-usermenu a i { width: 1.1rem; text-align: center; }
+        {# Desktop/tablet default: the hamburger has nothing to do (.admin-
+           aside is always in-flow there, see .admin-shell's flex layout
+           above) so it stays hidden outside its own @media block below,
+           which is the only place that flips it to display:flex. #}
+        .admin-mobile-nav-toggle { display: none; }
+        {# .admin-aside was a fixed 260px with NO narrower breakpoint at all
+           - the widget-grid media query further down (max-width: 720px)
+           reflows the dashboard's own content but leaves the sidebar
+           untouched, so on an actual phone (~390px wide) it permanently
+           ate two thirds of the viewport, leaving barely 130px for
+           content: form fields and labels wrapped word-by-word and inputs
+           ran off-screen. Reusing the desktop icon-rail collapse (is-
+           sidebar-collapsed, above) doesn't fix this on its own either -
+           it's an opt-in preference toggle, not an automatic breakpoint,
+           and its hover-driven submenu flyouts don't work on touch anyway.
+           Off-canvas instead, same breakpoint as the widget grid: hidden
+           by a translateX until explicitly opened via the hamburger
+           button now in .admin-topbar, then slides in as a full-height
+           overlay above the content rather than sharing width with it. #}
+        @media (max-width: 720px) {
+            .admin-mobile-nav-toggle { display: flex; }
+            .admin-aside { position: fixed; top: 0; left: 0; transform: translateX(-100%); transition: transform .2s ease; box-shadow: 0 0 24px rgba(0,0,0,.25); }
+            html.is-mobile-nav-open .admin-aside { transform: translateX(0); }
+            {# Scroll lock while the overlay is open - otherwise the page
+               underneath keeps scrolling with it (most visible on iOS
+               Safari's rubber-band overscroll), which reads as the
+               backdrop/sidebar not really being modal at all. #}
+            html.is-mobile-nav-open { overflow: hidden; }
+            {# z-index 18: below .admin-aside's own 20 (must not cover the
+               open sidebar) but above .admin-topbar's 15 (must dim it, or
+               the search bar/icon cluster would read as still usable while
+               the nav is open). display:none by default even inside this
+               query - is-mobile-nav-open is the only thing that ever shows
+               it, but that class can only ever be set by clicking the
+               toggle button above, which itself only exists at this same
+               breakpoint, so the two never disagree in practice; kept
+               explicit rather than relying on that indirectly. #}
+            .admin-mobile-nav-backdrop { display: none; position: fixed; inset: 0; z-index: 18; background: rgba(0,0,0,.4); }
+            html.is-mobile-nav-open .admin-mobile-nav-backdrop { display: block; }
+        }
         .admin-main { flex: 1; padding: 1.5rem 2rem; min-width: 0; }
         {# sticks right under the topbar (itself sticky at top:0) so the
            title/entity-actions stay reachable while scrolling a long form
@@ -422,10 +596,122 @@
         .admin-header { display: flex; align-items: center; gap: 1rem; margin: 0 -2rem 1.25rem; padding: 1rem 2rem;
                         position: sticky; top: 3.3rem; z-index: 14; background: var(--admin-bg); }
         .admin-header h1 { margin: 0; font-size: 1.35rem; }
+        {# Detail-page shape: the record's own name is the heading and the
+           CRUD name drops to a small line beneath it. The name can be a
+           full article title, so it wraps rather than stretching the
+           sticky header - clamped to two lines, with the full text on the
+           element's title attribute. #}
+        .admin-header-record { font-size: 1.35rem; line-height: 1.25; overflow-wrap: anywhere;
+                               display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        {# The record's id, picked out of the muted subtitle line the way
+           production picks it out - the one part of that line worth
+           scanning for. #}
+        .admin-header-subtitle .admin-header-suffix { color: var(--admin-accent); }
+        {# The page's own icon in a rounded box before the title block -
+           production's system pages lead with this (reported live as
+           missing on beta). .admin-header is already a gapped flex row,
+           the box just slots in as the first item. #}
+        .admin-header-icon { display: flex; align-items: center; justify-content: center; width: 3.4rem; height: 3.4rem; flex-shrink: 0;
+                             border: 1px solid var(--admin-border); border-radius: 12px; background: var(--admin-surface); font-size: 1.4rem; }
         .admin-header-titles { min-width: 0; }
+        {# Which-language-am-I-editing chip for the in-place page title
+           (see system.html.twig) - customize mode only, sits right by the
+           editable heading's dashed outline. cursor:help + title attr
+           carry the "switch language to translate" hint. #}
+        .page-locale-badges { display: none; }
+        body.is-customizing .page-locale-badges { display: inline-flex; gap: .25rem; margin-bottom: .25rem; }
+        .page-locale-badge { display: inline-flex; align-items: center; padding: .2rem .3rem;
+                             border: 1px solid var(--admin-border); border-radius: 5px; background: var(--admin-surface); }
+        {# Inactive locales are links through _switch_locale - dimmed at
+           rest so the ACTIVE flag reads as "you are editing this
+           language" at a glance, full-strength on hover as the "click to
+           edit that one instead" affordance. #}
+        a.page-locale-badge { opacity: .4; cursor: pointer; }
+        a.page-locale-badge:hover { opacity: 1; border-color: var(--admin-accent); }
+        .page-locale-badge.is-active { border-color: var(--admin-accent); }
+        .page-locale-badge img { width: 1.15rem; height: .85rem; object-fit: cover; border-radius: 2px; display: block; }
+        {# The page-icon box doubles as its own edit surface in customize
+           mode (see the popover handler below) - same dashed-outline
+           affordance the editable titles use. #}
+        body.is-customizing [data-page-icon] { cursor: pointer; }
+        body.is-customizing [data-page-icon]:hover { outline: 1px dashed var(--admin-accent); outline-offset: 2px; }
+        {# position:fixed + appended to <body>, same reasoning as the
+           resize ghost: immune to any ancestor's overflow/stacking. #}
+        .page-icon-popover { position: fixed; z-index: 100010; display: flex; flex-direction: column; gap: .5rem; padding: .6rem;
+                             background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: var(--admin-radius);
+                             box-shadow: 0 8px 24px rgba(0,0,0,.15); }
+        .page-icon-popover-header { display: flex; gap: .5rem; align-items: center; }
+        {# The input wrapper hosts the in-field spinner + clear ✕ at its
+           right edge - padding-right on the input keeps typed text from
+           sliding under them. #}
+        {# display:flex is what actually centres the two absolutely-positioned
+           overlays (spinner, clear button). They anchor to THIS box and use
+           top:50%/translateY(-50%), so they centre on the wrapper's height,
+           not the input's - and with the input left inline-level the wrapper
+           was ~15px taller than it (the line box adds descender space under
+           an inline-block), dropping both overlays 7.5px below the input's
+           real centre. Measured live; reported as the spinner looking
+           offset. Flex collapses the wrapper onto the input's own height so
+           the two centres coincide. #}
+        .page-icon-search { position: relative; display: flex; align-items: center; }
+        .page-icon-popover input { width: 15rem; padding: .35rem 3rem .35rem .5rem; border: 1px solid var(--admin-border); border-radius: 6px;
+                                   font: inherit; font-size: .85rem; background: var(--admin-bg); color: inherit; }
+        {# Selector is .page-icon-popover-scoped purely to WIN, not to scope:
+           the spinner element also carries `fa-solid` (it is a
+           fa-circle-notch), and FontAwesome ships
+           `.fa-solid{display:var(--fa-display,inline-block)}` at the same
+           (0,1,0) specificity as a bare `.icon-search-spinner`, loaded
+           after this inline block - so document order handed FA the win and
+           the spinner rendered permanently, spinning next to the clear
+           button whether or not a search was in flight (reported live:
+           "continuously displayed even after finish computing"). Two
+           classes puts this at (0,2,0) so the default hidden state sticks;
+           the .is-loading rule below is (0,3,0) and still wins over both. #}
+        {# Centred by stretching top-to-bottom and flex-centring the glyph,
+           NOT by top:50%+translateY(-50%) - this element carries fa-spin,
+           and an ANIMATION on `transform` beats a static transform
+           declaration outright, so the spin wiped out the -50% pull-back
+           and left the icon sitting half its own height below centre
+           (measured 7.5px low, while the identically-positioned clear
+           button - no animation - centred perfectly). Stretching leaves
+           `transform` free for fa-spin to own, and since the glyph ends up
+           at the box's centre the rotation still reads as spinning in
+           place. #}
+        .page-icon-popover .icon-search-spinner { display: none; position: absolute; right: 1.9rem; top: 0; bottom: 0;
+                                                  align-items: center; color: var(--admin-muted); pointer-events: none; }
+        .page-icon-popover.is-loading .icon-search-spinner { display: flex; }
+        .icon-search-clear { display: none; position: absolute; right: .35rem; top: 50%; transform: translateY(-50%);
+                             width: 1.3rem; height: 1.3rem; padding: 0; border: 0; border-radius: 50%;
+                             background: none; color: var(--admin-muted); font: inherit; line-height: 1; cursor: pointer; }
+        .icon-search-clear:hover { background: var(--admin-border); color: var(--admin-text); }
+        .page-icon-popover.has-term .icon-search-clear { display: flex; align-items: center; justify-content: center; }
+        .page-icon-popover .page-icon-preview { width: 2.1rem; height: 2.1rem; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+                                                border: 1px solid var(--admin-border); border-radius: 6px; }
+        {# Fixed 8-per-row cells; the grid scrolls its own overflow (never
+           the page) past ~4 rows. :empty collapses the search-in-flight /
+           no-results state instead of leaving a hollow band. #}
+        .page-icon-grid { display: grid; grid-template-columns: repeat(8, 2.1rem); gap: .25rem; max-height: 10rem; overflow-y: auto; }
+        .page-icon-grid:empty { display: none; }
+        .page-icon-cell { display: flex; align-items: center; justify-content: center; width: 2.1rem; height: 2.1rem;
+                          border: 1px solid transparent; border-radius: 6px; background: none; color: inherit; font-size: 1rem; cursor: pointer; }
+        .page-icon-cell:hover { border-color: var(--admin-accent); color: var(--admin-accent); background: var(--admin-bg); }
         .admin-header-subtitle { font-size: .82rem; color: var(--admin-muted); margin-top: .2rem; }
         .admin-header .global-actions { margin-left: auto; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .5rem; }
         .card { background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: var(--admin-radius); }
+        {# Generic "no card chrome" toggle any dashboard widget can carry
+           (see MenuItem::$background's own docblock) - .widget-group IS
+           its own .card (same div, see that template's own comment) so
+           strips itself directly; .widget-block is a wrapper AROUND its
+           own .card (analytics-card.card/composite-card.card/...) so
+           strips that child instead. welcome.html.twig only ever adds
+           .card when widget.background is true in the first place (its
+           own code-level default is false), so this selector simply has
+           nothing to strip there most of the time - same bare, boxless
+           end result either way, just reached through "no .card element"
+           instead of "a .card element with its chrome stripped". #}
+        .widget-group.no-card-bg, .widget-block.no-card-bg > .card {
+            background: none; border-color: transparent; box-shadow: none;
+        }
         .btn { display: inline-flex; align-items: center; gap: .4rem; padding: .45rem .9rem; border-radius: 6px; border: 1px solid var(--admin-border);
                background: var(--admin-surface); color: inherit; text-decoration: none; font-size: .9rem; cursor: pointer; }
         .btn:hover { border-color: var(--admin-accent); color: var(--admin-accent); }
@@ -450,8 +736,37 @@
         table.datagrid { width: 100%; min-width: max-content; border-collapse: collapse; }
         .datagrid th, .datagrid td { text-align: left; padding: .6rem .9rem; border-bottom: 1px solid var(--admin-border); white-space: nowrap; }
         .datagrid th a { color: inherit; text-decoration: none; }
+        {# Tinted header row, like production's. Two reasons, one of them a
+           correctness fix rather than taste: the sticky actions cell below
+           needs an opaque background to cover the columns scrolling under
+           it, and giving that to th.actions ALONE left the header showing a
+           mismatched grey block over an otherwise transparent white row,
+           with a hard edge slicing through the neighbouring column's label
+           (seen live). Tinting the whole row makes the pinned cell
+           indistinguishable from its siblings and anchors the header at the
+           same time. #}
+        .datagrid thead th { background: var(--admin-bg); }
         .datagrid tr:hover td { background: var(--admin-bg); }
-        .datagrid td.actions, .datagrid th.actions { text-align: right; white-space: nowrap; }
+        {# Row actions stay pinned to the right edge while the rest of the
+           row scrolls under them (requested: keep view/edit/delete fixed,
+           make the other columns scrollable). Wide grids scroll far enough
+           that the actions used to end up off-screen, so acting on a row
+           meant scrolling right, losing sight of which row you were on,
+           then scrolling back.
+
+           An OPAQUE background is what makes this work at all: a sticky
+           cell still paints in normal table order, so with a transparent
+           background the scrolled columns show straight through it.
+           --admin-surface is the .card the table sits on, and the hover
+           rule has to be repeated here or a hovered row's pinned cell
+           keeps the resting colour while the rest of the row changes.
+           The inset shadow on the left edge is the cue that content
+           continues underneath rather than ending there. #}
+        .datagrid td.actions, .datagrid th.actions { text-align: right; white-space: nowrap;
+            position: sticky; right: 0; z-index: 5; background: var(--admin-surface);
+            box-shadow: -8px 0 8px -8px rgba(0,0,0,.25); }
+        .datagrid th.actions { background: var(--admin-bg); z-index: 6; }
+        .datagrid tr:hover td.actions { background: var(--admin-bg); }
         .datagrid .actions a, .datagrid .actions button { margin-left: .35rem; }
         .paginator { display: flex; align-items: center; gap: .75rem; padding: .75rem .9rem; color: var(--admin-muted); font-size: .9rem; }
         .paginator .pages { margin-left: auto; display: flex; gap: .25rem; }
@@ -473,10 +788,29 @@
            content doesn't sit flush against the card's border. #}
         form.admin-form .system-form-body { padding: 1.25rem; }
         form.admin-form .system-form-body .form-translatable + .form-translatable { margin-top: 1.5rem; }
+        {# Section headers (settings page's own intl/unv split - see
+           SystemController::renderSystemPage()) - a plain heading, not a
+           bordered/backgrounded box: this is a divider between two parts
+           of ONE form, not a separate card-within-a-card (see
+           .form-password's own comment below for why boxes-within-boxes
+           were removed from this same page). #}
+        form.admin-form .system-form-group-title { font-size: 1rem; font-weight: 700; margin: 0 0 1rem; padding-bottom: .5rem; border-bottom: 1px solid var(--admin-border); }
+        form.admin-form .system-form-group-title:not(:first-child) { margin-top: 2rem; }
         form.admin-form label { display: block; font-weight: 600; margin-bottom: .3rem; }
+        {# `color: inherit` next to `font: inherit`, and it is not decoration:
+           form controls are the one place `color` does NOT inherit. The UA
+           gives input/select/textarea `color: fieldtext` (and buttons
+           `buttontext`), which resolves against the page's color-scheme -
+           so with only `font: inherit` here, every field's TEXT stayed the
+           light-mode system black while its background followed
+           --admin-bg into the dark theme: black on #16181d, effectively
+           unreadable (reported live). Bootstrap's reboot ships exactly
+           this line; the admin loads no Bootstrap, so it has to. The
+           `color-scheme` declaration up in :root fixes the same root cause
+           for the native chrome CSS can't reach - keep both. #}
         form.admin-form input[type=text], form.admin-form input[type=email], form.admin-form input[type=number],
         form.admin-form input[type=password], form.admin-form select, form.admin-form textarea {
-            width: 100%; padding: .5rem .65rem; border: 1px solid var(--admin-border); border-radius: 6px; font: inherit; background: var(--admin-bg);
+            width: 100%; padding: .5rem .65rem; border: 1px solid var(--admin-border); border-radius: 6px; font: inherit; color: inherit; background: var(--admin-bg);
         }
         form.admin-form .form-errors { color: var(--admin-danger); font-size: .85rem; margin-top: .25rem; }
         @media (max-width: 720px) { form.admin-form .form-row { grid-column: span 12 !important; } }
@@ -556,29 +890,267 @@
            unstyled the icon addon and input stack vertically instead of
            sitting side by side, and every field looks structurally broken
            rather than just plain. #}
-        form.admin-form .form-group { margin-bottom: 1.1rem; }
-        form.admin-form .form-group .form-group { margin-bottom: .6rem; }
+        {# The settings/API-key pages (LayoutSettingListType) nest a real
+           field up to 4 .form-group levels deep (AssociationType wrapping
+           TranslationType wrapping a per-locale collection wrapping the
+           actual label+input) - found live via raw HTML inspection, not
+           visible from the rendered page alone. The old rule below applied
+           margin-bottom to EVERY level via a plain descendant selector, so
+           the same field's spacing got counted 3-4 times over, stacking
+           into ~120px between two single-line fields that should read as
+           adjacent rows. Only the INNERMOST .form-group - the one that
+           actually contains a .label-wrapper - is a real visual "row";
+           every other .form-group in the chain is pure structural
+           wrapping and should contribute nothing. #}
+        form.admin-form .form-group { margin-bottom: 0; }
+        form.admin-form .form-group:has(> .label-wrapper),
+        form.admin-form .form-group:has(> span > .label-wrapper) { margin-bottom: 1rem; }
+        {# Same nesting chain also lands a bare structural <div> with class
+           "form-control" (a wrapper the underlying vendor form template
+           reuses for the value slot, unrelated to this admin's own CSS -
+           grep confirms this admin stylesheet never styles .form-control
+           itself; real text inputs get their padding from the shared
+           easyadmin/stylesheet.css .form-control rule instead). That rule
+           doesn't distinguish "a real input" from "a plain layout div" -
+           found live adding an extra 12px top+bottom on every single
+           field via a div that renders no visible content of its own.
+           Scoped to the tag, not the class, so real
+           input/textarea/select.form-control elsewhere are untouched. #}
+        form.admin-form div.form-control { padding: 0; border: 0; background: transparent; }
+        {# .form-entity/.form-collection-items/.form-association normally
+           carry their own padding+border (see the shared easyadmin
+           stylesheet's `.form-entity > .form-group { padding: 1em 0; }`
+           and this file's own `.form-collection-items` rule below) - real,
+           deliberate chrome for an actual repeatable collection UI
+           elsewhere in the admin. On these system pages specifically
+           (LayoutSettingListType) every field gets wrapped in this SAME
+           collection machinery even though there's only ever exactly one
+           "item" per field - no add/remove UI, nothing to visually group -
+           so it was purely adding compounding padding on top of the
+           .form-group margin already covering per-field spacing above.
+           Scoped to .system-form-body so genuine collection fields
+           elsewhere (a real repeatable list) keep their bordered box. #}
+        form.admin-form .system-form-body .form-entity,
+        form.admin-form .system-form-body .form-collection-items,
+        form.admin-form .system-form-body .form-association { padding: 0; margin: 0; border: 0; }
+        {# `.form-translatable .tab-pane > div:first-child { padding: 0.5em
+           0 0 0; }` (shared easyadmin stylesheet) means "first field in
+           this locale tab" on an ordinary translatable entity form - here
+           each field gets its OWN private single-item collection wrapper,
+           so that wrapper is ALWAYS its collection's only/first child
+           regardless of the field's position on the page, recurring on
+           every single field instead of just the page's actual first
+           one. #}
+        form.admin-form .system-form-body .form-translatable .tab-pane > div:first-child { padding-top: 0; }
+        {# `.form-password > .form-group { padding: 1em 0.5em 1em 0; }`
+           (base-async.css, the old EasyAdmin dashboard bundle's
+           stylesheet - still loaded sitewide, see this file's own earlier
+           comment on why: unstyled input-group/form-check otherwise) -
+           the API-key page's password fields sit directly inside
+           .form-password, so every one of them picked up an extra 30px
+           (1em top + 1em bottom) on top of the .form-group margin already
+           covering row spacing above. Found live via matched-CSS-rule
+           inspection, not visible from grep alone (selector never
+           mentions anything specific to this page). #}
+        form.admin-form .system-form-body .form-password > .form-group { padding: 0; }
         form.admin-form .label-wrapper { display: flex; align-items: center; gap: .4rem; margin-bottom: .3rem; }
         form.admin-form .label-wrapper label { margin-bottom: 0; }
-        form.admin-form .badge.label { display: inline-flex; align-items: center; padding: .1rem .35rem; border-radius: 5px;
-                                       background: var(--admin-bg); color: var(--admin-muted); font-size: .75rem; }
+        form.admin-form .badge.label { display: inline-flex; align-items: center; gap: .25rem; padding: .15rem .35rem; border-radius: 5px;
+                                       background: var(--admin-bg); color: var(--admin-muted); font-size: .72rem; line-height: 1; }
+        {# fa-fw forces 1.25em fixed width per icon - inside this small
+           chip that reads as lopsided horizontal padding around the
+           glyph; natural width + the flex gap above spaces multi-icon
+           chips (e.g. Mots-clés' database+clipboard pair) evenly. #}
+        form.admin-form .badge.label .fa-fw { width: auto; }
+        {# form_div_layout renders the badge span UNCONDITIONALLY and a
+           string-replace fills it (see password2_row's own comment) - a
+           field with no badges keeps the empty span, which painted as a
+           bare gray padded blob next to its label. #}
+        form.admin-form .badge.label:empty { display: none; }
         form.admin-form .input-group { display: flex; align-items: stretch; position: relative; }
         form.admin-form .input-group-text { display: flex; align-items: center; padding: 0 .65rem; border: 1px solid var(--admin-border);
                                             border-right: 0; border-radius: 6px 0 0 6px; background: var(--admin-bg); color: var(--admin-muted); flex: 0 0 auto; }
         form.admin-form .input-group input, form.admin-form .input-group select { border-radius: 0 6px 6px 0; }
         form.admin-form .input-group .form-password-revealer { color: var(--admin-muted); }
         form.admin-form .input-group .form-password-revealer:hover { color: var(--admin-accent); }
+        {# Safari renders its own password-AutoFill key button (a gray
+           rounded chip) pinned at the right edge of every password input -
+           the exact spot the revealer eye above absolutely positions
+           itself into (base-async.css: right:.5em), so on the API-keys
+           page the two icons stack on top of each other (reported live
+           via screenshot). These admin fields are API keys/settings, not
+           login credentials - Safari's saved-password UI is meaningless
+           noise here, so suppress it rather than play placement chicken
+           with it. Scoped to admin-form only: the login page is a real
+           credential form where native AutoFill must keep working. #}
+        form.admin-form input[type=password]::-webkit-credentials-auto-fill-button,
+        form.admin-form input[type=password]::-webkit-strong-password-auto-fill-button {
+            visibility: hidden; pointer-events: none; position: absolute; right: 0;
+        }
+        {# base-async.css's `.required:after` places the red dot with
+           relative-offset nudges (right:5px; bottom:4px) tuned for the OLD
+           EasyAdmin label metrics - under this layout's own label styles
+           those offsets drag the dot back INTO the label's last letter
+           (reported live via prod-vs-beta screenshots). rem-FIXED size,
+           not em - the dot renders in very different font contexts (field
+           labels, locale-tab flags) and an em-relative size made them
+           visibly mismatched. Raised via position:relative/top, NOT
+           vertical-align:super: super raises the dot IN LAYOUT, growing
+           the line box - which pushed the flag image down on exactly the
+           locale tabs that carry a required dot, visibly misaligning them
+           against their dot-less siblings (reported live). A relative
+           offset is purely visual and leaves every line box identical,
+           dot or no dot. right/bottom explicitly neutralized or the base
+           rule's own nudges come back with position:relative. #}
+        form.admin-form .required::after { position: relative; top: -.4em; right: auto; bottom: auto;
+                                           margin-left: .12rem; font-size: .85rem; line-height: 1; vertical-align: baseline; }
+        {# Right-side addon (e.g. fileupload's ✕ deleteBtn): the base
+           .input-group-text rule above assumes a LEFT prefix (border-right
+           dropped, left corners rounded) - mirror it when the addon is the
+           group's last child instead. #}
+        form.admin-form .input-group > .input-group-text:last-child {
+            border: 1px solid var(--admin-border); border-left: 0; border-radius: 0 6px 6px 0;
+        }
+        {# The datetime picker wraps its calendar icon in a .btn INSIDE the
+           .input-group-text - .btn's own padding (.45rem .9rem) + border
+           stacked on the addon's padding produced a bloated gray box with
+           a tiny icon lost in it (reported live: "prefixed icons have
+           padding issues"). Inside an addon the button is just an icon
+           surface - flatten it. base-async's `.form-stock .input-group-text
+           { padding-top:5px }` nudge is part of the same old-metrics tuning,
+           zero it too. #}
+        form.admin-form .input-group .input-group-text .btn {
+            padding: 0; border: 0; background: none; color: inherit; font: inherit; box-shadow: none;
+        }
+        form.admin-form .input-group.form-stock .input-group-text { padding-top: 0; }
+        form.admin-form .input-group .input-group-text { height: auto; min-height: 0; }
+        {# Image upload: base-async's .imageupload IS already a flex row
+           (figure left, field column right) - what it does NOT control is
+           the field column's own internals, which the old EasyAdmin
+           stylesheet used to lay out. base-async's `.fileupload .field
+           { align-items:center; justify-content:center }` centers the
+           file-input row as a shrink-to-fit box floating in the middle of
+           the remaining width (reported live twice: "Choose File" box
+           adrift top-right, ✕ half-detached above it). Stretch the column
+           and pin the row to one full-width nowrap line instead. #}
+        {# TOP-aligned like production (base-async's own align-items:start
+           carries through untouched) - a centering experiment here was
+           explicitly rejected against the prod reference. Only the gap is
+           ours. #}
+        form.admin-form .imageupload { gap: 1.25rem; }
+        {# margin:0, not just margin-right:0 - `figure` is one of the few
+           elements with a NON-zero UA default margin (`1em 40px`), and this
+           admin deliberately doesn't load Bootstrap, whose reboot
+           (`figure{margin:0 0 1rem}`) is what neutralizes it in production.
+           base-async only ever zeroes margin-bottom and sets margin-right,
+           so the UA's margin-top:1em + margin-left:40px survived: the
+           thumbnail sat 15px BELOW the top of the input row it should be
+           flush with, and 40px in from the field's left edge (reported
+           live against the prod reference - "image alignment"). Verified
+           by matched-CSS-rule inspection: no project rule sets either. #}
+        form.admin-form .imageupload figure { flex: 0 0 auto; margin: 0; border: 1px solid var(--admin-border); background: var(--admin-surface); }
+        form.admin-form .imageupload .imageupload-field { flex: 1 1 0; min-width: 0; }
+        form.admin-form .fileupload .field { align-items: stretch; justify-content: flex-start; }
+        form.admin-form .fileupload .input-group.field-raw { display: flex; flex-flow: row nowrap; align-items: stretch; width: 100%; }
+        {# height 38px !important = production's exact row height, measured
+           live. This was `height:auto` for a while because the Choose-File
+           button, then styled as a padded pill by the generic rules above,
+           rendered TALLER than 38px and poked out of the strip - but auto
+           only hid that symptom by letting the row grow to fit (it settled
+           at 40px even after the button was fixed, since the button's
+           border-box still overflows the 24px content box by design). The
+           button is now sized to the row rather than the row to the
+           button, so pinning is safe and exact; if you ever change the
+           button's padding or font-size, re-measure both together. Inside
+           a fileupload row the button also drops the floating-pill look:
+           no own border/radius, just a right divider, so it reads as the
+           row's left cell like production. #}
+        {# padding-right with !important: the absolutely-positioned ✕ (see
+           .deleteBtn below) overlays the input's right end, and base-async's
+           `.imageupload input { padding-right: 0 !important }` would let
+           the filename slide underneath it. Right-side radius too - the ✕
+           only covers the corner while a file is set; when it's hidden the
+           input IS the row's right edge. #}
+        form.admin-form .fileupload .input-group input[type=file] {
+            flex: 1 1 auto; min-width: 0; width: auto; height: 38px !important;
+            padding: 6px 44px 6px 12px !important; border: 1px solid var(--admin-border); border-radius: 6px; background: var(--admin-surface);
+            font-size: .95rem;
+        }
+        {# The button's NEGATIVE margins are the whole trick, and they are
+           production's own (measured live: `-6px 12px -6px -12px` against
+           an input padded `6px 0 6px 12px`). -12px left cancels the input's
+           left padding so the button starts flush at the border; -6px top
+           and bottom cancel the vertical padding so it fills the row edge
+           to edge AND, crucially, contributes 12px LESS than its own height
+           to layout - which is what keeps the row at production's 38px.
+           A previous pass instead grew the padding to .75rem 1.25rem with
+           zero margins, reasoning that prod's row "is visibly taller"; that
+           was backwards - it pushed the row to 49px, ~30% TALLER than the
+           38px prod reference, which is the bloated Choose-File box
+           reported live here. Padding must stay 6px 12px: it is load-
+           bearing for the height, not cosmetic. #}
+        form.admin-form .fileupload .input-group input[type=file]::file-selector-button {
+            margin: -6px .75rem -6px -12px; padding: 6px 12px; border: 0; border-right: 1px solid var(--admin-border);
+            border-radius: 5px 0 0 5px; background: var(--admin-bg); font-size: .95rem;
+        }
+        form.admin-form .fileupload .input-group input[type=file]::-webkit-file-upload-button {
+            margin: -6px .75rem -6px -12px; padding: 6px 12px; border: 0; border-right: 1px solid var(--admin-border);
+            border-radius: 5px 0 0 5px; background: var(--admin-bg); font-size: .95rem;
+        }
+        {# The ✕ is NOT a flex sibling of the input: base-async's bare
+           `.deleteBtn { position:absolute; right:0 }` takes it out of
+           flow, anchored to the .input-group (position:relative above).
+           That's also exactly how PRODUCTION renders it - there,
+           `.input-group-text { height:100% }` resolves against the
+           positioned group and the ✕ becomes a flush full-height right
+           segment. Two earlier attempts here treated it as a flex child
+           (stretch/height:auto), which silently BROKE the 100% and shrank
+           it to a floating 38px box - complete the absolute model
+           instead of fighting it. Selector deliberately over-specific:
+           it must outrank the generic `....input-group-text:last-child`
+           rule above (whose border-left:0 would eat prod's divider line)
+           AND base-async's `.imageupload .deleteBtn{height:38px
+           !important}`. #}
+        form.admin-form .fileupload .input-group > .input-group-text.deleteBtn {
+            top: 0; right: 0; height: 100% !important; min-height: 0;
+            align-items: center; justify-content: center;
+            border: 1px solid var(--admin-border); border-radius: 0 6px 6px 0;
+            background: var(--admin-surface); cursor: pointer;
+        }
+        {# The hint under the row ("La taille de fichier maximale...") - a
+           child of .fileupload, full width under the input row, never
+           beside the figure. #}
+        {# The color here is belt-and-braces, not the actual fix: this hint
+           reads gray because of the --text-muted alias up in :root (see
+           the note there), which is what repairs `.text-muted` for the
+           whole admin. Keeping an explicit color anyway means a hint that
+           is only `.form-filesize`, with no `.text-muted` on it, still
+           lands muted rather than at full body-text strength. #}
+        form.admin-form .fileupload .form-filesize { width: 100%; margin: .4rem 0 0; color: var(--admin-muted); }
+        {# select2 renders with its bootstrap4 theme (SelectType default),
+           whose chip rule overrides select2's own default gray chip with
+           "inherit Bootstrap's badge look" - Bootstrap isn't loaded here
+           by design, so keyword/tag chips rendered as bare text (reported
+           live). Full theme-selector specificity needed to outrank it. #}
+        form.admin-form .select2-container--bootstrap4 .select2-selection--multiple .select2-selection__choice {
+            background: var(--admin-bg); border: 1px solid var(--admin-border); border-radius: 5px;
+            padding: .05rem .45rem; margin-right: .3rem; color: inherit;
+        }
+        form.admin-form .select2-container--bootstrap4 .select2-selection--multiple .select2-selection__choice__remove { color: var(--admin-muted); }
+        form.admin-form .select2-container--bootstrap4 .select2-selection--multiple .select2-selection__choice__remove:hover { color: var(--admin-danger); }
         form.admin-form .form-password-strength { display: flex; gap: .2rem; margin-top: .4rem; }
         form.admin-form .form-password-strength .strength { flex: 1; height: 3px; border-radius: 2px; background: var(--admin-border); }
-        {# Same "raw Bootstrap-shaped markup, no Bootstrap CSS" issue as the
-           comment above, ported from how EasyAdmin's own stylesheet (still
-           live in production, see vendor/glitchr/base-bundle/assets/styles/
-           css/easyadmin/stylesheet.css there) boxed these two: a password
-           field on its own reads as just a bare input stack without one,
-           and a flat list of unrelated named settings (the API keys page's
-           5 fields, all siblings inside one "collection") reads as an
-           undifferentiated wall of fields without a panel to group them. #}
-        form.admin-form .form-password { border: 1px solid var(--admin-border); border-radius: var(--admin-radius); padding: 1rem; }
+        {# .form-password used to get its own bordered/padded box here too
+           (same reasoning as .form-collection-items below, ported from how
+           EasyAdmin's own stylesheet boxed both) - removed: a whole page
+           of nothing but password fields (the API keys page) stacked five
+           of these boxes-within-a-box, reported live as looking cluttered
+           next to production's own flat "label + input" rows sharing one
+           outer card. A single password field still reads fine as a plain
+           row, same as every other field type - it never needed its own
+           box to not look bare, only the collection case right below
+           actually does (multiple distinct sub-items with no other visual
+           grouping at all). #}
         form.admin-form .form-collection-items { border: 1px solid var(--admin-border); border-radius: var(--admin-radius); padding: 1rem; }
         form.admin-form .form-collection-items > .form-association:last-child,
         form.admin-form .form-collection-items > .form-group:last-child { margin-bottom: 0; }
@@ -594,19 +1166,81 @@
            handler right below is this admin's from-scratch equivalent (see
            that stylesheet's own .form-translatable rules for the padding
            EasyAdmin gave the active pane, mirrored in tab-pane.active below). #}
-        form.admin-form .nav-tabs { display: flex; gap: .25rem; list-style: none; margin: 0 0 1rem; padding: 0; border-bottom: 1px solid var(--admin-border); }
-        form.admin-form .nav-tabs .nav-link { display: flex; align-items: center; margin-bottom: -1px; padding: .4rem .7rem;
-                                               border: 1px solid transparent; border-bottom: none; border-radius: 6px 6px 0 0;
-                                               background: none; cursor: pointer; opacity: .55; }
-        form.admin-form .nav-tabs .nav-link.active { opacity: 1; border-color: var(--admin-border); background: var(--admin-surface); }
-        form.admin-form .nav-tabs .nav-link.muted:not(.active) { opacity: .3; }
-        form.admin-form .nav-tabs .country-flag { width: 20px; height: 14px; object-fit: cover; border-radius: 2px; }
+        {# The 15px left padding is load-bearing, not cosmetic breathing
+           room: it insets the first tab so a run of the container hairline
+           is visible to its left, which is what makes the row read as tabs
+           sitting ON a line rather than one box wedged into the corner.
+           Production gets the same 15px from a margin-left on the first
+           nav-item; padding on the flex container is equivalent here and
+           leaves the border-bottom spanning the full width. gap is 0 for
+           the same reason - prod's tabs butt directly against each other,
+           and a gap breaks the continuous run of hairline between them. #}
+        form.admin-form .nav-tabs { display: flex; gap: 0; list-style: none; margin: 0 0 1rem; padding: .9rem 0 0 15px; border-bottom: 1px solid var(--admin-border); }
+        {# border-bottom is a transparent 1px, NOT `none` - and the active
+           tab then paints that same edge in its own fill colour rather
+           than leaving it off. Both halves are production's structure,
+           measured live. `none` collapsed the edge entirely, so the active
+           tab kept the container's hairline running along its bottom and
+           read as a closed box instead of one that opens into the pane
+           below; combined with margin-bottom:-1px, a fill-coloured bottom
+           border overlaps that hairline and erases it for exactly the
+           width of the tab. Keeping the transparent edge on inactive tabs
+           (rather than dropping it) is what keeps every tab the same
+           height, so the row doesn't shift by a pixel as you switch
+           locales. #}
+        form.admin-form .nav-tabs .nav-link { display: flex; align-items: center; margin-bottom: -1px; padding: .5rem 1rem;
+                                               border: 1px solid transparent; border-radius: 4px 4px 0 0;
+                                               background: none; cursor: pointer; color: inherit; }
+        form.admin-form .nav-tabs .nav-link.active { border-color: var(--admin-border); border-bottom-color: var(--admin-surface);
+                                                     background: var(--admin-surface); }
+        {# NO opacity on .nav-link, and that is the fix, not an omission.
+           base-async already dims the FLAG of an untranslated locale
+           (`.form-translatable .nav-link.muted:not(.active) .country-flag
+           { opacity: .5 }`) - that is the "nothing written in this
+           language yet" signal, and production shows exactly that and
+           nothing more. Two link-level rules here used to stack on top of
+           it and multiply: `.nav-link{opacity:.55}` took every inactive
+           flag to .55 where prod shows 1, and `.muted:not(.active)
+           {opacity:.3}` compounded to .3 x .5 = .15 - the German flag was
+           rendering at under a third of prod's .5 and read as a blank
+           smudge (measured live on both). Active/inactive is already
+           conveyed by the border + surface background on .active above,
+           the same way production does it, so the dimming was never
+           load-bearing. Don't reintroduce an opacity here: anything set
+           on the link silently multiplies with the flag rule. #}
+        {# 5px, deliberately rounder than production's 3.75px - asked for
+           directly ("make the flag more round"), so don't "correct" this
+           back to the prod value on a later matching pass. height:auto
+           keeps each flag's own aspect ratio; an earlier fixed 20x14 with
+           object-fit:cover was cropping them. #}
+        form.admin-form .nav-tabs .country-flag { width: 30px; height: auto; border-radius: 5px; }
+        {# The flag sits inside a <label> in each tab, and the generic
+           `form.admin-form label { display:block; margin-bottom:.3rem }`
+           rule above was riding every tab's flag ~5px high of the tab's
+           own vertical center (reported live: "offset language icons in
+           the form"). Flex here also turns the required-dot ::after into
+           a centered flex item, so its own raise stays purely visual. #}
+        form.admin-form .nav-tabs .nav-link label { display: flex; align-items: center; gap: .1rem; margin-bottom: 0; cursor: pointer; }
         form.admin-form .tab-content .tab-pane { display: none; }
         form.admin-form .tab-content .tab-pane.active { display: block; padding-top: .5rem; }
         form.admin-form .form-text { font-size: .82rem; color: var(--admin-muted); margin-top: .35rem; }
         form.admin-form .form-text.text-danger { color: var(--admin-danger); display: flex; align-items: center; gap: .35rem; }
         form.admin-form .form-text.text-danger::before { content: "\f071"; font-family: "Font Awesome 6 Free"; font-weight: 900; }
-        form.admin-form .form-check { display: flex; align-items: center; gap: .5rem; }
+        {# flex-direction explicit, not left to default: the PUBLIC site's
+           own .form-check rule (base-async.css, loaded here too via the
+           shared 'base' Encore entry - see encore_entry_link_tags('base')
+           below) sets flex-direction:column for ITS OWN forms. This rule
+           already wins on display/align-items (higher specificity, form.
+           admin-form .form-check vs a bare .form-check), but never
+           declared flex-direction at all - CSS cascades per-property, so
+           that one value fell through uncontested from the public rule,
+           silently stacking every boolean/switch field's label above its
+           toggle and centering both (align-items:center, cross-axis of a
+           COLUMN flex is horizontal) instead of the intended label-beside-
+           toggle row. Reported live: every toggle field on the settings
+           page rendered centered while every other field type stayed
+           left-aligned. #}
+        form.admin-form .form-check { display: flex; flex-direction: row; align-items: center; gap: .5rem; }
         {# File inputs (avatar/image/document upload fields) were entirely
            unstyled - the native browser "Choose File" button/label don't
            pick up any of the admin's theme (light OR dark: the label text
@@ -683,8 +1317,28 @@
            .dashboard-welcome's own margin above was tuned to sit right
            under the header's h1/slogan stack, wrong once it's the ONLY
            thing in its own standalone card. #}
-        .widget-welcome { padding: 1.5rem; display: flex; align-items: center; }
+        {# 1rem, not every other card's own 1.5rem (analytics-card/
+           composite-card/...) - reported live as excess empty space
+           around one short line of text at 1.5rem. Stays a single fixed
+           value rather than something that shrinks further once the
+           background toggle strips the .card look: that toggle is a pure
+           client-side class flip with no matching server round-trip (see
+           welcome.html.twig's own comment), so a padding rule gated on
+           .no-card-bg would only ever apply AFTER a reload, never live in
+           the preview - same trap the .card class itself was in before
+           this fix. #}
+        .widget-welcome { padding: 1rem; display: flex; align-items: center; }
         .widget-welcome .dashboard-welcome { margin: 0; font-size: 1rem; }
+        {# Same reasoning/same value as .analytics-card-header's own
+           padding-right below: handle+toggle-hidden+toggle-background+
+           remove is the same 4-icon max case (4 * 1.5rem + 3 * .3rem gap +
+           .6rem right offset = 7.5rem) - without this, a long single line
+           of welcome text runs right up under .widget-controls' icons
+           (position:absolute, unaware of text flow) instead of wrapping
+           or stopping short of them, reported live as the text visibly
+           overlapping the icon row. Resize floats separately at the
+           bottom-right corner, so no extra room needed for that. #}
+        body.is-customizing .widget-welcome { padding-right: 7.5rem; }
         {# Dashboard-only, rendered into layout.html.twig's own
            topbar_dashboard_extra block (see there) rather than scrolling
            away with the page content - only ever visible while
@@ -779,6 +1433,23 @@
             flex-basis: calc(var(--widget-col-width) * var(--widget-span, 1) + (var(--widget-span, 1) - 1) * 1.5rem);
             min-width: min(var(--widget-col-width), 100%);
         }
+        {# While customizing, .item-resize-handle (bottom:.6rem, 1.8rem
+           tall - see its own rule below) and .widget-controls (top:.6rem,
+           its icons ~1.5rem tall) are BOTH absolutely positioned corner
+           overlays, independent of each other and of the card's own
+           content height. A short enough card (a single line of text -
+           the Bienvenue/"Generic" widget's own reduced padding, see that
+           widget's own comment, made this the first one short enough to
+           actually hit it) leaves too little vertical room between "near
+           the top" and "near the bottom" for the two to avoid overlapping
+           - reported live as the resize handle sitting visually on top of
+           the remove icon. This is a customize-mode-only floor (matches
+           the two overlays it exists to keep apart, neither of which
+           renders outside customize mode either), not a general min-
+           height for every view - a short widget still renders as short
+           normally, only gains a bit of headroom while its own edit
+           controls are on screen. #}
+        body.is-customizing .widget-block, body.is-customizing .widget-group { min-height: 4.75rem; }
         {# Widgets span 1-N tracks (N = --widget-columns, superadmin-
            adjustable via both the resize control AND the columns select
            above, persisted like everything else in LayoutConfig). Each
@@ -871,18 +1542,24 @@
         .analytics-card { padding: 1.5rem; }
         .analytics-card-header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 1.5rem; margin-bottom: 1.25rem; }
         {# .widget-controls floats absolutely over the card's top-right
-           corner - without this, a wide stat row's own right-aligned
-           content (e.g. the last stat's change badge) runs right up
-           against the handle/toggle/settings/remove icons. Resize floats
-           separately at the bottom-right corner (see .item-resize-handle),
-           so this only needs room for the MAX top-row case: an ad-hoc
-           analytics_card instance gets all 4 (handle+toggle+settings+
-           remove) - 4 * 1.5rem + 3 * .3rem gap + the .6rem right offset =
-           7.5rem, rounded up. The built-in, code-defined instance only
-           ever shows 3 (no remove button), so this is a little generous
-           there, which is harmless. Only needed while the controls are
-           actually visible. #}
-        body.is-customizing .analytics-card-header { padding-right: 7.5rem; }
+           corner (handle+toggle-visibility+toggle-background+remove, see
+           _block.html.twig - 4 icons, no "settings" among them; series
+           visibility is legend-click only now, see analytics_card.html.
+           twig's own comment) - without this, a wide stat row's own
+           right-aligned content (e.g. the last stat's change badge) runs
+           right up against those icons. Resize floats separately at the
+           bottom-right corner (see .item-resize-handle), so this only
+           needs room for that one row: 4 * 1.5rem + 3 * .3rem gap + .6rem
+           right offset = 6.9rem from .widget-block's own edge - but this
+           padding-right lives INSIDE .analytics-card's own content box,
+           which already sits 1.5rem in from that same edge (.analytics-
+           card's own padding, right above) - so only 6.9 - 1.5 ≈ 6rem is
+           actually needed here, not the full amount. Confirmed via live
+           pixel measurement: without subtracting that 1.5rem, this
+           right-aligned content lands a real, visible gap short of
+           actually touching the control icons. Only needed while the
+           controls are actually visible. #}
+        body.is-customizing .analytics-card-header { padding-right: 6rem; }
         .analytics-card-header h2 { margin: 0; font-size: 1.1rem; }
         .analytics-stat-row { display: flex; gap: 1.75rem; flex-wrap: wrap; }
         .analytics-stat { min-width: 6rem; }
@@ -891,6 +1568,11 @@
         .analytics-stat-change { font-size: .8rem; font-weight: 600; margin-left: .4rem; }
         .analytics-stat-change.is-up { color: var(--admin-success); }
         .analytics-stat-change.is-down { color: var(--admin-danger); }
+        {# "Counter" widget's own big number - deliberately much larger
+           than .analytics-stat-value (1.4rem): the whole card IS this one
+           figure, not one of several stats sharing a row with it. #}
+        .counter-value-row { display: flex; align-items: baseline; gap: .5rem; }
+        .counter-value { font-size: 2.75rem; font-weight: 700; line-height: 1.1; }
         .analytics-range-picker { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: 1rem; transition: opacity .15s ease; }
         .analytics-range-picker.is-loading { opacity: .5; }
         .analytics-range-btn { border: 1px solid var(--admin-border); background: transparent; color: var(--admin-muted); font-size: .78rem; font-weight: 600; padding: .3rem .75rem; border-radius: 999px; cursor: pointer; transition: background .15s ease, color .15s ease, border-color .15s ease; }
@@ -903,15 +1585,6 @@
            specific, lives here alongside the other shared card primitives
            for the same reason .widget-settings-panel does. #}
         .analytics-empty-state { color: var(--admin-muted); font-size: .85rem; text-align: center; padding: 2rem 1rem; margin: 0; }
-        {# Reused by the series-toggle checkboxes in the widget's settings
-           panel below as a color swatch next to each series' label - kept
-           dark-mode aware since it's driven by the same
-           AnalyticsSeriesPalette colors as the chart itself. #}
-        .analytics-source-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--chip-color); display: inline-block; flex-shrink: 0; }
-        :root[data-theme="dark"] .analytics-source-dot { background: var(--chip-color-dark, var(--chip-color)); }
-        @media (prefers-color-scheme: dark) {
-            :root:not([data-theme]) .analytics-source-dot { background: var(--chip-color-dark, var(--chip-color)); }
-        }
         {# Belt-and-suspenders with the JS reset in the "Terminé" handler
            below: this panel's own visibility is otherwise driven purely by
            its `hidden` attribute, with nothing tying it to customize mode
@@ -923,11 +1596,10 @@
            render outside body.is-customizing. #}
         {# Generic per-instance settings panel shell - shared by any widget
            type that offers one (composite's pane-ratio selector below,
-           article_views' article picker) - analytics_card no longer uses
-           this at all (title edits in place, series toggle is the chart's
-           own legend - see that template's own comment), but the shell
-           stays generic rather than reverting to an analytics-specific
-           name now that two OTHER consumers exist. #}
+           entity_views'/counter's own class+instance picker). analytics_card
+           used to have one too (a series-visibility checklist duplicating
+           the chart's own legend) - removed, see that template's own
+           comment. #}
         .widget-settings-panel { display: none; }
         body.is-customizing .widget-settings-panel:not([hidden]) { border: 1px solid var(--admin-border); border-radius: var(--admin-radius); padding: 1rem; margin-bottom: 1rem; display: flex; flex-direction: column; gap: .9rem; background: var(--admin-surface); }
         .widget-settings-field { display: flex; flex-direction: column; gap: .4rem; font-size: .78rem; color: var(--admin-muted); text-transform: uppercase; letter-spacing: .03em; }
@@ -937,7 +1609,7 @@
            by JS (see refreshTitleEditability()), not rendered conditionally
            server-side - a plain focus ring is enough affordance, no other
            chrome change needed to signal "editable" here. #}
-        [data-analytics-title][contenteditable="true"]:focus { outline: 2px solid var(--admin-accent); outline-offset: 2px; border-radius: 4px; }
+        [data-analytics-title][contenteditable="true"]:focus, [data-widget-text][contenteditable="true"]:focus { outline: 2px solid var(--admin-accent); outline-offset: 2px; border-radius: 4px; }
         {# Elementary info only (just the 3 numbers) once the widget is
            shrunk down to a single grid track - the chart needs real width
            to be legible and just clips awkwardly otherwise. Queries the
@@ -984,7 +1656,16 @@
            the gutter beside it. Only composite-card needs this: a plain
            .widget-group/.analytics-card has no nested bordered pane for
            the handle to collide with in the first place. #}
-        .composite-card { padding: 1.5rem 2.75rem 2.75rem 1.5rem; display: flex; flex-direction: column; }
+        {# Top/left are ZERO on purpose: .composite-pane already carries the
+           same 1.25rem/1.5rem padding a plain .widget-group does, so any
+           top/left padding here is applied a SECOND time and pushes the
+           pane's heading in past every sibling card's. Measured live: a
+           merged card's icon sat at (49,45) from the card edge where every
+           standalone card's sits at (25,21) - reported as merged-card icons
+           looking misplaced and offset. Panes have no border or background
+           of their own, so this padding was buying nothing visually.
+           Bottom/right keep the wide gutter for the reason below. #}
+        .composite-card { padding: 0 2.75rem 2.75rem 0; display: flex; flex-direction: column; }
         {# 2 columns, not a single flex row - up to MAX_COMPOSITE_PANES (4)
            panes can land here now (merge onto an existing composite grows
            its own panes), wrapping naturally into a 2x2 arrangement for
@@ -1013,12 +1694,81 @@
            mechanism at all - see layout.html.twig's own
            [data-composite-pane-divider] handler), invisible in
            customize mode off since dragging only ever works there. #}
-        .composite-pane-divider { width: 10px; border-radius: 999px; background: var(--admin-border); cursor: col-resize; touch-action: none; transition: background .15s ease; }
+        {# 6px, not the original 10px - read as a visually heavy bar next to
+           everything else's thin 1px borders, reported live. Must match
+           composite.html.twig's own inline grid-template-columns track
+           width exactly (same "10px" literal there) or the divider element
+           and the gap the grid actually reserves for it drift apart. #}
+        .composite-pane-divider { width: 6px; border-radius: 999px; background: var(--admin-border); cursor: col-resize; touch-action: none; transition: background .15s ease; }
         body:not(.is-customizing) .composite-pane-divider { cursor: default; pointer-events: none; opacity: .4; }
         .composite-pane-divider:hover, .composite-pane-divider.is-dragging { background: var(--admin-accent); }
         @container (max-width: 480px) {
-            .composite-panes { grid-template-columns: 1fr; }
+            {# !important: exactly-2-pane composites carry an inline
+               grid-template-columns (composite.html.twig, drag-to-resize
+               ratio) which otherwise always wins over ANY stylesheet rule
+               regardless of specificity or @container/@media context -
+               without it this breakpoint was a dead rule, matched
+               correctly (confirmed live: .widget-block's own
+               container-type:inline-size ancestor really does report
+               ~326px on a phone) but never actually applied, so Photos/
+               Blog-style merged widgets stayed forced side by side down
+               to a two-word-wide column each, truncating every label. #}
+            .composite-panes { grid-template-columns: 1fr !important; }
+            {# The drag divider has no meaning once panes are stacked
+               instead of side-by-side (nothing left to drag horizontally)
+               and, unlike .composite-panes, was never inline-styled -
+               plain display:none is enough here, no !important needed. #}
+            .composite-pane-divider { display: none; }
         }
+        {# Filter dialog (crud/index.html.twig). Replaces the always-visible
+           .filter-bar below, whose rules are kept only because the bar's
+           inner markup (label / .filter-range / .filter-comparison) is
+           reused verbatim inside the panel body. #}
+        .filter-modal[hidden] { display: none; }
+        .filter-modal { position: fixed; inset: 0; z-index: 100020; display: flex; align-items: flex-start; justify-content: center; padding: 4rem 1rem 1rem; }
+        .filter-modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.35); }
+        .filter-modal-panel { position: relative; width: min(38rem, 100%); max-height: calc(100vh - 6rem); display: flex; flex-direction: column;
+            background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: var(--admin-radius); box-shadow: 0 16px 48px rgba(0,0,0,.25); overflow: hidden; }
+        {# 3 columns with the title centred, so Effacer/Appliquer sit hard
+           against the two edges however wide the title is - the shape
+           production uses. #}
+        .filter-modal-header { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: .5rem;
+            padding: .75rem .9rem; border-bottom: 1px solid var(--admin-border); background: var(--admin-bg); }
+        .filter-modal-header > a { justify-self: start; }
+        .filter-modal-header > button { justify-self: end; }
+        .filter-modal-title { display: inline-flex; align-items: center; gap: .4rem; font-weight: 600; }
+        .filter-modal-body { padding: .9rem; overflow: auto; display: grid; gap: .75rem; }
+        {# One filter per row, label above control, every control the same
+           width - the point of the rebuild. The old bar laid them out
+           inline so a date range, a comparison pair and a plain select all
+           ended up different heights on one wrapped line. #}
+        .filter-modal-body label { display: grid; gap: .25rem; font-size: .82rem; color: var(--admin-muted); }
+        .filter-modal-body label > span { font-weight: 600; color: var(--admin-text); }
+        .filter-modal-body input, .filter-modal-body select {
+            width: 100%; padding: .45rem .55rem; border: 1px solid var(--admin-border); border-radius: 6px;
+            font: inherit; font-size: .9rem; color: inherit; background: var(--admin-bg); }
+        .filter-modal-body .filter-range, .filter-modal-body .filter-comparison { display: flex; gap: .4rem; }
+        {# The operator select must not eat the row: it holds a symbol, the
+           value input holds the actual term. #}
+        .filter-modal-body .filter-comparison select { flex: 0 0 5rem; }
+        .filter-modal-body .filter-comparison input { flex: 1 1 auto; min-width: 0; }
+        .filter-modal-body .filter-range input { flex: 1 1 0; min-width: 0; }
+        {# Reorderable top-right action buttons (customize mode only). The
+           grab cursor and dashed outline are the only affordance - the row
+           is otherwise unchanged, so nothing shifts when customize mode is
+           off. #}
+        body.is-customizing [data-action-row] { user-select: none; -webkit-user-select: none; }
+        body.is-customizing [data-action-row] [data-action-key] { cursor: grab; }
+        body.is-customizing [data-action-row] [data-action-key]:hover { outline: 1px dashed var(--admin-accent); outline-offset: 2px; }
+        body.is-customizing [data-action-row] [data-action-key].is-dragging { opacity: .4; cursor: grabbing; }
+        {# The drop marker: a thin accent bar rendered on whichever button the
+           pointer is currently before/after. Using an outline edge rather
+           than inserting a placeholder node keeps the row's own flex layout
+           from reflowing mid-drag. #}
+        body.is-customizing [data-action-row] [data-action-key].drop-before { box-shadow: -3px 0 0 0 var(--admin-accent); }
+        body.is-customizing [data-action-row] [data-action-key].drop-after { box-shadow: 3px 0 0 0 var(--admin-accent); }
+        .filter-count { display: inline-flex; align-items: center; justify-content: center; min-width: 1.15rem; height: 1.15rem; padding: 0 .3rem;
+            margin-left: .35rem; border-radius: 999px; background: var(--admin-accent); color: #fff; font-size: .7rem; font-weight: 700; }
         .filter-bar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .75rem; padding: .75rem .9rem; margin-bottom: 1rem;
                       background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: var(--admin-radius); }
         .filter-bar label { display: flex; flex-direction: column; gap: .2rem; font-size: .82rem; color: var(--admin-muted); }
@@ -1043,6 +1793,17 @@
         .badge-accent { background: color-mix(in srgb, var(--admin-accent) 12%, transparent); border-color: color-mix(in srgb, var(--admin-accent) 35%, transparent); color: var(--admin-accent); }
         .badge-muted { color: var(--admin-muted); }
         .badge-list { display: flex; flex-wrap: wrap; gap: .3rem; }
+        {# A related entity rendered as a badge (SelectField/AssociationField
+           with entityDisplay and/or crudControllerFqcn set). text-decoration
+           because the linked variant is an <a> and this admin loads no
+           Bootstrap reboot to strip the UA underline. In 'avatar' mode the
+           badge holds only the image, so the pill padding would frame it
+           oddly - drop it and let the circle be the badge. #}
+        .badge-entity { text-decoration: none; }
+        .badge-entity:hover { border-color: var(--admin-accent); }
+        .badge-entity:has(.badge-avatar) { padding: 0; border: 0; background: none; }
+        .badge-avatar { width: 1.6rem; height: 1.6rem; border-radius: 999px; object-fit: cover; display: block;
+            border: 1px solid var(--admin-border); background: var(--admin-bg); }
 
         .field-switch { display: inline-flex; align-items: center; cursor: pointer; }
         .field-switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
@@ -1120,6 +1881,19 @@
            the same way everything else does: AJAX swap of #page, cached
            pages, fade transitions - instead of a hard reload per click. #}
         <link rel="stylesheet" href="{{ asset('bundles/admin/css/transparent.css') }}">
+        <style>
+            {# transparent.css pins its native progress bar to the VIEWPORT's
+               top (position:fixed) - generic default for any consumer. In
+               the admin it should belong to the DOCUMENT instead (requested
+               live): absolute anchors it to the page's own top edge, so it
+               scrolls away with the content rather than shadowing the
+               sticky topbar. Must come AFTER the transparent.css <link> -
+               same specificity, cascade order is what makes this override
+               win. #}
+            html.progress-bar-native.ready:not(.first).progress-bar-active body::before {
+                position: absolute;
+            }
+        </style>
         <script src="{{ asset('bundles/admin/js/jquery.min.js') }}"></script>
         <script src="{{ asset('bundles/admin/js/transparent.js') }}"></script>
         {% if customize_enabled is defined and customize_enabled %}
@@ -1154,7 +1928,10 @@
                     // page cached from before a deploy purges its whole
                     // Transparent cache instead of replaying stale HTML
                     // forever - see transparent.js's own cache_version doc.
-                    cache_version: '{{ deploy_version() }}'
+                    // admin_dev_version(): debug-only mtime suffix so
+                    // UNCOMMITTED vendor edits purge it too - see
+                    // DevVersionTwigExtension.
+                    cache_version: '{{ deploy_version() }}{{ admin_dev_version() }}'
                 });
             }, { once: true });
         </script>
@@ -1207,6 +1984,60 @@
                 const field = e.target.closest('[data-autosubmit]');
                 if (!field || !field.form) return;
                 field.form.requestSubmit();
+            });
+
+            // Filter dialog open/close. Delegated on document for the same
+            // AJAX-swap-survival reason as every other listener here - the
+            // button and the panel are both inside #page and get replaced
+            // wholesale on each in-admin navigation.
+            function setFilterModal(open) {
+                const modal = document.getElementById('filter-modal');
+                const toggle = document.getElementById('filter-toggle');
+                if (!modal) return;
+                modal.hidden = !open;
+                if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+                if (open) {
+                    // Focus the first control so the dialog is usable from
+                    // the keyboard immediately.
+                    const first = modal.querySelector('input, select');
+                    if (first) first.focus();
+                }
+            }
+            // CAPTURE phase, and it submits the form itself rather than
+            // letting the button's own default do it. transparentJS's
+            // document-level click handler treats a submit button as a
+            // navigation candidate and runs its own swap for the form's
+            // ACTION only - dropping every filter field, so "Appliquer"
+            // reloaded the unfiltered list (verified: the same form via
+            // requestSubmit() produces the correct ?filters[...] query,
+            // the click produced none). Capturing lets us mark the event
+            // handled before transparentJS's bubble-phase listener sees
+            // it; that listener bails on e.defaultPrevented, which is
+            // exactly the hook we want here.
+            document.addEventListener('click', function (e) {
+                const submit = e.target.closest('.filter-modal-panel [type="submit"]');
+                if (!submit) return;
+                const form = submit.form || submit.closest('form');
+                if (!form) return;
+                e.preventDefault();
+                form.requestSubmit();
+            }, true);
+
+            document.addEventListener('click', function (e) {
+                if (e.target.closest('#filter-toggle')) {
+                    const modal = document.getElementById('filter-modal');
+                    setFilterModal(!!modal && modal.hidden);
+                    return;
+                }
+                // Backdrop only - a click anywhere inside the panel (including
+                // on a <label>, which would otherwise bubble from its control)
+                // must not close it mid-edit.
+                if (e.target.closest('[data-filter-close]')) setFilterModal(false);
+            });
+            document.addEventListener('keydown', function (e) {
+                if ('Escape' !== e.key) return;
+                const modal = document.getElementById('filter-modal');
+                if (modal && !modal.hidden) setFilterModal(false);
             });
         </script>
         <script>
@@ -1367,6 +2198,28 @@
                 if (toggle) toggle.setAttribute('aria-pressed', document.documentElement.classList.contains('is-sidebar-collapsed') ? 'true' : 'false');
             });
 
+            // Mobile off-canvas nav toggle - same event-delegation reasoning
+            // as the desktop collapse toggle above. Not persisted like that
+            // one is: a fresh page load (a real navigation, not an SPA
+            // route swap - every sidebar link is a plain <a>) always starts
+            // with the nav closed, so there's nothing to sync pre-paint or
+            // on DOMContentLoaded here.
+            document.addEventListener('click', function (e) {
+                var toggle = e.target.closest('#admin-mobile-nav-toggle');
+                if (toggle) {
+                    var open = !document.documentElement.classList.contains('is-mobile-nav-open');
+                    document.documentElement.classList.toggle('is-mobile-nav-open', open);
+                    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+                    return;
+                }
+                if (e.target.closest('#admin-mobile-nav-backdrop')) {
+                    document.documentElement.classList.remove('is-mobile-nav-open');
+                }
+            });
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape') document.documentElement.classList.remove('is-mobile-nav-open');
+            });
+
             // Sidebar stats panel: click-to-toggle (event-delegated, same
             // reasoning as the collapse toggle right above).
             document.addEventListener('click', function (e) {
@@ -1447,6 +2300,11 @@
    site's base.html.twig uses) - everything inside it is what gets swapped
    and cached on navigation. #}
 <div id="page" class="admin-shell">
+    {# Only ever shown/clickable via the is-mobile-nav-open class (see the
+       @media block on .admin-mobile-nav-backdrop above) - a straight
+       sibling of .admin-aside/.admin-main, not nested in either, so its
+       fixed positioning isn't affected by .admin-aside's own transform. #}
+    <div class="admin-mobile-nav-backdrop" id="admin-mobile-nav-backdrop"></div>
     <aside class="admin-aside">
         {% set hasUserMenu = admin_context is defined and admin_context.userMenu is not empty %}
         {% set canEditBrand = is_granted('ROLE_SUPERADMIN') %}
@@ -1457,10 +2315,12 @@
                         <img class="brand-logo" src="{{ app.site.logo|thumbnail(64, 64) }}" alt="">
                     {% endif %}
                     <div class="brand-text">
-                        <span class="brand-title" data-brand-title>{% block brand_title %}{{ app.site.title ?? 'Administration' }}{% endblock %}</span>
+                        <div class="brand-title-row">
+                            <span class="brand-title" data-brand-title>{% block brand_title %}{{ app.site.title ?? 'Administration' }}{% endblock %}</span>
+                            {% if hasUserMenu %}<i class="fa-solid fa-chevron-down account-caret"></i>{% endif %}
+                        </div>
                         {% if app.user %}<span class="brand-user">{{ app.user }}</span>{% endif %}
                     </div>
-                    {% if hasUserMenu %}<i class="fa-solid fa-chevron-down account-caret"></i>{% endif %}
                 {% endblock %}
             </div>
             {% block user_menu %}
@@ -1562,7 +2422,13 @@
         {% block sidebar_footer %}
             {% set analyticsItem = admin_context is defined ? (admin_context.mainMenu|filter(i => i.type == 'block' and i.blockName == 'analytics_widget')|first) : null %}
             <div class="admin-sidebar-footer">
-                <a class="admin-icon-btn" href="/" title="{{ 'sidebar.home'|trans({}, 'admin') }}">
+                {# Was a plain link to the public site ("/") - repurposed to
+                   the admin dashboard itself, taking over the job of the
+                   top nav's own "Tableau de bord" link (now removed from
+                   App\Controller\Admin\DashboardController::configureMenuItems(),
+                   see its own comment) - reported as a redundant pair, one
+                   icon should do this job, not two. #}
+                <a class="admin-icon-btn" href="{{ path('admin') }}" title="{{ 'sidebar.home'|trans({}, 'admin') }}">
                     <i class="fa-solid fa-house"></i>
                 </a>
                 {% if analyticsItem and not analyticsItem.hidden %}
@@ -1575,7 +2441,14 @@
                         <i class="fa-solid fa-chart-simple"></i>
                     </button>
                 {% endif %}
-                <a class="admin-icon-btn" href="{{ path('security_logout') }}" title="{{ 'sidebar.exit'|trans({}, 'admin') }}">
+                {# Was a real logout link - repurposed to just LEAVE the
+                   admin panel (back to the public site root), staying
+                   signed in. Real logout wasn't removed anywhere, it's
+                   still one click away in the account dropdown up top
+                   (see MenuBuilder::buildUserMenuDefault()'s own
+                   menu.logout entry) - this was only ever a duplicate of
+                   that, reported as not a useful spot for it. #}
+                <a class="admin-icon-btn" href="/" title="{{ 'sidebar.exit'|trans({}, 'admin') }}">
                     <i class="fa-solid fa-arrow-right-from-bracket"></i>
                 </a>
                 {# In the sidebar itself, not the topbar on the opposite side
@@ -1618,6 +2491,9 @@
     <main class="admin-main">
         {% block topbar %}
             <div class="admin-topbar">
+                <button type="button" class="admin-icon-btn admin-mobile-nav-toggle" id="admin-mobile-nav-toggle" title="{{ 'topbar.open_menu'|trans({}, 'admin') }}" aria-expanded="false" aria-controls="admin-mobile-nav-backdrop">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
                 {% if admin_context is defined and admin_context.crudControllerFqcn %}
                     {# persistent search, present on every page of a CRUD (index/
                        new/edit/detail) not just the index listing - always
@@ -1770,10 +2646,27 @@
 {% if customize_enabled is defined and customize_enabled %}
 <script>
     (function () {
+        // This IIFE binds document-level listeners: transparentJS's SPA
+        // body-merge can re-insert this script node after navigating from
+        // a page that lacked it, and a second execution would double every
+        // delegated handler (two toggles = visual no-op). One global guard
+        // beats auditing each listener for idempotency.
+        if (window.__adminCustomizeBound) return;
+        window.__adminCustomizeBound = true;
+
         var STORAGE_KEY = 'admin-customizing';
         var body = document.body;
-        var toggleBtn = document.getElementById('admin-customize-toggle');
-        var doneBtn = document.getElementById('admin-customize-done');
+        // LIVE lookups, never parse-time element captures: every in-admin
+        // navigation swaps #page's whole subtree (topbar included), so an
+        // element grabbed here once would be a detached ghost after the
+        // first SPA click - the exact reason the customize toggle "worked
+        // only on the page you happened to hard-load" (reported live).
+        function getToggleBtn() { return document.getElementById('admin-customize-toggle'); }
+        function getDoneBtn() { return document.getElementById('admin-customize-done'); }
+        function layoutCsrfToken() {
+            var btn = getDoneBtn();
+            return btn ? btn.dataset.csrfToken : '';
+        }
         var sortablesInitialized = false;
 
         // Applies the CURRENT customize-mode state to every
@@ -1786,12 +2679,21 @@
         // inserted mid-session never goes through setCustomizing() itself.
         function refreshTitleEditability() {
             var on = body.classList.contains('is-customizing');
-            document.querySelectorAll('[data-analytics-title], [data-brand-title]').forEach(function (el) {
+            // data-widget-text ("Generic"'s own body content, see welcome.
+            // html.twig's own comment) rides along here too - same toggle
+            // mechanism, different data-* target/persistence path.
+            // data-page-title/data-page-desc: a non-dashboard page's own
+            // H1/description (see system.html.twig / crud/index.html.twig)
+            // - same in-place-edit pattern, persisted into the SIDEBAR
+            // scope's matching menu item so the sidebar label stays in
+            // sync by construction (one stored value shown twice).
+            document.querySelectorAll('[data-analytics-title], [data-brand-title], [data-widget-text], [data-page-title], [data-page-desc]').forEach(function (el) {
                 el.contentEditable = on ? 'true' : 'false';
             });
         }
 
         function setCustomizing(on) {
+            var toggleBtn = getToggleBtn();
             body.classList.toggle('is-customizing', on);
             if (toggleBtn) toggleBtn.classList.toggle('is-active', on);
             if (toggleBtn) toggleBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
@@ -1810,26 +2712,25 @@
             refreshTitleEditability();
             // Every way OUT of customize mode (Terminé, the toolbar toggle,
             // whatever else calls this with on=false) must also close any
-            // widget settings panel left open (article_views' own - the
-            // composite's pane-ratio control is a direct drag divider now,
-            // not a panel, see [data-composite-pane-divider] below;
-            // analytics_card has no panel of its own either) - its own
-            // `hidden` state otherwise has nothing tying it to customize
-            // mode at all, and stayed stuck open outside customize mode
-            // once entered, found live. Discards whatever was mid-edit,
-            // same as clicking the panel's own Cancel would - leaving
-            // customize mode is already an implicit "never mind" for
-            // everything else here too.
+            // widget settings panel left open (entity_views'/counter's own,
+            // and analytics_card's own series-checkbox panel too - the
+            // composite's pane-ratio control is a direct drag divider,
+            // not a panel, see [data-composite-pane-divider] below) - its
+            // own `hidden` state otherwise has nothing tying it to
+            // customize mode at all, and stayed stuck open outside
+            // customize mode once entered, found live. Discards whatever
+            // was mid-edit, same as clicking the panel's own Cancel would -
+            // leaving customize mode is already an implicit "never mind"
+            // for everything else here too.
             if (!on) {
-                document.querySelectorAll('[data-article-views-settings-panel]:not([hidden])').forEach(function (panel) {
+                document.querySelectorAll('[data-entity-views-settings-panel]:not([hidden]), [data-counter-settings-panel]:not([hidden])').forEach(function (panel) {
                     panel.hidden = true;
-                    // The toggle button lives in _block.html.twig's shared
-                    // top-right .item-controls row, a SIBLING of the
-                    // widget's own content (article_views' own card), not
-                    // a descendant of it - both are reachable from the
-                    // common .widget-block ancestor.
+                    // Both toggle buttons live INSIDE their own widget's
+                    // own card, a SIBLING of the panel, not an ancestor of
+                    // it - reachable from the common .widget-block
+                    // ancestor either way.
                     var widgetBlock = panel.closest('[data-sortable-item]');
-                    var toggle = widgetBlock && widgetBlock.querySelector('[data-article-views-settings-toggle]');
+                    var toggle = widgetBlock && widgetBlock.querySelector('[data-entity-views-settings-toggle], [data-counter-settings-toggle]');
                     if (toggle) toggle.classList.remove('is-active');
                 });
             }
@@ -2007,11 +2908,12 @@
                 });
         });
 
-        if (toggleBtn) {
-            toggleBtn.addEventListener('click', function () {
-                setCustomizing(!body.classList.contains('is-customizing'));
-            });
-        }
+        // Delegated (not element-bound): the button node is replaced on
+        // every SPA swap, a direct listener died with the first navigation.
+        document.addEventListener('click', function (e) {
+            if (!e.target.closest('#admin-customize-toggle')) return;
+            setCustomizing(!body.classList.contains('is-customizing'));
+        });
 
         // hide/show toggle - flips the class + icon only, batched to the
         // server on "Done" (SettingBag::set() invalidates the whole
@@ -2025,6 +2927,20 @@
             var icon = toggle.querySelector('i');
             if (icon) icon.classList.toggle('fa-eye-slash', item.classList.contains('is-hidden'));
             if (icon) icon.classList.toggle('fa-eye', !item.classList.contains('is-hidden'));
+        });
+
+        // Card-background toggle - same shape/batching as hide/show above
+        // (see MenuItem::$background's own docblock: generic, works for
+        // ANY widget type, not just "Generic"/Bienvenue). .no-card-bg
+        // strips the chrome via CSS below; captureLevel() reads it back
+        // the same way it already reads .is-hidden.
+        document.addEventListener('click', function (e) {
+            var toggle = e.target.closest('[data-toggle-background]');
+            if (!toggle || !body.classList.contains('is-customizing')) return;
+            var item = toggle.closest('[data-sortable-item]');
+            if (!item) return;
+            item.classList.toggle('no-card-bg');
+            toggle.classList.toggle('is-active', item.classList.contains('no-card-bg'));
         });
 
         // Remove - every widget now, code-defined or ad-hoc alike (see
@@ -2075,6 +2991,15 @@
         // (same dragThreshold-style guard sticky-sortable.js already uses
         // for "is this a drag or just a click").
         var HEIGHT_TOUCH_THRESHOLD = 4;
+        // How close (in px) a drag needs to land to this card's own
+        // natural content height before it snaps straight to it - see
+        // the pointermove handler's own comment on why this is the real
+        // "magnetized" behavior, not the HEIGHT_KEY_STEP grid alone.
+        // Wide enough to actually catch a real drag (a mouse rarely stops
+        // on the exact pixel), narrow enough that it only fires near a
+        // genuine "this fits" point rather than swallowing the whole
+        // usable drag range.
+        var HEIGHT_MAGNET_RADIUS = 24;
 
         // .widget-block's own min-height is NOT enough on its own: the
         // wrapper is a CSS Grid item stretched to its row's auto-sized
@@ -2150,6 +3075,25 @@
             // explicit height the instant you touched the corner at all.
             var startHeight = parseInt(item.dataset.widgetHeight || '', 10) || rect.height;
 
+            // This card's own TRUE content height, momentarily freed from
+            // both its explicit --widget-height floor AND align-items:
+            // stretch (which pulls a shorter card up to match a taller
+            // sibling on the same line - see .widget-block/.widget-group's
+            // own comment) - a snap target real "this now fits" magnetism
+            // needs, not just a blind pixel grid. Measured synchronously
+            // before any paint (set styles, read scrollHeight, restore),
+            // so there's no visible flicker.
+            var prevAlignSelf = item.style.alignSelf;
+            var prevMinHeight = item.style.minHeight;
+            var prevVarHeight = item.style.getPropertyValue('--widget-height');
+            item.style.alignSelf = 'flex-start';
+            item.style.minHeight = '0';
+            item.style.removeProperty('--widget-height');
+            var naturalHeight = item.scrollHeight;
+            item.style.alignSelf = prevAlignSelf;
+            item.style.minHeight = prevMinHeight;
+            if (prevVarHeight) item.style.setProperty('--widget-height', prevVarHeight);
+
             var ghost = document.createElement('div');
             ghost.className = 'admin-resize-ghost';
             var badge = document.createElement('span');
@@ -2162,6 +3106,7 @@
                 item: item, handle: handle, ghost: ghost, badge: badge, rect: rect,
                 pointerId: e.pointerId, startX: e.clientX, startY: e.clientY,
                 startSize: startSize, startHeight: startHeight, columnWidth: columnWidth,
+                naturalHeight: naturalHeight,
                 target: startSize, targetHeight: startHeight, heightTouched: false,
             };
         });
@@ -2173,7 +3118,23 @@
 
             var deltaY = e.clientY - resizing.startY;
             if (Math.abs(deltaY) > HEIGHT_TOUCH_THRESHOLD) resizing.heightTouched = true;
-            var nextHeight = Math.max(MIN_WIDGET_HEIGHT, Math.round(resizing.startHeight + deltaY));
+            var rawHeight = Math.max(MIN_WIDGET_HEIGHT, resizing.startHeight + deltaY);
+            // Real magnetism, not just a blind pixel grid: within
+            // HEIGHT_MAGNET_RADIUS of this card's OWN natural/unstretched
+            // content height (measured once at pointerdown - see its own
+            // comment), the drag PULLS straight to that exact value - "let
+            // go of the corner and it clicks into a height that actually
+            // fits the content" is what "magnetized" needs to mean here,
+            // a fixed-size grid alone can't promise that since natural
+            // content height is essentially never a clean round number.
+            // Falls back to the HEIGHT_KEY_STEP grid (same one the
+            // keyboard fallback already moves in) everywhere else, so a
+            // deliberately-taller-than-content resize still lands on a
+            // clean, comparable-across-cards value instead of an
+            // arbitrary one.
+            var nextHeight = Math.abs(rawHeight - resizing.naturalHeight) <= HEIGHT_MAGNET_RADIUS
+                ? resizing.naturalHeight
+                : Math.round(rawHeight / HEIGHT_KEY_STEP) * HEIGHT_KEY_STEP;
 
             if (next !== resizing.target || nextHeight !== resizing.targetHeight) {
                 resizing.target = next;
@@ -2284,20 +3245,93 @@
         // change[key] is null, e.g. a prior period with zero traffic to
         // compare against) rather than leaving a stale badge from whatever
         // range was showing before.
+        // Tweens a stat's leading number from whatever it currently reads
+        // to `target` instead of snapping straight there - both the range
+        // picker (a whole new period's totals) and the chart legend
+        // (hiding/showing a series changes what's summed into the same
+        // stat) land here now, so "the numbers never actually move" reads
+        // as one consistent animation either way rather than an instant
+        // swap on one path and nothing at all on the other.
+        // data-raw-value (not textContent) is the tween's source of truth:
+        // mid-animation textContent is itself a rounded in-between value,
+        // re-reading THAT as the next start point would drift/stutter on
+        // rapid repeated toggles.
+        function animateStatNumber(numberEl, target) {
+            target = Math.round(target);
+            var start = parseInt(numberEl.dataset.rawValue, 10);
+            if (isNaN(start)) start = parseInt(numberEl.textContent, 10) || 0;
+            numberEl.dataset.rawValue = target;
+            if (numberEl._statAnimFrame) cancelAnimationFrame(numberEl._statAnimFrame);
+            if (start === target) return;
+            var duration = 450;
+            var startTime = null;
+            function step(ts) {
+                if (startTime === null) startTime = ts;
+                var progress = Math.min(1, (ts - startTime) / duration);
+                var eased = 1 - Math.pow(1 - progress, 3);
+                numberEl.textContent = Math.round(start + (target - start) * eased);
+                if (progress < 1) {
+                    numberEl._statAnimFrame = requestAnimationFrame(step);
+                } else {
+                    numberEl._statAnimFrame = null;
+                }
+            }
+            numberEl._statAnimFrame = requestAnimationFrame(step);
+        }
+
         function updateStatRow(card, totals, change) {
             if (!totals || !change) return;
             var row = card.querySelector('.analytics-stat-row');
             if (!row) return;
             Object.keys(totals).forEach(function (key) {
-                var value = row.querySelector('[data-stat="' + key + '"] .analytics-stat-value');
-                if (!value) return;
-                var html = String(totals[key]);
+                var stat = row.querySelector('[data-stat="' + key + '"]');
+                if (!stat) return;
+                var number = stat.querySelector('.analytics-stat-number');
+                if (number) animateStatNumber(number, totals[key]);
+                var valueEl = stat.querySelector('.analytics-stat-value');
+                var existingChange = valueEl && valueEl.querySelector('.analytics-stat-change');
                 var pct = change[key];
                 if (pct !== null && pct !== undefined) {
                     var cls = pct >= 0 ? 'is-up' : 'is-down';
-                    html += ' <span class="analytics-stat-change ' + cls + '">' + (pct >= 0 ? '+' : '') + pct + '%</span>';
+                    var html = (pct >= 0 ? '+' : '') + pct + '%';
+                    if (!existingChange) {
+                        existingChange = document.createElement('span');
+                        valueEl.appendChild(existingChange);
+                    }
+                    existingChange.className = 'analytics-stat-change ' + cls;
+                    existingChange.textContent = html;
+                } else if (existingChange) {
+                    existingChange.remove();
                 }
-                value.innerHTML = html;
+            });
+        }
+
+        // Same idea as updateStatRow above, but sourced from the chart's
+        // OWN currently-plotted data (chart.data.datasets[i].data, summed)
+        // rather than a fresh server payload - a legend click has no
+        // request/response round trip to hang a totals/change object off
+        // of, it's a pure client-side visibility flip, so the stat row has
+        // to derive its own numbers from exactly what's now visible.
+        // pageViews has no single matching dataset key (it's Human+Bot+AI
+        // combined, see AnalyticsSeriesPalette) - every other stat key IS
+        // one dataset's own key 1:1, hence the two branches below.
+        // period-over-period % is left untouched here: that comparison is
+        // only meaningful against a matching PRIOR-period series-filtered
+        // sum this client-side data doesn't have, not something to fake.
+        function recomputeStatsFromChart(card, chart) {
+            var row = card.querySelector('.analytics-stat-row');
+            if (!row) return;
+            var sums = { pageViews: 0, uniqueVisitors: 0, uniqueUsers: 0 };
+            var pageViewKeys = { pageViewsHuman: true, pageViewsBot: true, pageViewsAi: true };
+            chart.data.datasets.forEach(function (ds, i) {
+                if (chart.getDatasetMeta(i).hidden) return;
+                var total = (ds.data || []).reduce(function (a, b) { return a + (Number(b) || 0); }, 0);
+                if (pageViewKeys[ds.key]) sums.pageViews += total;
+                else if (ds.key === 'uniqueVisitors' || ds.key === 'uniqueUsers') sums[ds.key] = total;
+            });
+            Object.keys(sums).forEach(function (key) {
+                var number = row.querySelector('[data-stat="' + key + '"] .analytics-stat-number');
+                if (number) animateStatNumber(number, sums[key]);
             });
         }
         document.addEventListener('click', function (e) {
@@ -2373,7 +3407,19 @@
             widgetBlock.dataset.blockName = def.blockName || '';
             widgetBlock.dataset.widgetLabel = def.label || '';
             widgetBlock.dataset.widgetIcon = def.icon || '';
-            widgetBlock.dataset.widgetParams = JSON.stringify(def.params || {});
+            // def.params is PHP's own MenuItem::getParams() round-tripped
+            // through json_encode - an empty PHP array (no params ever
+            // set, e.g. the built-in Trafic widget before its first edit)
+            // encodes as JSON `[]`, not `{}` (PHP can't tell an empty LIST
+            // from an empty MAP). `[] || {}` still picks `[]` (truthy), so
+            // every later `params.series = ...`/`params.panes = ...` sets
+            // a non-index property JSON.stringify silently drops off an
+            // array - found live via the analytics settings panel's own
+            // Apply losing its selection with no error anywhere. Explicit
+            // Array.isArray check, not just truthiness, is what actually
+            // guards against this.
+            var params = def.params;
+            widgetBlock.dataset.widgetParams = JSON.stringify((params && !Array.isArray(params)) ? params : {});
         }
 
         // Enter commits (blurs) instead of inserting a newline - this is a
@@ -2397,18 +3443,483 @@
             var widgetBlock = title.closest('[data-sortable-item]');
             if (!widgetBlock) return;
             ensureCustomizableWidget(widgetBlock);
+            // A composite pane's OWN title (see composite.html.twig's
+            // data-pane-index) doesn't belong on the outer composite's own
+            // label - closest('[data-sortable-item]') always finds the
+            // whole composite (no data-sortable-item on .composite-pane
+            // itself), so writing widgetLabel here unconditionally was
+            // silently editing the wrong thing for any pane title (found
+            // live: "can't modify title" on a merged card). Routes into
+            // params.panes[i].label instead, same
+            // read/modify/JSON.stringify-back pattern the pane-ratio
+            // divider handler below already uses for panes[i].size.
+            var pane = title.closest('.composite-pane[data-pane-index]');
+            if (pane) {
+                var paneIndex = parseInt(pane.dataset.paneIndex, 10);
+                var params = JSON.parse(widgetBlock.dataset.widgetParams || '{}');
+                var panes = Array.isArray(params.panes) ? params.panes : [];
+                if (panes[paneIndex]) {
+                    panes[paneIndex] = Object.assign({}, panes[paneIndex], { label: title.textContent.trim() });
+                    params.panes = panes;
+                    widgetBlock.dataset.widgetParams = JSON.stringify(params);
+                }
+                return;
+            }
             widgetBlock.dataset.widgetLabel = title.textContent.trim();
         });
 
-        // Brand title: unlike a widget title (captured into a data-attribute
-        // above, only actually persisted later via "Terminé"/
-        // admin_layout_save), there's no encompassing save step for the
-        // sidebar - the edit POSTs for itself the instant the field loses
-        // focus, same "commit immediately" behavior as the boolean-switch
-        // PATCH near the top of this file. Delegated on 'blur' in the
-        // CAPTURE phase - unlike 'input'/'click', 'blur' does not bubble,
-        // so a plain document-level listener would never see it fire on a
-        // field nested this deep.
+        // "Generic" widget's own body text (see welcome.html.twig's own
+        // comment on why this is a separate mechanism from the title one
+        // above) - writes into params.text, not the label, and (unlike
+        // the single-line title) deliberately allows Enter to insert a
+        // real line break rather than committing/blurring - a free-form
+        // text block reasonably wants more than one line.
+        document.addEventListener('input', function (e) {
+            var text = e.target.closest('[data-widget-text][contenteditable="true"]');
+            if (!text || !document.body.classList.contains('is-customizing')) return;
+            var widgetBlock = text.closest('[data-sortable-item]');
+            if (!widgetBlock) return;
+            ensureCustomizableWidget(widgetBlock);
+            var params = JSON.parse(widgetBlock.dataset.widgetParams || '{}');
+            params.text = text.textContent.trim();
+            widgetBlock.dataset.widgetParams = JSON.stringify(params);
+        });
+
+        // Widget title/text: the 'input' handlers above only ever update
+        // the local data-attribute, persisted later via "Terminé"/
+        // admin_layout_save - a contenteditable field visually commits the
+        // instant you type though, so leaving customize mode any other
+        // way (closing the tab, navigating off, is-customizing simply
+        // toggled off without the button) silently lost the edit,
+        // reported live. This mirrors the brand-title blur handler right
+        // below (same "commit immediately on blur" idea, same CSRF token)
+        // but hits admin_layout_quick instead - a narrow, single-field
+        // PATCH against the CURRENTLY PERSISTED layout (see
+        // LayoutController::quickSave()'s own doc comment for why it's
+        // scoped to just label/text and not position/size/etc, which keep
+        // batching via "Terminé" exactly as before).
+        var LAYOUT_QUICK_URL = '{{ path("admin_layout_quick", {scope: "dashboard"}) }}';
+        document.addEventListener('blur', function (e) {
+            var field = e.target.closest('[data-analytics-title][contenteditable="true"], [data-widget-text][contenteditable="true"]');
+            if (!field || !getDoneBtn()) return;
+            var widgetBlock = field.closest('[data-sortable-item]');
+            if (!widgetBlock || !widgetBlock.dataset.sortableKey) return;
+
+            var payload = { key: widgetBlock.dataset.sortableKey, value: field.textContent.trim() };
+            var pane = field.closest('.composite-pane[data-pane-index]');
+            if (pane) {
+                payload.field = 'label';
+                payload.paneIndex = parseInt(pane.dataset.paneIndex, 10);
+            } else if (field.hasAttribute('data-widget-text')) {
+                payload.field = 'text';
+            } else {
+                payload.field = 'label';
+            }
+
+            fetch(LAYOUT_QUICK_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': layoutCsrfToken() },
+                body: JSON.stringify(payload),
+            }).catch(function () {});
+        }, true);
+
+        // Page title/description (non-dashboard pages: system pages' own
+        // H1/subtitle, a CRUD index's H1) - persisted against the SIDEBAR
+        // scope's menu item for this page (data-menu-key, resolved
+        // server-side from the selected menu entry), which is exactly what
+        // keeps the sidebar label "always in sync with the title": there
+        // is only one stored value, the sidebar and the heading both
+        // render it. The sidebar's visible label is also patched in place
+        // immediately - no reload needed to see the sync happen.
+        var SIDEBAR_QUICK_URL = '{{ path("admin_layout_quick", {scope: "sidebar"}) }}';
+        // CRUD pages persist into their OWN scope, keyed by the CRUD slug -
+        // they mostly have no sidebar menu item to hang a customization on
+        // (see LayoutScope::CRUD). An element opts in with
+        // data-layout-scope="crud"; everything else keeps posting to the
+        // sidebar scope exactly as before.
+        var CRUD_QUICK_URL = '{{ path("admin_layout_quick", {scope: "crud"}) }}';
+
+        // Quick-saves run ONE AT A TIME. Each request is a read-modify-write
+        // of the whole layout config server-side (quickSave loads it, patches
+        // one field, saves it back), so two in flight together both read the
+        // pre-edit state and the second one's save silently discards the
+        // first's field. Reproduced: editing the title and description in the
+        // same tick persisted only the description, losing the title with no
+        // error anywhere. Tabbing straight from one to the other is exactly
+        // that pattern, so this is a real loss, not a test artefact.
+        // Chaining on a single promise keeps each request reading the state
+        // the previous one wrote. Failures are swallowed deliberately - a
+        // rejected link must not break the chain for later edits.
+        var quickSaveChain = Promise.resolve();
+        function queueQuickSave(url, payload) {
+            quickSaveChain = quickSaveChain.then(function () {
+                return fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': layoutCsrfToken() },
+                    body: JSON.stringify(payload),
+                }).catch(function () {});
+            });
+            return quickSaveChain;
+        }
+        document.addEventListener('blur', function (e) {
+            var field = e.target.closest('[data-page-title][contenteditable="true"], [data-page-desc][contenteditable="true"]');
+            if (!field) return;
+            var key = field.dataset.menuKey;
+            if (!key) return;
+            var isTitle = field.hasAttribute('data-page-title');
+            var value = field.textContent.trim();
+            var isCrudScope = 'crud' === field.dataset.layoutScope;
+
+            var payload = { key: key, field: isTitle ? 'label' : 'description', value: value };
+            // The item's section (see groupIntoSections()) - quickSave's
+            // upsert needs it to place a never-before-stored entry at the
+            // right nesting level, not the top of the tree. Never sent for
+            // the CRUD scope: that one is a flat list keyed by slug.
+            if (!isCrudScope && field.dataset.menuParentKey) payload.parentKey = field.dataset.menuParentKey;
+
+            queueQuickSave(isCrudScope ? CRUD_QUICK_URL : SIDEBAR_QUICK_URL, payload);
+
+            // Sidebar-label sync only applies to the sidebar scope - a CRUD
+            // slug is not a menu key, so this would silently match nothing
+            // (or, worse, a same-named item) for the crud scope.
+            if (!isCrudScope && isTitle && value) {
+                var menuLabel = document.querySelector('.admin-menu [data-sortable-key="' + (window.CSS && CSS.escape ? CSS.escape(key) : key) + '"] .label-text');
+                if (menuLabel) menuLabel.textContent = value;
+            }
+        }, true);
+
+        // Enter commits the single-line page title, same as the widget/
+        // brand titles above. The description stays multi-line-friendly
+        // (same reasoning as data-widget-text).
+        document.addEventListener('keydown', function (e) {
+            if (e.key !== 'Enter') return;
+            var title = e.target.closest('[data-page-title][contenteditable="true"]');
+            if (!title) return;
+            e.preventDefault();
+            title.blur();
+        });
+
+        // Drag-to-reorder for a CRUD page's top-right action buttons.
+        // Pointer events rather than HTML5 drag-and-drop: several of these
+        // buttons are <a href> (and one is a <form>), which the native API
+        // treats as link drags with their own ghost image and default
+        // navigation. Only elements carrying data-action-key move; the
+        // search box and filter button are untouched.
+        (function () {
+            var dragEl = null, row = null, startOrder = null, pendingBefore = null;
+            // A press with no real movement is a CLICK, not a drag. Without
+            // this the mouseup path treated every click as a drop with no
+            // target and appended the button to the end of the row - which
+            // both silently reordered it and swallowed the click, because
+            // re-inserting the node mid-gesture stops the click firing at
+            // all (observed: activating any action button did nothing).
+            var startX = 0, moved = false;
+            var DRAG_THRESHOLD = 4;
+
+            function clearMarkers() {
+                if (!row) return;
+                row.querySelectorAll('.drop-before, .drop-after').forEach(function (n) {
+                    n.classList.remove('drop-before', 'drop-after');
+                });
+            }
+
+            function currentOrder(el) {
+                return [].map.call(el.querySelectorAll('[data-action-key]'), function (n) {
+                    return n.dataset.actionKey;
+                });
+            }
+
+            function finish(persist) {
+                if (!dragEl || !row) { dragEl = null; row = null; return; }
+                dragEl.classList.remove('is-dragging');
+                clearMarkers();
+
+                // The actual move happens HERE, once, on release - and only
+                // for a real drag.
+                if (persist && moved) {
+                    if (pendingBefore) row.insertBefore(dragEl, pendingBefore);
+                    else row.appendChild(dragEl);
+                }
+
+                var order = currentOrder(row);
+                if (persist && moved && startOrder && order.join() !== startOrder.join()) {
+                    // Swallow the click that follows the drop - a reorder is
+                    // not an activation of the button it landed on.
+                    dragEl.dataset.justReordered = '1';
+                    // Serialized like every other quick-save: quickSave is a
+                    // read-modify-write of the whole layout config.
+                    queueQuickSave(CRUD_QUICK_URL, { key: row.dataset.pageKey, field: 'actions', value: order });
+                }
+
+                dragEl = null; row = null; startOrder = null; pendingBefore = null; moved = false;
+            }
+
+            // Kill the browser's OWN link drag first. Most of these buttons
+            // are <a href>, and pressing + moving on a link makes Chrome
+            // start a native drag-and-drop: that cancels the pointer
+            // sequence outright, so pointerup/mouseup never arrive and the
+            // drop could never be committed or saved (verified - a control
+            // drag over plain page text fired down/move/up/click normally,
+            // the identical drag over an action button fired only down and
+            // move). preventDefault on dragstart keeps the gesture ours.
+            document.addEventListener('dragstart', function (e) {
+                if (!document.body.classList.contains('is-customizing')) return;
+                if (e.target.closest && e.target.closest('[data-action-row] [data-action-key]')) e.preventDefault();
+            });
+
+            document.addEventListener('pointerdown', function (e) {
+                if (!document.body.classList.contains('is-customizing')) return;
+                if (0 !== e.button) return;
+                var handle = e.target.closest('[data-action-row] [data-action-key]');
+                if (!handle || e.target.closest('.new-dropdown-menu')) return;
+                dragEl = handle;
+                row = handle.closest('[data-action-row]');
+                startOrder = currentOrder(row);
+                startX = e.clientX;
+                moved = false;
+            });
+
+            // Compute the insertion point from sibling MIDPOINTS and show it
+            // as a marker - the dragged node itself is deliberately NOT moved
+            // until release. Moving it mid-drag re-inserts it in the DOM,
+            // which drops the pointer-event stream (pointerup stopped firing
+            // entirely, so the reorder applied visually but never saved).
+            // Midpoints rather than elementFromPoint because the dragged
+            // element still occupies its own slot under the cursor.
+            document.addEventListener('pointermove', function (e) {
+                if (!dragEl || !row) return;
+                if (!moved) {
+                    if (Math.abs(e.clientX - startX) < DRAG_THRESHOLD) return;
+                    moved = true;
+                    dragEl.classList.add('is-dragging');
+                }
+                // NO preventDefault() here: on a pointermove it makes Chrome
+                // treat the gesture as browser-handled and fire pointercancel
+                // instead of pointerup, so the drop never committed and the
+                // save never fired (observed: zero pointerup/mouseup events
+                // for a completed drag). Text selection is suppressed with
+                // user-select in CSS instead.
+                clearMarkers();
+
+                pendingBefore = null;
+                var siblings = [].filter.call(row.querySelectorAll('[data-action-key]'), function (n) {
+                    return n !== dragEl;
+                });
+                for (var i = 0; i < siblings.length; i++) {
+                    var r = siblings[i].getBoundingClientRect();
+                    if (e.clientX < r.left + r.width / 2) { pendingBefore = siblings[i]; break; }
+                }
+
+                if (pendingBefore) pendingBefore.classList.add('drop-before');
+                else if (siblings.length) siblings[siblings.length - 1].classList.add('drop-after');
+            });
+
+            // Both events, and on window: a pointerup that lands outside the
+            // document (or is swallowed by a synthetic-input quirk) would
+            // otherwise leave the row reordered but never persisted.
+            window.addEventListener('pointerup', function () { finish(true); });
+            window.addEventListener('mouseup', function () { finish(true); });
+            document.addEventListener('pointercancel', function () { finish(false); });
+
+            document.addEventListener('click', function (e) {
+                var moved = e.target.closest('[data-action-row] [data-action-key]');
+                if (moved && moved.dataset.justReordered) {
+                    delete moved.dataset.justReordered;
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+            }, true);
+        })();
+
+
+        // Page icon editor: the header's icon box IS the click target
+        // (see system.html.twig's data-page-icon) - a small popover with
+        // the Font Awesome class + live preview, persisted through the
+        // same sidebar quickSave path as the title (field 'icon',
+        // locale-agnostic server-side), and the sidebar item's own icon
+        // patched in place immediately - same one-stored-value sync
+        // contract as the title/description.
+        var iconPopover = null;
+        function closeIconPopover() {
+            if (iconPopover) { iconPopover.remove(); iconPopover = null; }
+        }
+
+        function applyPageIcon(box, value) {
+            var payload = { key: box.dataset.menuKey, field: 'icon', value: value };
+            if (box.dataset.menuParentKey) payload.parentKey = box.dataset.menuParentKey;
+            queueQuickSave(SIDEBAR_QUICK_URL, payload);
+
+            box.dataset.pageIconValue = value;
+            var headerIcon = box.querySelector('i');
+            if (headerIcon) headerIcon.className = value || 'fa-solid fa-circle-question';
+
+            if (!value) return; // cleared = reset on next load; nothing sane to paint in the sidebar meanwhile
+            var keyEsc = window.CSS && CSS.escape ? CSS.escape(box.dataset.menuKey) : box.dataset.menuKey;
+            var link = document.querySelector('.admin-menu li[data-sortable-key="' + keyEsc + '"] > a');
+            if (!link) return;
+            var menuIcon = link.querySelector(':scope > i');
+            if (!menuIcon) {
+                menuIcon = document.createElement('i');
+                link.insertBefore(menuIcon, link.firstChild);
+            }
+            menuIcon.className = value;
+        }
+
+        var ICON_SEARCH_URL = '{{ path("admin_icon_search") }}';
+
+        document.addEventListener('click', function (e) {
+            if (iconPopover && !iconPopover.contains(e.target)) closeIconPopover();
+            var box = e.target.closest('[data-page-icon]');
+            if (!box || !body.classList.contains('is-customizing')) return;
+
+            var popover = document.createElement('div');
+            popover.className = 'page-icon-popover';
+            var header = document.createElement('div');
+            header.className = 'page-icon-popover-header';
+            var preview = document.createElement('span');
+            preview.className = 'page-icon-preview';
+            var previewIcon = document.createElement('i');
+            previewIcon.className = box.dataset.pageIconValue || 'fa-solid fa-circle-question';
+            preview.appendChild(previewIcon);
+            var searchWrap = document.createElement('span');
+            searchWrap.className = 'page-icon-search';
+            var input = document.createElement('input');
+            input.type = 'text';
+            input.value = box.dataset.pageIconValue || '';
+            input.placeholder = '{{ 'customize.icon_search'|trans({}, 'admin')|e('js') }}';
+            input.setAttribute('aria-label', box.title || 'icon');
+            var spinnerEl = document.createElement('i');
+            spinnerEl.className = 'icon-search-spinner fa-solid fa-circle-notch fa-spin';
+            var clearBtn = document.createElement('button');
+            clearBtn.type = 'button';
+            clearBtn.className = 'icon-search-clear';
+            clearBtn.textContent = '✕';
+            clearBtn.title = '{{ 'customize.icon_clear'|trans({}, 'admin')|e('js') }}';
+            searchWrap.appendChild(input);
+            searchWrap.appendChild(spinnerEl);
+            searchWrap.appendChild(clearBtn);
+            header.appendChild(preview);
+            header.appendChild(searchWrap);
+            var grid = document.createElement('div');
+            grid.className = 'page-icon-grid';
+            popover.appendChild(header);
+            popover.appendChild(grid);
+            function syncHasTerm() {
+                popover.classList.toggle('has-term', '' !== input.value.trim());
+            }
+            syncHasTerm();
+
+            var rect = box.getBoundingClientRect();
+            popover.style.left = rect.left + 'px';
+            popover.style.top = (rect.bottom + 6) + 'px';
+            document.body.appendChild(popover);
+            iconPopover = popover;
+            input.focus();
+            input.select();
+
+            // Searchable grid, fed by admin_icon_search (base-bundle's own
+            // cached FontAwesome metadata). The text input stays the
+            // power-user path: any string still commits as a raw class via
+            // Enter/blur, whether or not the search found it.
+            var searchSeq = 0;
+            function renderGrid(icons) {
+                grid.textContent = '';
+                icons.forEach(function (icon) {
+                    var cell = document.createElement('button');
+                    cell.type = 'button';
+                    cell.className = 'page-icon-cell';
+                    cell.title = icon.label;
+                    var i = document.createElement('i');
+                    i.className = icon.class;
+                    cell.appendChild(i);
+                    // mousedown preventDefault: keep focus in the input so
+                    // its commit-on-blur below never fires for a grid pick.
+                    cell.addEventListener('mousedown', function (ev) { ev.preventDefault(); });
+                    cell.addEventListener('click', function () {
+                        applyPageIcon(box, icon.class);
+                        closeIconPopover();
+                    });
+                    grid.appendChild(cell);
+                });
+            }
+            function search(term) {
+                var seq = ++searchSeq;
+                popover.classList.add('is-loading');
+                fetch(ICON_SEARCH_URL + '?term=' + encodeURIComponent(term))
+                    .then(function (r) { return r.ok ? r.json() : { icons: [] }; })
+                    .then(function (data) {
+                        if (seq !== searchSeq || iconPopover !== popover) return; // stale response / closed
+                        renderGrid(data.icons || []);
+                    })
+                    .catch(function () {})
+                    .finally(function () {
+                        // only the LATEST request may clear the spinner - an
+                        // older response finishing after a newer one started
+                        // must not hide the newer one's own loading state.
+                        if (seq === searchSeq) popover.classList.remove('is-loading');
+                    });
+            }
+            // Seed with the current icon's own NAME (not the full class -
+            // "fa-solid fa-key" as a term matches nothing, "key" matches
+            // the whole family), or everything when unset.
+            var seed = (box.dataset.pageIconValue || '').split(' ').pop().replace(/^fa-/, '');
+            search(seed);
+
+            var debounce = null;
+            input.addEventListener('input', function () {
+                previewIcon.className = input.value.trim() || 'fa-solid fa-circle-question';
+                syncHasTerm();
+                clearTimeout(debounce);
+                debounce = setTimeout(function () {
+                    // Same normalization as the seed: typing/pasting a full
+                    // class should still find its family in the grid.
+                    search(input.value.trim().split(' ').pop().replace(/^fa-/, ''));
+                }, 250);
+            });
+            // ✕ empties the field and reruns the unfiltered search - it
+            // does NOT commit anything (resetting the stored icon stays an
+            // explicit clear-the-field-then-Enter action). mousedown
+            // preventDefault keeps focus in the input so the blur-close
+            // below never swallows the click.
+            clearBtn.addEventListener('mousedown', function (ev) { ev.preventDefault(); });
+            clearBtn.addEventListener('click', function () {
+                input.value = '';
+                previewIcon.className = box.dataset.pageIconValue || 'fa-solid fa-circle-question';
+                syncHasTerm();
+                clearTimeout(debounce);
+                search('');
+                input.focus();
+            });
+            input.addEventListener('keydown', function (ev) {
+                if ('Enter' === ev.key) {
+                    ev.preventDefault();
+                    applyPageIcon(box, input.value.trim());
+                    closeIconPopover();
+                } else if ('Escape' === ev.key) {
+                    closeIconPopover();
+                }
+            });
+            // Blur/outside-click just CLOSES, it never commits - unlike the
+            // titles' commit-on-blur contract, this input doubles as the
+            // SEARCH field, and silently saving a half-typed search term
+            // ("calendar") as a raw icon class would break the icon. The
+            // explicit commit paths are Enter (raw class, power users) and
+            // clicking a grid cell.
+            input.addEventListener('blur', function () {
+                if (!iconPopover) return; // Escape already closed it
+                closeIconPopover();
+            });
+        });
+
+        // Brand title: same "commit immediately on blur" idea as the
+        // widget-title/text handler just above, just against a plain
+        // SettingBag path (admin_settings_quick) instead of one item
+        // inside a LayoutConfig (admin_layout_quick) - the sidebar has no
+        // per-item key/scope concept the way dashboard widgets do, so it
+        // never shared that handler, only the pattern. Delegated on
+        // 'blur' in the CAPTURE phase - unlike 'input'/'click', 'blur'
+        // does not bubble, so a plain document-level listener would never
+        // see it fire on a field nested this deep.
         document.addEventListener('blur', function (e) {
             var field = e.target.closest('[data-brand-title][contenteditable="true"]');
             if (!field) return;
@@ -2436,12 +3947,21 @@
         // preference instead of attempting to persist something that
         // doesn't exist.
         document.addEventListener('admin-chart:legend-toggle', function (e) {
-            if (!document.body.classList.contains('is-customizing')) return;
             var card = e.target.closest('[data-analytics-card]');
-            if (!card) return;
-            var widgetBlock = card.closest('[data-sortable-item]');
             var chart = e.target._adminChart;
-            if (!widgetBlock || !chart) return;
+            if (!card || !chart) return;
+
+            // The stat row reacts to every legend click regardless of
+            // customize mode - it's just reflecting what the chart itself
+            // is now showing, same as hovering a point already does via
+            // the tooltip. Persisting that choice for every OTHER admin
+            // (below) stays gated to customize mode, same as any other
+            // layout edit.
+            recomputeStatsFromChart(card, chart);
+
+            if (!document.body.classList.contains('is-customizing')) return;
+            var widgetBlock = card.closest('[data-sortable-item]');
+            if (!widgetBlock) return;
 
             ensureCustomizableWidget(widgetBlock);
 
@@ -2482,29 +4002,46 @@
             divider.classList.add('is-dragging');
 
             var sizes = (divider.dataset.paneSizes || '1,1').split(',').map(function (n) { return parseInt(n, 10) || 1; });
-            var total = sizes[0] + sizes[1];
-            // Both sides clamped to [1, MAX_PANE_SIZE] (see
-            // DashboardWidgetController's own constant) without needing
-            // to import it here - minLeft/maxLeft derived from total
-            // keeps the OTHER side in range for free (e.g. total=8: left
-            // can't go below 2, or right would exceed 6).
-            var minLeft = Math.max(1, total - 6);
-            var maxLeft = Math.min(6, total - 1);
+            // MIN_PANE_SIZE(1)/MAX_PANE_SIZE(6), mirroring
+            // DashboardWidgetController's own constants (no direct line to
+            // import them from here). A FIXED reference span for the
+            // delta-to-fr scaling below, NOT sizes[0]+sizes[1] - every
+            // fresh composite starts both panes at size 1 (see
+            // DashboardWidgetController::sanitizePaneDefinition()'s own
+            // default), so scaling/clamping off the CURRENT total
+            // collapsed to a single frozen value (1+1=2, so
+            // max(1,2-6)=1 and min(6,2-1)=1 - the divider could never
+            // move AT ALL, for every composite, from the moment it's
+            // created). Found live via instrumented console logging:
+            // pointerdown/pointermove/onMove/paint all fired correctly on
+            // every real drag, paint() just always re-clamped straight
+            // back to the same value - this was never an event-handling
+            // bug, the clamp math itself was unsatisfiable.
+            var MIN = 1, MAX = 6, SPAN = MIN + MAX;
             var rect = panesEl.getBoundingClientRect();
             var startX = e.clientX;
             var startLeft = sizes[0];
+            var startRight = sizes[1];
             var pointerId = e.pointerId;
 
-            function paint(left) {
-                var right = total - left;
-                panesEl.style.gridTemplateColumns = left + 'fr 10px ' + right + 'fr';
+            function paint(left, right) {
+                panesEl.style.gridTemplateColumns = left + 'fr 6px ' + right + 'fr';
                 divider.dataset.paneSizes = left + ',' + right;
             }
 
             function onMove(ev) {
                 if (ev.pointerId !== pointerId) return;
-                var deltaFr = ((ev.clientX - startX) / rect.width) * total;
-                paint(Math.max(minLeft, Math.min(maxLeft, Math.round(startLeft + deltaFr))));
+                // Both sides start from their OWN actual current size (no
+                // jump the instant you touch the divider) and move in
+                // lockstep, opposite directions, off the SAME fixed-SPAN
+                // delta - independently clamped to [MIN, MAX] rather than
+                // forced to keep summing to whatever they started at, so
+                // one side can keep growing toward MAX even past the
+                // point where the other has already hit MIN.
+                var deltaFr = ((ev.clientX - startX) / rect.width) * SPAN;
+                var left = Math.max(MIN, Math.min(MAX, Math.round(startLeft + deltaFr)));
+                var right = Math.max(MIN, Math.min(MAX, Math.round(startRight - deltaFr)));
+                paint(left, right);
             }
 
             function onUp(ev) {
@@ -2541,14 +4078,16 @@
             if (!panesEl || !widgetBlock) return;
             e.preventDefault();
 
+            // Same fixed MIN/MAX clamp as the pointer-drag handler above
+            // (see its own comment) - independently clamped sides, not
+            // derived from the current sizes' own volatile sum.
             var sizes = (divider.dataset.paneSizes || '1,1').split(',').map(function (n) { return parseInt(n, 10) || 1; });
-            var total = sizes[0] + sizes[1];
-            var minLeft = Math.max(1, total - 6);
-            var maxLeft = Math.min(6, total - 1);
-            var left = Math.max(minLeft, Math.min(maxLeft, sizes[0] + (e.key === 'ArrowRight' ? 1 : -1)));
-            var right = total - left;
+            var MIN = 1, MAX = 6;
+            var step = e.key === 'ArrowRight' ? 1 : -1;
+            var left = Math.max(MIN, Math.min(MAX, sizes[0] + step));
+            var right = Math.max(MIN, Math.min(MAX, sizes[1] - step));
 
-            panesEl.style.gridTemplateColumns = left + 'fr 10px ' + right + 'fr';
+            panesEl.style.gridTemplateColumns = left + 'fr 6px ' + right + 'fr';
             divider.dataset.paneSizes = left + ',' + right;
 
             ensureCustomizableWidget(widgetBlock);
@@ -2562,68 +4101,172 @@
             }
         });
 
-        // Article-views widget settings panel (which article only now -
-        // title edits in place on the heading itself, see
-        // article_views.html.twig's own comment) - App\Admin\Widget\
-        // ArticleViewsWidgetType, an APP-level widget type reusing this
-        // same generic settings-panel shell. Simpler than the two above:
-        // no live chart re-fetch here (no per-article breakdown endpoint
-        // exists yet - a reasonable v2, not built this round) - applying
+        // Entity-views widget settings panel (which entity, across ANY
+        // pickable class - title edits in place on the heading itself,
+        // see entity_views.html.twig's own comment) - Base\Admin\Widget\
+        // EntityViewsWidgetType, generalized from the old Article-only
+        // ArticleViewsWidgetType, reusing this same generic settings-panel
+        // shell. Simpler than analytics_card's own: no live chart re-fetch
+        // here (no per-entity breakdown endpoint exists yet) - applying
         // just relies on "Done" to reload+re-render the chart itself with
-        // the new article selection, same as any other customize-mode
-        // edit that doesn't have its own live preview.
+        // the new selection, same as any other customize-mode edit that
+        // doesn't have its own live preview.
+        //
+        // The class select's own 'change' populates the entity select's
+        // options from data-instances-by-class (embedded server-side JSON,
+        // see the template's own comment) - client-side, no AJAX round
+        // trip, matching this widget's existing "no live chart" simplicity.
+        document.addEventListener('change', function (e) {
+            var classSelect = e.target.closest('[data-entity-views-settings-class]');
+            if (!classSelect) return;
+            var panel = classSelect.closest('[data-entity-views-settings-panel]');
+            var entitySelect = panel && panel.querySelector('[data-entity-views-settings-entity]');
+            if (!entitySelect) return;
+
+            var byClass = JSON.parse(panel.dataset.instancesByClass || '{}');
+            var instances = byClass[classSelect.value] || [];
+            entitySelect.disabled = !classSelect.value;
+            entitySelect.innerHTML = '<option value=""></option>' + (classSelect.value ? '<option value="all">' + (entitySelect.dataset.allLabel || 'all') + '</option>' : '')
+                + instances.map(function (instance) {
+                    return '<option value="' + instance.id + '">' + instance.label.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>';
+                }).join('');
+        });
+
         document.addEventListener('click', function (e) {
-            var toggle = e.target.closest('[data-article-views-settings-toggle]');
+            var toggle = e.target.closest('[data-entity-views-settings-toggle]');
             if (toggle) {
                 var toggleBlock = toggle.closest('[data-sortable-item]');
-                var toggleCard = toggleBlock && toggleBlock.querySelector('[data-article-views-card]');
+                var toggleCard = toggleBlock && toggleBlock.querySelector('[data-entity-views-card]');
                 if (!toggleCard) return;
-                var togglePanel = toggleCard.querySelector('[data-article-views-settings-panel]');
+                var togglePanel = toggleCard.querySelector('[data-entity-views-settings-panel]');
                 var opening = !!togglePanel.hidden;
                 if (opening) {
                     var toggleDef = JSON.parse((toggleBlock && toggleBlock.dataset.mergeDef) || '{}');
-                    var toggleArticleId = (toggleDef.params && toggleDef.params.articleId) || '';
-                    toggleCard.querySelector('[data-article-views-settings-article]').value = toggleArticleId;
+                    var toggleClass = (toggleDef.params && toggleDef.params.entityClass) || '';
+                    var toggleEntityId = (toggleDef.params && toggleDef.params.entityId) || '';
+                    toggleCard.querySelector('[data-entity-views-settings-class]').value = toggleClass;
+                    // Repaint the entity select for whatever class was
+                    // already saved, THEN select its saved value - the
+                    // 'change' handler above only builds the option list,
+                    // it doesn't know what should end up selected.
+                    toggleCard.querySelector('[data-entity-views-settings-class]').dispatchEvent(new Event('change', { bubbles: true }));
+                    toggleCard.querySelector('[data-entity-views-settings-entity]').value = toggleEntityId;
                 }
                 togglePanel.hidden = !opening;
                 toggle.classList.toggle('is-active', opening);
                 return;
             }
 
-            var cancel = e.target.closest('[data-article-views-settings-cancel]');
+            var cancel = e.target.closest('[data-entity-views-settings-cancel]');
             if (cancel) {
-                cancel.closest('[data-article-views-settings-panel]').hidden = true;
+                cancel.closest('[data-entity-views-settings-panel]').hidden = true;
                 var cancelBlock = cancel.closest('[data-sortable-item]');
-                var cancelToggle = cancelBlock && cancelBlock.querySelector('[data-article-views-settings-toggle]');
+                var cancelToggle = cancelBlock && cancelBlock.querySelector('[data-entity-views-settings-toggle]');
                 if (cancelToggle) cancelToggle.classList.remove('is-active');
                 return;
             }
 
-            var apply = e.target.closest('[data-article-views-settings-apply]');
+            var apply = e.target.closest('[data-entity-views-settings-apply]');
             if (!apply) return;
 
-            var applyCard = apply.closest('[data-article-views-card]');
+            var applyCard = apply.closest('[data-entity-views-card]');
             var applyBlock = applyCard && applyCard.closest('[data-sortable-item]');
             if (!applyBlock) return;
 
             var applyDef = JSON.parse(applyBlock.dataset.mergeDef || '{}');
-            var articleSelect = applyCard.querySelector('[data-article-views-settings-article]');
-            // 'all' (every published article, summed - see the widget
-            // type's own ALL_ARTICLES constant) is the one non-numeric
-            // option value; everything else is a real article id.
-            var articleId = articleSelect.value === 'all' ? 'all' : (articleSelect.value ? parseInt(articleSelect.value, 10) : null);
+            var classSelectApply = applyCard.querySelector('[data-entity-views-settings-class]');
+            var entitySelectApply = applyCard.querySelector('[data-entity-views-settings-entity]');
+            var entityClass = classSelectApply.value || null;
+            // 'all' (every instance of entityClass, summed - see the
+            // widget type's own ALL_INSTANCES constant) is the one
+            // non-numeric option value; everything else is a real id.
+            var entityId = entitySelectApply.value === 'all' ? 'all' : (entitySelectApply.value ? parseInt(entitySelectApply.value, 10) : null);
 
             // Label is NOT touched here - the heading's own contenteditable
             // input handler (generic over any [data-analytics-title]) owns
             // widgetLabel entirely, independent of whether this panel is
             // even open.
-            applyBlock.dataset.blockName = applyDef.blockName || 'article_views';
+            applyBlock.dataset.blockName = applyDef.blockName || 'entity_views';
             applyBlock.dataset.widgetLabel = applyBlock.dataset.widgetLabel || applyDef.label || '';
             applyBlock.dataset.widgetIcon = applyDef.icon || '';
-            applyBlock.dataset.widgetParams = JSON.stringify(Object.assign({}, applyDef.params, { articleId: articleId }));
+            applyBlock.dataset.widgetParams = JSON.stringify(Object.assign({}, applyDef.params, { entityClass: entityClass, entityId: entityId }));
 
-            applyCard.querySelector('[data-article-views-settings-panel]').hidden = true;
-            var applyToggle = applyBlock.querySelector('[data-article-views-settings-toggle]');
+            applyCard.querySelector('[data-entity-views-settings-panel]').hidden = true;
+            var applyToggle = applyBlock.querySelector('[data-entity-views-settings-toggle]');
+            if (applyToggle) applyToggle.classList.remove('is-active');
+        });
+
+        // "Counter" widget settings panel - exact same picker mechanism as
+        // entity_views' own above, just under its own data-counter-
+        // settings-* namespace/data-counter-card scoping (see counter.
+        // html.twig's own comment on why this stays a separate copy
+        // rather than a shared abstraction).
+        document.addEventListener('change', function (e) {
+            var classSelect = e.target.closest('[data-counter-settings-class]');
+            if (!classSelect) return;
+            var panel = classSelect.closest('[data-counter-settings-panel]');
+            var entitySelect = panel && panel.querySelector('[data-counter-settings-entity]');
+            if (!entitySelect) return;
+
+            var byClass = JSON.parse(panel.dataset.instancesByClass || '{}');
+            var instances = byClass[classSelect.value] || [];
+            entitySelect.disabled = !classSelect.value;
+            entitySelect.innerHTML = '<option value=""></option>' + (classSelect.value ? '<option value="all">' + (entitySelect.dataset.allLabel || 'all') + '</option>' : '')
+                + instances.map(function (instance) {
+                    return '<option value="' + instance.id + '">' + instance.label.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>';
+                }).join('');
+        });
+
+        document.addEventListener('click', function (e) {
+            var toggle = e.target.closest('[data-counter-settings-toggle]');
+            if (toggle) {
+                var toggleBlock = toggle.closest('[data-sortable-item]');
+                var toggleCard = toggleBlock && toggleBlock.querySelector('[data-counter-card]');
+                if (!toggleCard) return;
+                var togglePanel = toggleCard.querySelector('[data-counter-settings-panel]');
+                var opening = !!togglePanel.hidden;
+                if (opening) {
+                    var toggleDef = JSON.parse((toggleBlock && toggleBlock.dataset.mergeDef) || '{}');
+                    var toggleClass = (toggleDef.params && toggleDef.params.entityClass) || '';
+                    var toggleEntityId = (toggleDef.params && toggleDef.params.entityId) || '';
+                    toggleCard.querySelector('[data-counter-settings-class]').value = toggleClass;
+                    toggleCard.querySelector('[data-counter-settings-class]').dispatchEvent(new Event('change', { bubbles: true }));
+                    toggleCard.querySelector('[data-counter-settings-entity]').value = toggleEntityId;
+                }
+                togglePanel.hidden = !opening;
+                toggle.classList.toggle('is-active', opening);
+                return;
+            }
+
+            var cancel = e.target.closest('[data-counter-settings-cancel]');
+            if (cancel) {
+                cancel.closest('[data-counter-settings-panel]').hidden = true;
+                var cancelBlock = cancel.closest('[data-sortable-item]');
+                var cancelToggle = cancelBlock && cancelBlock.querySelector('[data-counter-settings-toggle]');
+                if (cancelToggle) cancelToggle.classList.remove('is-active');
+                return;
+            }
+
+            var apply = e.target.closest('[data-counter-settings-apply]');
+            if (!apply) return;
+
+            var applyCard = apply.closest('[data-counter-card]');
+            var applyBlock = applyCard && applyCard.closest('[data-sortable-item]');
+            if (!applyBlock) return;
+
+            var applyDef = JSON.parse(applyBlock.dataset.mergeDef || '{}');
+            var classSelectApply = applyCard.querySelector('[data-counter-settings-class]');
+            var entitySelectApply = applyCard.querySelector('[data-counter-settings-entity]');
+            var entityClass = classSelectApply.value || null;
+            var entityId = entitySelectApply.value === 'all' ? 'all' : (entitySelectApply.value ? parseInt(entitySelectApply.value, 10) : null);
+
+            applyBlock.dataset.blockName = applyDef.blockName || 'counter';
+            applyBlock.dataset.widgetLabel = applyBlock.dataset.widgetLabel || applyDef.label || '';
+            applyBlock.dataset.widgetIcon = applyDef.icon || '';
+            applyBlock.dataset.widgetParams = JSON.stringify(Object.assign({}, applyDef.params, { entityClass: entityClass, entityId: entityId }));
+
+            applyCard.querySelector('[data-counter-settings-panel]').hidden = true;
+            var applyToggle = applyBlock.querySelector('[data-counter-settings-toggle]');
             if (applyToggle) applyToggle.classList.remove('is-active');
         });
 
@@ -2657,7 +4300,7 @@
         var paletteTrigger = document.getElementById('admin-add-widget-trigger');
         var paletteMenu = document.querySelector('[data-widget-palette-menu]');
         if (paletteTrigger && paletteMenu) {
-            paletteTrigger.addEventListener('click', function () {
+            function loadPaletteTypes() {
                 if (paletteTypes) return;
                 fetch('{{ path("admin_dashboard_widget_types") }}')
                     .then(function (r) { return r.json(); })
@@ -2668,7 +4311,18 @@
                                 + (t.icon ? '<i class="' + t.icon + '"></i> ' : '') + t.label + '</button>';
                         }).join('');
                     });
-            });
+            }
+            // Fetched as soon as customize mode's own toolbar exists, not
+            // lazily on the trigger's first click - the dropdown itself
+            // opens INSTANTLY either way (the generic [data-dropdown]
+            // handler just toggles a CSS class), but its content used to
+            // stay genuinely blank for however long the request took
+            // (~0.7s here, reported as ~4s live) - a blank white dropdown
+            // box reads as "did my click even register?", not "still
+            // loading". Firing this early means the list is very likely
+            // already in hand by the time anyone actually clicks.
+            loadPaletteTypes();
+            paletteTrigger.addEventListener('click', loadPaletteTypes);
         }
         document.addEventListener('click', function (e) {
             var button = e.target.closest('[data-add-widget-type]');
@@ -2693,6 +4347,27 @@
                 });
         });
 
+        // Restoring a deleted code-defined widget (see dashboard.html.twig's
+        // "restore" picker) writes straight to the stored LayoutConfig -
+        // unlike every other customize-mode change, it can't wait for the
+        // batched "Done" save (deleted_widgets is itself read from that
+        // same stored config on every page load, see
+        // AbstractDashboardController::index()) - so this reloads on
+        // success rather than patching the DOM: the restored widget has no
+        // code-defined MenuItem available client-side to render from.
+        document.addEventListener('click', function (e) {
+            var button = e.target.closest('[data-restore-widget-key]');
+            if (!button || !doneBtn) return;
+
+            fetch('{{ path("admin_dashboard_widget_restore") }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-Token': doneBtn.dataset.csrfToken },
+                body: 'key=' + encodeURIComponent(button.dataset.restoreWidgetKey),
+            }).then(function (r) {
+                if (r.ok) window.location.reload();
+            });
+        });
+
         function captureLevel(container) {
             var items = [];
             container.querySelectorAll(':scope > [data-sortable-item]').forEach(function (el) {
@@ -2700,6 +4375,9 @@
                 var entry = {
                     key: el.dataset.sortableKey,
                     visible: !el.classList.contains('is-hidden'),
+                    // Same generic, always-present shape as visible above
+                    // - see MenuItem::$background's own docblock.
+                    background: !el.classList.contains('no-card-bg'),
                     size: parseInt(el.dataset.widgetSize || '1', 10),
                     // null (not omitted) when never explicitly resized -
                     // matches LayoutConfig's own "height: ?int" shape, and
@@ -2727,6 +4405,16 @@
                     entry.label = el.dataset.widgetLabel || '';
                     entry.icon = el.dataset.widgetIcon || null;
                     try { entry.params = JSON.parse(el.dataset.widgetParams || '{}'); } catch (err) { entry.params = {}; }
+                } else if (el.dataset.widgetLabel !== undefined) {
+                    // A code-defined SECTION widget (Blog/Photos/
+                    // Destinations/...) whose title got edited in place -
+                    // no blockName/params to carry (section widgets are
+                    // never blockName-dispatched, see _group.html.twig),
+                    // just the new label - see LayoutArranger::applyLevel()'s
+                    // own matching half of this (label applies to any
+                    // matched code-defined item now, not just a
+                    // blockName-carrying one).
+                    entry.label = el.dataset.widgetLabel;
                 }
                 items.push(entry);
             });
@@ -2754,29 +4442,47 @@
             }
             return fetch(LAYOUT_SAVE_URLS[scope], {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': doneBtn.dataset.csrfToken },
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': layoutCsrfToken() },
                 body: JSON.stringify(payload),
             });
         }
 
-        if (doneBtn) {
-            doneBtn.addEventListener('click', function () {
-                var saves = [];
-                document.querySelectorAll('[data-sortable="sidebar"]').forEach(function (el) { saves.push(saveScope('sidebar', el)); });
-                document.querySelectorAll('[data-sortable="dashboard"]').forEach(function (el) { saves.push(saveScope('dashboard', el)); });
+        // Delegated for the same SPA-swap-survival reason as the customize
+        // toggle above.
+        document.addEventListener('click', function (e) {
+            if (!e.target.closest('#admin-customize-done')) return;
+            var saves = [];
+            document.querySelectorAll('[data-sortable="sidebar"]').forEach(function (el) { saves.push(saveScope('sidebar', el)); });
+            document.querySelectorAll('[data-sortable="dashboard"]').forEach(function (el) { saves.push(saveScope('dashboard', el)); });
 
-                Promise.all(saves).then(function () {
-                    setCustomizing(false);
-                    window.location.reload();
-                }).catch(function () {
-                    // leave customize mode open so nothing is silently lost
-                });
+            Promise.all(saves).then(function () {
+                setCustomizing(false);
+                window.location.reload();
+            }).catch(function () {
+                // leave customize mode open so nothing is silently lost
             });
-        }
+        });
 
         var wasCustomizing = false;
         try { wasCustomizing = localStorage.getItem(STORAGE_KEY) === '1'; } catch (e) {}
         if (wasCustomizing) setCustomizing(true);
+
+        // transparentJS re-dispatches a synthetic 'load' on every in-admin
+        // navigation (see Transparent.ready()'s own {once:true} comment in
+        // the <head>) - the swapped-in #page subtree is brand new DOM:
+        // sortables aren't initialized on it, contenteditable flags are
+        // gone, and the fresh toggle button renders without its active
+        // state. Re-apply the CLIENT-side customize state to it. NOT
+        // {once:true}, deliberately - re-running on every swap is the
+        // whole point here.
+        window.addEventListener('load', function () {
+            sortablesInitialized = false;
+            var on = body.classList.contains('is-customizing');
+            if (on) initSortables();
+            var toggleBtn = getToggleBtn();
+            if (toggleBtn) { toggleBtn.classList.toggle('is-active', on); toggleBtn.setAttribute('aria-pressed', on ? 'true' : 'false'); }
+            refreshTitleEditability();
+        });
     })();
 </script>
 {% endif %}

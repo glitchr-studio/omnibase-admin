@@ -5,16 +5,29 @@ namespace Base\Admin\Layout;
 /**
  * One persisted layout: an ordered, hide/show-annotated tree of item keys.
  * Shape: {version, items: [{key, visible, size, height, deleted, children:
- * [...]}]}, plus four OPTIONAL keys (blockName, label, icon, params)
- * present only on ad-hoc/palette-added widgets - a self-contained widget
- * definition with no code-defined counterpart to re-skin. An item without
- * blockName is otherwise byte-identical to the pre-widening 4-key shape
- * (every pre-existing stored config, and every sidebar-scope item, which
- * never carries blockName at all) - deleted only ever matters for a
- * code-defined item (see LayoutArranger's own comment on why an ad-hoc
- * one needs no such flag), but is always present/false rather than one
- * more OPTIONAL key, since unlike blockName's group it isn't tied to
- * whether this entry has its own self-contained widget definition.
+ * [...]}]}, plus five OPTIONAL keys (blockName, label, icon, params, and
+ * label ALONE without the other three - see below).
+ *
+ * blockName+label+icon+params together mean an ad-hoc/palette-added widget
+ * - a self-contained widget definition with no code-defined counterpart to
+ * re-skin. An item without any of the five is otherwise byte-identical to
+ * the pre-widening 4-key shape (every pre-existing stored config, and
+ * every sidebar-scope item, which never carries any of them at all).
+ *
+ * label CAN also appear alone, with no blockName/icon/params: an in-place
+ * title edit on a matched CODE-DEFINED item, block-type or section-type
+ * alike (see LayoutArranger::applyLevel()'s own matching half - label
+ * applies to any matched code-defined item, not just a blockName-carrying
+ * one). icon/params only ever mean something for a blockName-dispatched
+ * (block-type) widget's own rendering, so they stay gated to entries that
+ * actually carry a blockName.
+ *
+ * deleted only ever matters for a code-defined item (see LayoutArranger's
+ * own comment on why an ad-hoc one needs no such flag), but is always
+ * present/false rather than one more OPTIONAL key, since unlike the
+ * others it isn't tied to whether this entry has its own self-contained
+ * widget definition.
+ *
  * fromArray() is the validation boundary for data coming back out of
  * SettingBag (itself reachable and hand-editable via the generic settings
  * CRUD) - it must never throw or produce something LayoutArranger can't
@@ -103,6 +116,12 @@ class LayoutConfig
                 'visible' => !\array_key_exists('visible', $item) || (bool) $item['visible'],
                 'size' => max(self::MIN_SIZE, min($maxSize, $size)),
                 'height' => $height,
+                // Same "always present, missing means true/default" shape
+                // as visible above - any widget can toggle its own card
+                // chrome off now (see MenuItem::$background's own
+                // docblock), not just Bienvenue/"Generic" (the one this
+                // was first built for).
+                'background' => !\array_key_exists('background', $item) || (bool) $item['background'],
                 // A code-defined item (no blockName carried on ITS OWN
                 // entry - an ad-hoc one is already truly gone the moment a
                 // save simply omits its key, see LayoutArranger's own
@@ -115,14 +134,81 @@ class LayoutConfig
                 'children' => self::sanitizeItems($item['children'] ?? [], $depthRemaining - 1, $maxSize),
             ];
 
+            // An in-place title edit on a matched code-defined item - block
+            // OR section widget alike (see LayoutArranger::applyLevel()'s
+            // own matching half of this: label applies to any matched
+            // code-defined item now, not just a blockName-carrying one -
+            // found live, only Trafic/Vues could ever have their title
+            // changed before this, every plain link-list card like Blog/
+            // Photos/Destinations couldn't, because this whole key used to
+            // live inside the blockName-only branch below and got silently
+            // dropped by this exact validator for anything else). '' not
+            // null: every widget template does {{ widget.label|trans(...) }}.
+            $label = \is_string($item['label'] ?? null) && '' !== $item['label']
+                ? mb_substr($item['label'], 0, self::MAX_LABEL_LENGTH)
+                : null;
+
             $blockName = $item['blockName'] ?? null;
             if (\is_string($blockName) && '' !== $blockName) {
+                // Key order kept exactly as before (blockName, label,
+                // icon, params) for every existing ad-hoc entry - only
+                // the label-alone case below is new.
                 $entry['blockName'] = mb_substr($blockName, 0, self::MAX_BLOCK_NAME_LENGTH);
-                // '' not null: every widget template does {{ widget.label|trans(...) }}
-                $entry['label'] = \is_string($item['label'] ?? null) ? mb_substr($item['label'], 0, self::MAX_LABEL_LENGTH) : '';
+                $entry['label'] = $label ?? '';
                 $icon = $item['icon'] ?? null;
                 $entry['icon'] = \is_string($icon) && '' !== $icon ? mb_substr($icon, 0, self::MAX_ICON_LENGTH) : null;
                 $entry['params'] = self::sanitizeParams($item['params'] ?? [], self::MAX_PARAMS_DEPTH);
+            } else {
+                if (null !== $label) {
+                    $entry['label'] = $label;
+                }
+                // icon-ALONE on a code-defined item: an in-place page/menu
+                // icon customization (see layout.html.twig's data-page-icon
+                // handler) - same OPTIONAL shape and clear-to-reset
+                // semantics as label-alone. Locale-agnostic on purpose: an
+                // icon isn't language-specific, so it never joins the
+                // 'intl' map below.
+                $icon = $item['icon'] ?? null;
+                if (\is_string($icon) && '' !== $icon) {
+                    $entry['icon'] = mb_substr($icon, 0, self::MAX_ICON_LENGTH);
+                }
+            }
+
+            // A page's own customized description (see MenuItem::$description
+            // / layout.html.twig's data-page-desc handler) - same OPTIONAL
+            // "present only when customized" shape as label-alone, same
+            // clear-to-reset semantics ('' drops the key entirely).
+            $description = \is_string($item['description'] ?? null) && '' !== $item['description']
+                ? mb_substr($item['description'], 0, self::MAX_LABEL_LENGTH)
+                : null;
+            if (null !== $description) {
+                $entry['description'] = $description;
+            }
+
+            // Per-locale page title/description overrides for NON-default
+            // admin locales: {locale: {label?, description?}}. The plain
+            // label/description keys above stay the DEFAULT locale's values
+            // (and the only shape dashboard widgets ever use) - this map is
+            // additive, only the page-heading feature reads it. Same
+            // clear-to-reset semantics per locale; a locale left with
+            // neither field is dropped, an empty map drops the key.
+            $intl = [];
+            foreach (\is_array($item['intl'] ?? null) ? $item['intl'] : [] as $locale => $values) {
+                if (!\is_string($locale) || !preg_match('/^[a-z]{2}(-[A-Z]{2})?$/', $locale) || !\is_array($values)) {
+                    continue;
+                }
+                $localized = [];
+                foreach (['label', 'description'] as $field) {
+                    if (\is_string($values[$field] ?? null) && '' !== $values[$field]) {
+                        $localized[$field] = mb_substr($values[$field], 0, self::MAX_LABEL_LENGTH);
+                    }
+                }
+                if ([] !== $localized) {
+                    $intl[$locale] = $localized;
+                }
+            }
+            if ([] !== $intl) {
+                $entry['intl'] = $intl;
             }
 
             $sanitized[] = $entry;
@@ -191,6 +277,25 @@ class LayoutConfig
     public function setItems(array $items): static
     {
         $this->items = $items;
+        return $this;
+    }
+
+    /**
+     * Clears the deleted flag on the top-level entry with this key, if
+     * present - the restore-widget action's whole job (see
+     * DashboardWidgetController::restore()). A no-op if the key isn't
+     * stored at all (nothing to restore) or wasn't deleted in the first
+     * place (idempotent, matches a superadmin double-clicking restore).
+     */
+    public function restoreItem(string $key): static
+    {
+        foreach ($this->items as &$item) {
+            if ($item['key'] === $key) {
+                $item['deleted'] = false;
+            }
+        }
+        unset($item);
+
         return $this;
     }
 

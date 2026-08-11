@@ -51,10 +51,11 @@ abstract class AbstractDashboardController extends AbstractController
         $this->adminContext->setMainMenu($menu);
         $this->adminContext->setUserMenu($this->menuBuilder->resolve($this->toArray($this->configureUserMenu())));
 
-        $widgets = $this->menuBuilder->resolve(array_merge(
+        $widgetItems = array_merge(
             $this->toArray($this->configureWidgetItems()),
             $this->toArray($this->configureDashboardBlockItems()),
-        ), LayoutScope::DASHBOARD);
+        );
+        $widgets = $this->menuBuilder->resolve($widgetItems, LayoutScope::DASHBOARD);
 
         return $this->render('@Admin/dashboard.html.twig', [
             'admin_context' => $this->adminContext,
@@ -64,6 +65,11 @@ abstract class AbstractDashboardController extends AbstractController
             'quick_access' => [] === $widgets ? $this->buildQuickAccess($menu) : [],
             'customize_enabled' => $this->isGranted(\Base\Enum\UserRole::SUPERADMIN),
             'dashboard_columns' => $this->menuBuilder->getColumns(LayoutScope::DASHBOARD),
+            // same $widgetItems array apply() above just mutated in place -
+            // harmless here, a deleted entry is never touched by apply()'s
+            // matching loop (see LayoutArranger::applyLevel()'s own comment)
+            // so its code-defined label/icon are always still intact
+            'deleted_widgets' => $this->menuBuilder->deletedItems($widgetItems, LayoutScope::DASHBOARD),
         ]);
     }
 
@@ -156,8 +162,15 @@ abstract class AbstractDashboardController extends AbstractController
             // span) and listed first - a greeting reads oddly squeezed
             // into a partial-width card next to other content, and it's
             // the first thing the historical dashboard showed too.
+            // ->setBackground(false): overrides MenuItem's own generic
+            // true-by-default (see MenuItem::$background's own docblock) -
+            // a fresh/never-customized welcome should still read as part
+            // of the page itself, not a boxed card (see welcome.html.twig's
+            // own comment); a superadmin can still toggle a real card
+            // background on for it later, same as any other widget.
             MenuItemFactory::block('welcome', 'dashboard.welcome_title', 'fa-solid fa-hand-wave')
-                ->setSize(5),
+                ->setSize(5)
+                ->setBackground(false),
             MenuItemFactory::block('analytics_card', 'dashboard.analytics_title', 'fa-solid fa-chart-line')
                 ->setSize(3), // chart-heavy by default; superadmins can shrink it in customize mode
         ];

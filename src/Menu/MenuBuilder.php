@@ -34,6 +34,7 @@ class MenuBuilder
         protected readonly AuthorizationCheckerInterface $authorizationChecker,
         protected readonly LayoutStore $layoutStore,
         protected readonly LayoutArranger $layoutArranger,
+        protected readonly ?\Base\Service\LocalizerInterface $localizer = null,
         protected readonly iterable $dashboardControllers = [],
     ) {
     }
@@ -155,6 +156,24 @@ class MenuBuilder
         return $this->layoutStore->get($layoutScope)->getColumns();
     }
 
+    /**
+     * Code-defined items the superadmin has deleted from the given scope -
+     * the "restore a widget" picker's data source (see dashboard.html.twig).
+     * Same filterGranted() pass as resolve() so a permission-gated item
+     * never shows up as "deleted" just because the current user can't see
+     * it in the first place.
+     *
+     * @param iterable<MenuItem> $items
+     * @return MenuItem[]
+     */
+    public function deletedItems(iterable $items, string $layoutScope): array
+    {
+        $items = is_array($items) ? $items : iterator_to_array($items, false);
+        $items = $this->filterGranted($items);
+
+        return $this->layoutArranger->deletedItems($items, $this->layoutStore->get($layoutScope));
+    }
+
     public function resolve(iterable $items, ?string $layoutScope = null): array
     {
         $items = is_array($items) ? $items : iterator_to_array($items, false);
@@ -163,7 +182,15 @@ class MenuBuilder
             $this->resolveUrl($item);
         }
         if (null !== $layoutScope) {
-            $items = $this->layoutArranger->apply($items, $this->layoutStore->get($layoutScope));
+            // Locale pair drives per-locale title/description overrides
+            // (see LayoutArranger::applyLevel()) - null localizer (pure
+            // unit-test setups) degrades to locale-agnostic behavior.
+            $items = $this->layoutArranger->apply(
+                $items,
+                $this->layoutStore->get($layoutScope),
+                $this->localizer?->getLocale(),
+                $this->localizer ? $this->localizer::getDefaultLocale() : null,
+            );
         }
         $this->markSelected($items);
 

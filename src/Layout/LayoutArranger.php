@@ -14,11 +14,17 @@ class LayoutArranger
 {
     /**
      * @param MenuItem[] $items
+     * @param string|null $locale current request locale - drives which of an
+     *        entry's per-locale title/description overrides applies (see
+     *        LayoutConfig's 'intl' key). null keeps the historical
+     *        locale-agnostic behavior (plain label/description only).
+     * @param string|null $defaultLocale the app's default locale - plain
+     *        label/description are THAT locale's values, 'intl' holds the rest.
      * @return MenuItem[]
      */
-    public function apply(array $items, LayoutConfig $config): array
+    public function apply(array $items, LayoutConfig $config, ?string $locale = null, ?string $defaultLocale = null): array
     {
-        return $this->applyLevel($items, $config->getItems(), $config->getColumns());
+        return $this->applyLevel($items, $config->getItems(), $config->getColumns(), $locale, $defaultLocale);
     }
 
     /**
@@ -26,7 +32,7 @@ class LayoutArranger
      * @param array<int, array{key: string, visible: bool, deleted?: bool, children: array}> $stored
      * @return MenuItem[]
      */
-    private function applyLevel(array $items, array $stored, int $columns): array
+    private function applyLevel(array $items, array $stored, int $columns, ?string $locale = null, ?string $defaultLocale = null): array
     {
         /** @var array<string, MenuItem> $byKey first-wins on a key collision */
         $byKey = [];
@@ -73,28 +79,68 @@ class LayoutArranger
                 // future save simply omits this key, it's never synthesized
                 // again - no tombstone/delete path needed anywhere here.
                 $item = $this->synthesizeAdHocWidget($entry);
-            } elseif (!empty($entry['blockName'])) {
-                // A code-defined widget the admin has customized in place
-                // (see the analytics card's settings panel) - blockName
-                // present on a stored entry that DID match a code-defined
-                // item means "apply this override", not "synthesize a new
-                // widget": blockName/icon are deliberately left untouched
-                // (swapping what a key renders isn't customizing it, it's
-                // a different widget), only label/params ever get applied
-                // this way. An empty label falls back to the code-defined
-                // default rather than shipping a blank title - the same
-                // "clear the field to reset" a superadmin would expect,
-                // not a state this app has to specifically distinguish
-                // from "never customized".
-                if (\is_string($entry['label'] ?? null) && '' !== $entry['label']) {
-                    $item->setLabel($entry['label']);
+            } else {
+                // A code-defined item the admin has customized in place
+                // (see the analytics card's settings panel, or any
+                // in-place title edit - see layout.html.twig's own input
+                // handler) - blockName/icon are deliberately left
+                // untouched either way (swapping what a key renders isn't
+                // customizing it, it's a different widget). An empty
+                // label falls back to the code-defined default rather
+                // than shipping a blank title - the same "clear the field
+                // to reset" a superadmin would expect, not a state this
+                // app has to specifically distinguish from "never
+                // customized".
+                //
+                // Label applies regardless of the entry's own shape
+                // (block OR section widget - a plain link-list card's
+                // title is just as editable as analytics_card's own,
+                // found live: only Trafic/Vues could have their title
+                // changed, every Blog/Photos/Destinations-style card
+                // couldn't, because this used to live inside the
+                // blockName-only branch below). params only ever means
+                // something for a blockName-dispatched (block-type)
+                // widget's own rendering, so it stays gated to entries
+                // that actually carry one.
+                // Which stored values apply depends on the CURRENT locale:
+                // plain label/description are the DEFAULT locale's values
+                // (and the only shape dashboard widgets use - a null/equal
+                // locale pair keeps that historical behavior), non-default
+                // locales read their own entry in the 'intl' map. An
+                // untouched locale deliberately falls through to the
+                // code-defined translation rather than showing another
+                // language's custom text.
+                $localized = (null === $locale || null === $defaultLocale || $locale === $defaultLocale)
+                    ? $entry
+                    : ($entry['intl'][$locale] ?? []);
+
+                if (\is_string($localized['label'] ?? null) && '' !== $localized['label']) {
+                    $item->setLabel($localized['label']);
+                    // A page heading needs to distinguish "renamed by a
+                    // superadmin" (show this label) from the code-defined
+                    // default (keep the page's own title) - see
+                    // MenuItem::$labelCustomized.
+                    $item->setLabelCustomized(true);
                 }
-                if (\is_array($entry['params'] ?? null)) {
+                if (\is_string($localized['description'] ?? null) && '' !== $localized['description']) {
+                    $item->setDescription($localized['description']);
+                }
+                // icon-alone (no blockName) = an in-place page/menu icon
+                // customization - locale-agnostic, unlike label/description
+                // above. blockName-carrying entries keep the historical
+                // "icon is widget identity, never overridden here" rule.
+                if (empty($entry['blockName']) && \is_string($entry['icon'] ?? null) && '' !== $entry['icon']) {
+                    $item->setIcon($entry['icon']);
+                }
+                if (!empty($entry['blockName']) && \is_array($entry['params'] ?? null)) {
                     $item->setParams($entry['params']);
                 }
             }
 
             $item->setHidden(!$entry['visible']);
+            // Same generic, works-for-any-widget shape as setHidden()
+            // above - see MenuItem::$background's own docblock.
+            $item->setBackground($entry['background'] ?? true);
             // min(), not a raw assignment: LayoutConfig::sanitizeItems()
             // already clamped a STORED size to whatever column count was
             // in effect when it was saved, but the column count can be
@@ -104,7 +150,7 @@ class LayoutArranger
             $item->setSize(min($columns, $entry['size'] ?? $item->getSize()));
             $item->setHeight(\array_key_exists('height', $entry) ? $entry['height'] : $item->getHeight());
             if ([] !== $item->getSubItems()) {
-                $item->setSubItems($this->applyLevel($item->getSubItems(), $entry['children'] ?? [], $columns));
+                $item->setSubItems($this->applyLevel($item->getSubItems(), $entry['children'] ?? [], $columns, $locale, $defaultLocale));
             }
 
             $result[] = $item;
@@ -136,6 +182,44 @@ class LayoutArranger
             $item->setSize(min($columns, $item->getSize()));
             $seen[$key] = true;
             $result[] = $item;
+        }
+
+        return $result;
+    }
+
+    /**
+     * The code-defined items a superadmin has deleted from this level
+     * (apply() intentionally omits these for good, see the deleted-flag
+     * branch above) - the "restore a widget" picker's data source. Reuses
+     * the same byKey matching apply() does, so the returned MenuItem is
+     * the real code-defined one (correct label/icon/key), not a
+     * reconstruction from the stored entry.
+     *
+     * @param MenuItem[] $items
+     * @return MenuItem[] in code order
+     */
+    public function deletedItems(array $items, LayoutConfig $config): array
+    {
+        $byKey = [];
+        foreach ($items as $item) {
+            $key = $item->getKey();
+            if (!isset($byKey[$key])) {
+                $byKey[$key] = $item;
+            }
+        }
+
+        $deletedKeys = [];
+        foreach ($config->getItems() as $entry) {
+            if ($entry['deleted'] ?? false) {
+                $deletedKeys[$entry['key']] = true;
+            }
+        }
+
+        $result = [];
+        foreach ($items as $item) {
+            if (isset($deletedKeys[$item->getKey()])) {
+                $result[] = $item;
+            }
         }
 
         return $result;
