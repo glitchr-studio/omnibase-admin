@@ -1,12 +1,34 @@
-{# Rendered via Base\Admin\Widget\WelcomeWidgetType - 'welcomeText' arrives
-   as a template var (getTemplateVars()). No title: this card's whole
-   content IS the one line of greeting text, nothing else in it needs a
-   heading to sit under (see the widget type's own comment on why
-   getDefaultLabel() is never rendered here).
+{# Rendered via Base\Admin\Widget\WelcomeWidgetType (the "Generic" palette
+   entry) - 'welcomeText' arrives as a template var (getTemplateVars()),
+   either the custom params.text a superadmin typed in place or the
+   original greeting default. No title: this widget's whole content IS
+   the text, nothing else in it needs a heading to sit under (see the
+   widget type's own comment on why getDefaultLabel() is never rendered
+   here).
 
-   'embedded' (set by composite.html.twig when this renders as one pane of
-   a CompositeWidgetType) drops the .card class, same "never a card nested
-   inside another card" rule every other widget template follows. #}
-<div class="widget-welcome {{ (embedded is not defined or not embedded) ? 'card' }}">
-    <p class="dashboard-welcome">{{ welcomeText }}</p>
+   data-widget-text is its own in-place-edit mechanism (see
+   layout.html.twig's own input handler) - deliberately NOT data-analytics-
+   title/data-brand-title: those two write straight into the widget's
+   LABEL (a card title), this one writes into params.text (body content,
+   no title concept here at all).
+
+   Always carries the .card class now, same as every other widget type
+   (analytics-card/composite-card/...) - the generic background toggle
+   (see _block.html.twig's [data-toggle-background]) is a pure client-side
+   class toggle on the WRAPPER (.widget-block.no-card-bg), applied on top
+   of whatever the server already rendered - it never re-renders this
+   template, so it can only ever show/hide a .card that's already in the
+   DOM, not add one that isn't there yet. Conditionally omitting .card
+   server-side (an earlier version of this comment/template) made the
+   toggle button a dead click: it flipped the stored flag and the class
+   on reload, but nothing visibly changed in the live preview before that
+   reload happened. AbstractDashboardController::configureDashboardBlockItems()
+   still sets this widget's own code-level default to false (not the
+   generic MenuItem default of true), so a fresh/never-customized instance
+   reads as part of the page itself, not a boxed widget competing visually
+   with the real content cards around it - but a superadmin can now
+   genuinely toggle a real card background on for it, live, same as any
+   other widget. #}
+<div class="widget-welcome card">
+    <p class="dashboard-welcome" data-widget-text>{{ welcomeText }}</p>
 </div>

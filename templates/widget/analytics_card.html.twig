@@ -11,16 +11,22 @@
    Bot/AI's shape) instead of something this template forces on every
    instance unconditionally.
 
-   Editing is fully in-place, no separate settings form: the title is a
-   contenteditable heading (see data-analytics-title, made editable by
-   layout.html.twig's setCustomizing() while body.is-customizing), and
-   which series show is just the chart's own legend - Chart.js already
-   toggles a series on a legend click for free, admin-charts.js only adds
-   a DOM event on top so layout.html.twig can persist the new hidden/shown
-   set. Tried a separate gear-icon settings panel (title input + a
-   checkbox per series) first; it duplicated controls that already exist
-   right there in the widget (the title text itself, the chart's own
-   legend) instead of just making them editable directly.
+   The title stays fully in-place (see data-analytics-title, made editable
+   by layout.html.twig's setCustomizing() while body.is-customizing) - no
+   settings-panel field duplicates that. Which series show is controlled
+   by the chart's own legend alone now (Chart.js already toggles a series
+   on a legend click for free; admin-charts.js's legendOnClick adds a DOM
+   event on top so layout.html.twig can persist it into params.series
+   while in customize mode - a plain click outside customize mode stays a
+   harmless, un-persisted view preference). A separate explicit gear-icon
+   settings panel duplicating the exact same checkboxes existed here
+   before and was removed - it read as redundant once it was clear the
+   legend already does the whole job, persistence included, while in
+   customize mode. (An EARLIER iteration had gone the other direction -
+   legend-only with no gear at all - and reverted specifically because
+   admins expected an explicit settings entry point too; if this removal
+   gets the same reaction, that's the fallback to revisit, not a dead
+   end.)
 
    ALL 5 series are always sent to the chart (datasets never omit a
    series just because params.series doesn't currently include it) with
@@ -42,7 +48,7 @@
         <div class="analytics-stat-row">
             <div class="analytics-stat" data-stat="pageViews">
                 <span class="analytics-stat-value">
-                    {{ totalPageViews }}
+                    <span class="analytics-stat-number" data-raw-value="{{ totalPageViews }}">{{ totalPageViews }}</span>
                     {%- if change.pageViews is not null %}
                         <span class="analytics-stat-change {{ change.pageViews >= 0 ? 'is-up' : 'is-down' }}">
                             {{ change.pageViews >= 0 ? '+' : '' }}{{ change.pageViews }}%
@@ -52,9 +58,10 @@
                 <span class="analytics-stat-label">{{ 'analytics.label.page_views'|trans({}, 'admin') }}</span>
             </div>
             {% for key in ['uniqueVisitors', 'uniqueUsers'] %}
+                {% set keyTotal = series|reduce((carry, day) => carry + day[key], 0) %}
                 <div class="analytics-stat" data-stat="{{ key }}">
                     <span class="analytics-stat-value">
-                        {{ series|reduce((carry, day) => carry + day[key], 0) }}
+                        <span class="analytics-stat-number" data-raw-value="{{ keyTotal }}">{{ keyTotal }}</span>
                         {%- if change[key] is not null %}
                             <span class="analytics-stat-change {{ change[key] >= 0 ? 'is-up' : 'is-down' }}">
                                 {{ change[key] >= 0 ? '+' : '' }}{{ change[key] }}%

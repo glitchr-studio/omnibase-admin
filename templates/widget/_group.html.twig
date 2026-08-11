@@ -12,14 +12,27 @@
 {% set mergeSubItems = [] %}
 {% for item in widget.subItems %}
     {% if item.linkUrl %}
-        {% set mergeSubItems = mergeSubItems|merge([{label: (item.label ? item.label|trans({}, 'admin') : ''), icon: item.icon, url: item.linkUrl}]) %}
+        {# The "add new X" link's icon is never item.icon itself (that's
+           null for it, same as below) - it's the fa-circle-plus this
+           template's own render loop bolts on purely from
+           item.crudActionName == 'new'. A merge into a composite pane
+           round-trips through DashboardWidgetController::sanitizePane
+           Definition()/CompositeWidgetType (plain {label,icon,url} JSON,
+           reconstructed via MenuItemFacade::linkToUrl() - no
+           crudActionName concept there at all), so capturing crudActionName
+           itself here would just get silently dropped one hop later. Baking
+           the resolved icon CLASS in now instead is what actually survives
+           the round trip - found live: a merged card's "add new" link
+           rendered as a bare, icon-less text link on the other side. #}
+        {% set mergeSubItems = mergeSubItems|merge([{label: (item.label ? item.label|trans({}, 'admin') : ''), icon: (item.crudActionName == 'new' ? 'fa-solid fa-circle-plus' : item.icon), url: item.linkUrl}]) %}
     {% endif %}
 {% endfor %}
-<div class="widget-group card {{ widget.hidden ? 'is-hidden' }}" style="--widget-span: {{ widget.size }}{% if widget.height %}; min-height: {{ widget.height }}px{% endif %}" data-sortable-item data-sortable-key="{{ widget.key }}" data-widget-size="{{ widget.size }}"{% if widget.height %} data-widget-height="{{ widget.height }}"{% endif %} data-merge-def="{{ {label: (widget.label ? widget.label|trans({}, 'admin') : ''), icon: widget.icon, subItems: mergeSubItems}|json_encode|e('html_attr') }}">
+<div class="widget-group card {{ widget.hidden ? 'is-hidden' }} {{ widget.background is defined and not widget.background ? 'no-card-bg' }}" style="--widget-span: {{ widget.size }}{% if widget.height %}; min-height: {{ widget.height }}px{% endif %}" data-sortable-item data-sortable-key="{{ widget.key }}" data-widget-size="{{ widget.size }}"{% if widget.height %} data-widget-height="{{ widget.height }}"{% endif %} data-merge-def="{{ {label: (widget.label ? widget.label|trans({}, 'admin') : ''), icon: widget.icon, subItems: mergeSubItems}|json_encode|e('html_attr') }}">
     {% if customize_enabled is defined and customize_enabled %}
         <div class="item-controls widget-controls">
             <button type="button" class="item-handle" data-sortable-handle title="{{ 'customize.reorder'|trans({}, 'admin') }}"><i class="fa-solid fa-grip-vertical"></i></button>
             <button type="button" class="item-toggle" data-toggle-hidden title="{{ 'customize.toggle_visibility'|trans({}, 'admin') }}"><i class="fa-solid fa-eye{{ widget.hidden ? '-slash' }}"></i></button>
+            <button type="button" class="item-background {{ widget.background is defined and not widget.background ? 'is-active' }}" data-toggle-background title="{{ 'customize.toggle_background'|trans({}, 'admin') }}"><i class="fa-solid fa-square{{ (widget.background is defined and not widget.background) ? '' : '-full' }}"></i></button>
             <button type="button" class="item-remove" data-remove-item title="{{ 'customize.remove'|trans({}, 'admin') }}"><i class="fa-solid fa-trash"></i></button>
         </div>
         {# Standalone sibling, not nested in .widget-controls - see
@@ -29,7 +42,15 @@
         <button type="button" class="item-resize-handle" data-resize-handle title="{{ 'customize.resize'|trans({}, 'admin') }}"><i class="fa-solid fa-up-right-and-down-left-from-center"></i></button>
     {% endif %}
     {% if widget.icon %}<div class="widget-icon"><i class="{{ widget.icon }}"></i></div>{% endif %}
-    <h2>{{ widget.label|trans({}, 'admin') }}</h2>
+    {# Same in-place-edit mechanism analytics_card/entity_views' own
+       titles already use (data-analytics-title, toggled contenteditable
+       by layout.html.twig's refreshTitleEditability() while
+       body.is-customizing) - found live: only those two could ever have
+       their title changed, every plain link-list card (Blog, Photos,
+       Destinations, ...) couldn't. Nothing else needed here - the input
+       handler/captureLevel()/LayoutArranger already handle a matched
+       code-defined item's label generically now, block-type or not. #}
+    <h2 class="widget-group-title" data-analytics-title>{{ widget.label|trans({}, 'admin') }}</h2>
     <ul data-sortable="dashboard-items-{{ widget.key }}">
         {% for item in widget.subItems %}
             {% if item.linkUrl %}

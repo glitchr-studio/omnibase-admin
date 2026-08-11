@@ -4,6 +4,8 @@ namespace Base\Admin\Controller;
 
 use Base\Admin\Config\Menu\MenuItem;
 use Base\Admin\Config\MenuItem as MenuItemFacade;
+use Base\Admin\Layout\LayoutScope;
+use Base\Admin\Layout\LayoutStore;
 use Base\Admin\Widget\PaletteWidgetTypeRegistry;
 use Base\Enum\UserRole;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -16,12 +18,20 @@ use Symfony\Contracts\Translation\TranslatorInterface;
  * Backs the dashboard's "+ Add widget" palette (types/newInstance), the
  * drag-one-card-onto-another merge gesture (merge, also used to add a
  * THIRD/FOURTH card into an already-merged composite), and pulling a
- * composite back apart into its standalone cards again (split). All
- * actions are GET, no CSRF - read-only, none of them persists anything
- * (persistence still only ever happens through the existing batched
- * admin_layout_save POST on "Done"). Each renders server-side Twig so the
- * client never has to reinvent widget markup itself - it only ever
- * inserts/replaces whatever HTML comes back.
+ * composite back apart into its standalone cards again (split). Those
+ * four actions are GET, no CSRF - read-only, none of them persists
+ * anything (persistence still only ever happens through the existing
+ * batched admin_layout_save POST on "Done"). Each renders server-side
+ * Twig so the client never has to reinvent widget markup itself - it
+ * only ever inserts/replaces whatever HTML comes back.
+ *
+ * restore() is the one exception: it's POST + CSRF-checked (same
+ * 'admin-layout' token as LayoutController::save()) because, unlike the
+ * four above, it writes straight to the stored LayoutConfig itself -
+ * clearing a deleted code-defined widget's flag can't wait for the next
+ * batched "Done" save, since deleted_widgets (see
+ * AbstractDashboardController::index()) is itself read from that same
+ * stored config on every page load.
  */
 class DashboardWidgetController extends AbstractController
 {
@@ -48,6 +58,7 @@ class DashboardWidgetController extends AbstractController
     public function __construct(
         protected readonly PaletteWidgetTypeRegistry $paletteRegistry,
         protected readonly TranslatorInterface $translator,
+        protected readonly LayoutStore $layoutStore,
     ) {
     }
 
@@ -172,7 +183,15 @@ class DashboardWidgetController extends AbstractController
 
             $subItems = [];
             foreach ($pane['subItems'] as $subItem) {
-                $subItems[] = MenuItemFacade::linkToUrl($subItem['label'], $subItem['icon'], $subItem['url'])->setLinkUrl($subItem['url']);
+                // Same defensive fallback as CompositeWidgetType's own pane
+                // rendering - a stored subItem with no icon is normally the
+                // "add new X" link (baked in as a real icon class at merge
+                // time, see _group.html.twig's own comment), this covers
+                // data saved before that existed.
+                $icon = \is_string($subItem['icon'] ?? null)
+                    ? $subItem['icon']
+                    : (\str_ends_with($subItem['url'], '/new') ? 'fa-solid fa-circle-plus' : null);
+                $subItems[] = MenuItemFacade::linkToUrl($subItem['label'], $icon, $subItem['url'])->setLinkUrl($subItem['url']);
             }
 
             $widget = (new MenuItem(MenuItem::TYPE_SECTION, $pane['label'], $pane['icon']))
@@ -299,6 +318,39 @@ class DashboardWidgetController extends AbstractController
             'widget' => $widget,
             'customize_enabled' => true,
         ]);
+    }
+
+    /**
+     * Un-deletes a code-defined dashboard widget (see
+     * AbstractDashboardController::index()'s deleted_widgets and
+     * dashboard.html.twig's "restore" picker). Dashboard-scope only - the
+     * sidebar has no equivalent picker, nothing else needs this yet.
+     * Writes straight to the stored LayoutConfig and returns success/
+     * failure only; the client reloads the page on success rather than
+     * this endpoint trying to render the restored widget's markup itself
+     * (it has no code-defined MenuItem to render from here - only
+     * AbstractDashboardController::index(), one layer up, ever sees
+     * configureWidgetItems() - a full reload naturally goes through that
+     * same path again, now with the flag cleared).
+     */
+    public function restore(Request $request): JsonResponse
+    {
+        $this->assertSuperadmin();
+
+        if (!$this->isCsrfTokenValid('admin-layout', $request->headers->get('X-CSRF-Token', ''))) {
+            throw $this->createAccessDeniedException('Invalid CSRF token.');
+        }
+
+        $key = $request->request->get('key');
+        if (!\is_string($key) || '' === $key) {
+            throw $this->createNotFoundException('Missing widget key to restore.');
+        }
+
+        $config = $this->layoutStore->get(LayoutScope::DASHBOARD);
+        $config->restoreItem($key);
+        $this->layoutStore->save(LayoutScope::DASHBOARD, $config);
+
+        return $this->json(['ok' => true]);
     }
 
     private function assertSuperadmin(): void

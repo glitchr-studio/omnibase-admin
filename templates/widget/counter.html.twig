@@ -1,0 +1,64 @@
+{# Rendered via Base\Admin\Widget\CounterWidgetType - 'classes'/'entityClass'/
+   'entity'/'allInstances'/'instancesByClass'/'total'/'change' arrive as
+   template vars (getTemplateVars()). Same entity-agnostic class/instance
+   picker as entity_views.html.twig's own settings panel (built off
+   LinkableEntityRegistry, never references Article/Destination/User/etc
+   by name) - kept as its own separate data-counter-settings-* namespace
+   rather than sharing entity_views' data-entity-views-settings-* one,
+   same "a little duplication over a premature shared abstraction"
+   convention analytics_card's own settings panel already established
+   here (three near-identical panels now, each with their own instance-
+   scoped attributes, none of them reaching into another's DOM).
+
+   No chart, deliberately - this is the "Counter" palette entry
+   specifically because it ISN'T "Vues" with the canvas hidden: a single
+   number + trend is the whole point, at a glance. #}
+<div class="analytics-card {{ (embedded is not defined or not embedded) ? 'card' }}" data-counter-card>
+    <div class="analytics-card-header">
+        <h2 class="analytics-card-title" data-analytics-title>
+            {{ entity ? (widget.label ?: entity) : widget.label|trans({}, 'admin') }}
+        </h2>
+        <button type="button" class="item-settings" data-counter-settings-toggle title="{{ 'counter.settings.title'|trans({}, 'admin') }}"><i class="fa-solid fa-gear"></i></button>
+    </div>
+    <div class="widget-settings-panel" data-counter-settings-panel hidden
+         data-instances-by-class="{{ instancesByClass|map(list => list|map(item => {id: item.id, label: item ~ ''}))|json_encode|e('html_attr') }}">
+        <label class="widget-settings-field">
+            <span>{{ 'counter.settings.class_label'|trans({}, 'admin') }}</span>
+            <select data-counter-settings-class>
+                <option value="">{{ 'counter.settings.class_placeholder'|trans({}, 'admin') }}</option>
+                {% for class, label in classes %}
+                    <option value="{{ class }}"{{ entityClass == class ? ' selected' }}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label class="widget-settings-field">
+            <span>{{ 'counter.settings.entity_label'|trans({}, 'admin') }}</span>
+            <select data-counter-settings-entity data-all-label="{{ 'counter.settings.all_instances'|trans({}, 'admin') }}"{{ entityClass ? '' : ' disabled' }}>
+                <option value="">{{ 'counter.settings.entity_placeholder'|trans({}, 'admin') }}</option>
+                {% if entityClass %}
+                    <option value="all"{{ allInstances ? ' selected' }}>{{ 'counter.settings.all_instances'|trans({}, 'admin') }}</option>
+                    {% for instance in instancesByClass[entityClass] %}
+                        <option value="{{ instance.id }}"{{ entity and entity.id == instance.id ? ' selected' }}>{{ instance }}</option>
+                    {% endfor %}
+                {% endif %}
+            </select>
+        </label>
+        <div class="widget-settings-actions">
+            <button type="button" class="analytics-range-btn" data-counter-settings-cancel>{{ 'counter.settings.cancel'|trans({}, 'admin') }}</button>
+            <button type="button" class="analytics-range-btn is-active" data-counter-settings-apply>{{ 'counter.settings.apply'|trans({}, 'admin') }}</button>
+        </div>
+    </div>
+    {% if total is not null %}
+        <div class="counter-value-row">
+            <span class="counter-value">{{ total }}</span>
+            {%- if change is not null %}
+                <span class="analytics-stat-change {{ change >= 0 ? 'is-up' : 'is-down' }}">
+                    {{ change >= 0 ? '+' : '' }}{{ change }}%
+                </span>
+            {% endif %}
+        </div>
+        <span class="analytics-stat-label">{{ 'analytics.label.page_views'|trans({}, 'admin') }}</span>
+    {% else %}
+        <p class="analytics-empty-state">{{ 'counter.empty_state'|trans({}, 'admin') }}</p>
+    {% endif %}
+</div>

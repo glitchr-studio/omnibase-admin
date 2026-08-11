@@ -70,4 +70,51 @@ class CompositeWidgetTypeTest extends TestCase
 
         $this->assertSame(1, $vars['panes'][0]->getSize());
     }
+
+    /**
+     * A subItem with no icon and a "/new"-ending url is the "add new X"
+     * link - _group.html.twig normally bakes a real fa-circle-plus icon
+     * class straight into the stored data the moment a card is dragged
+     * into a merge, but data saved before that fix (or that lost it on an
+     * earlier merge/split hop) must still render correctly rather than as
+     * a bare, icon-less link - found live.
+     */
+    public function testAddNewLinkWithNoStoredIconFallsBackToCirclePlus(): void
+    {
+        $widget = MenuItem::block('composite', 'Overview', null, null, ['panes' => [
+            ['label' => 'Links', 'subItems' => [
+                ['label' => 'Add', 'icon' => null, 'url' => '/admin/thing/new'],
+            ]],
+        ]]);
+
+        $vars = $this->type->getTemplateVars($widget);
+
+        $this->assertSame('fa-solid fa-circle-plus', $vars['panes'][0]->getSubItems()[0]->getIcon());
+    }
+
+    public function testAnAlreadyStoredIconIsNeverOverriddenEvenForANewUrl(): void
+    {
+        $widget = MenuItem::block('composite', 'Overview', null, null, ['panes' => [
+            ['label' => 'Links', 'subItems' => [
+                ['label' => 'Add', 'icon' => 'fa-solid fa-star', 'url' => '/admin/thing/new'],
+            ]],
+        ]]);
+
+        $vars = $this->type->getTemplateVars($widget);
+
+        $this->assertSame('fa-solid fa-star', $vars['panes'][0]->getSubItems()[0]->getIcon());
+    }
+
+    public function testANonAddNewLinkWithNoIconStaysIconLess(): void
+    {
+        $widget = MenuItem::block('composite', 'Overview', null, null, ['panes' => [
+            ['label' => 'Links', 'subItems' => [
+                ['label' => 'A', 'icon' => null, 'url' => '/a'],
+            ]],
+        ]]);
+
+        $vars = $this->type->getTemplateVars($widget);
+
+        $this->assertNull($vars['panes'][0]->getSubItems()[0]->getIcon());
+    }
 }

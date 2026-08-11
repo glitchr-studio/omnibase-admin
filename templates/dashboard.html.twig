@@ -49,8 +49,38 @@
             <button type="button" class="btn" aria-haspopup="true" aria-expanded="false" id="admin-add-widget-trigger">
                 <i class="fa-solid fa-plus"></i> {{ 'customize.add_widget'|trans({}, 'admin') }}
             </button>
-            <div class="admin-dropdown-menu" role="menu" data-widget-palette-menu></div>
+            {# Not left empty: the dropdown itself can open before the
+               palette's own fetch (layout.html.twig's loadPaletteTypes())
+               resolves - a blank white box in the meantime reads as
+               broken/nothing-happened rather than loading. Overwritten
+               the instant the real type list arrives. #}
+            <div class="admin-dropdown-menu" role="menu" data-widget-palette-menu>
+                <span class="admin-dropdown-loading">{{ 'customize.loading'|trans({}, 'admin') }}</span>
+            </div>
         </div>
+        {# Only a code-defined widget (Blog/Photos/Destinations/...) can
+           ever end up here - see AbstractDashboardController::index()'s
+           deleted_widgets and LayoutArranger::deletedItems(). An ad-hoc/
+           palette-added one needs no such picker: omitting its key from
+           the next save already removes it for good, nothing to restore
+           (see LayoutArranger::applyLevel()'s own comment on that). No
+           fetch needed - deleted_widgets is already server-rendered, same
+           reasoning as the loading placeholder above but simpler: there's
+           nothing async here to wait on. #}
+        {% if deleted_widgets is defined and deleted_widgets is not empty %}
+        <div class="admin-icon-dropdown" data-dropdown>
+            <button type="button" class="btn" aria-haspopup="true" aria-expanded="false" id="admin-restore-widget-trigger">
+                <i class="fa-solid fa-clock-rotate-left"></i> {{ 'customize.restore_widget'|trans({}, 'admin') }}
+            </button>
+            <div class="admin-dropdown-menu" role="menu">
+                {% for widget in deleted_widgets %}
+                    <button type="button" role="menuitem" data-restore-widget-key="{{ widget.key }}">
+                        {% if widget.icon %}<i class="{{ widget.icon }}"></i>{% endif %} {{ widget.label|trans({}, 'admin') }}
+                    </button>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
     </div>
 {% endif %}
 {% endblock %}

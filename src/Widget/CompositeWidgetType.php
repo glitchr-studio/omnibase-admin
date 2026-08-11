@@ -92,7 +92,21 @@ final class CompositeWidgetType implements DashboardWidgetTypeInterface
                 if (!\is_array($subItem) || !\is_string($subItem['label'] ?? null) || !\is_string($subItem['url'] ?? null) || '' === $subItem['url']) {
                     continue;
                 }
-                $icon = \is_string($subItem['icon'] ?? null) ? $subItem['icon'] : null;
+                // A stored subItem with no icon of its own is normally the
+                // "add new X" link (_group.html.twig bakes the real
+                // fa-circle-plus class straight into $subItem['icon'] the
+                // moment a widget-group gets dragged into a merge - see
+                // that template's own comment on why baking it in beats
+                // carrying a separate crudActionName flag through this
+                // JSON round trip). This is the belt-and-suspenders
+                // fallback for data saved before that fix existed (or one
+                // more merge/split hop that still lost it somewhere) -
+                // found live: a composite pane's "add new" link rendering
+                // as a bare, icon-less text link, one hop too many removed
+                // from the fix above to self-heal on its own.
+                $icon = \is_string($subItem['icon'] ?? null)
+                    ? $subItem['icon']
+                    : (\str_ends_with($subItem['url'], '/new') ? 'fa-solid fa-circle-plus' : null);
                 $paneSubItems[] = MenuItemFacade::linkToUrl($subItem['label'], $icon, $subItem['url'])->setLinkUrl($subItem['url']);
             }
             if ([] === $paneSubItems) {

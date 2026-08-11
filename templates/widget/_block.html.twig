@@ -23,18 +23,21 @@
    it can't be DRAGGED to merge further into something else - one level of
    fusion is the practical ceiling, so this is what keeps it out of the
    "can this be dragged to start a merge" side of that check. #}
-<div class="widget-block {{ widget.hidden ? 'is-hidden' }}" style="--widget-span: {{ widget.size }}{% if widget.height %}; min-height: {{ widget.height }}px; --widget-height: {{ widget.height }}px{% endif %}" data-sortable-item data-sortable-key="{{ widget.key }}" data-widget-size="{{ widget.size }}"{% if widget.height %} data-widget-height="{{ widget.height }}"{% endif %}{% if widget.adHoc %} data-block-name="{{ widget.blockName }}" data-widget-label="{{ widget.label }}" data-widget-icon="{{ widget.icon }}" data-widget-params="{{ widget.params|json_encode }}"{% endif %}{% if widget.blockName and widget.blockName != 'composite' %} data-merge-def="{{ {blockName: widget.blockName, label: (widget.label ? widget.label|trans({}, 'admin') : ''), icon: widget.icon, params: widget.params}|json_encode|e('html_attr') }}"{% endif %}>
+<div class="widget-block {{ widget.hidden ? 'is-hidden' }} {{ widget.background is defined and not widget.background ? 'no-card-bg' }}" style="--widget-span: {{ widget.size }}{% if widget.height %}; min-height: {{ widget.height }}px; --widget-height: {{ widget.height }}px{% endif %}" data-sortable-item data-sortable-key="{{ widget.key }}" data-widget-size="{{ widget.size }}"{% if widget.height %} data-widget-height="{{ widget.height }}"{% endif %}{% if widget.adHoc %} data-block-name="{{ widget.blockName }}" data-widget-label="{{ widget.label }}" data-widget-icon="{{ widget.icon }}" data-widget-params="{{ widget.params|json_encode }}"{% endif %}{% if widget.blockName and widget.blockName != 'composite' %} data-merge-def="{{ {blockName: widget.blockName, label: (widget.label ? widget.label|trans({}, 'admin') : ''), icon: widget.icon, params: widget.params}|json_encode|e('html_attr') }}"{% endif %}>
     {% if customize_enabled is defined and customize_enabled %}
         <div class="item-controls widget-controls">
             <button type="button" class="item-handle" data-sortable-handle title="{{ 'customize.reorder'|trans({}, 'admin') }}"><i class="fa-solid fa-grip-vertical"></i></button>
             <button type="button" class="item-toggle" data-toggle-hidden title="{{ 'customize.toggle_visibility'|trans({}, 'admin') }}"><i class="fa-solid fa-eye{{ widget.hidden ? '-slash' }}"></i></button>
-            {# analytics_card has NO settings button here (tried a gear-icon
-               panel first; removed it - see analytics_card.html.twig's own
-               comment) - its title edits in place (contenteditable, see
-               layout.html.twig's setCustomizing()) and its series toggle
-               is just the chart's own legend, both directly in the
-               widget's normal rendered content, nothing needed in this
-               shared controls row for it. #}
+            {# Same generic mechanism as the hide/show toggle right above -
+               see MenuItem::$background's own docblock. Works on every
+               widget type (block or section alike, see _group.html.twig's
+               own copy of this button), not scoped to any one of them. #}
+            <button type="button" class="item-background {{ widget.background is defined and not widget.background ? 'is-active' }}" data-toggle-background title="{{ 'customize.toggle_background'|trans({}, 'admin') }}"><i class="fa-solid fa-square{{ (widget.background is defined and not widget.background) ? '' : '-full' }}"></i></button>
+            {# analytics_card's own settings gear (series checkboxes) and
+               article_views' (article picker) both live INSIDE their own
+               widget content (analytics-card-header), not in this shared
+               controls row - each needs its OWN card-scoped markup right
+               next to what it's editing, not a generic slot here. #}
             {% if widget.blockName == 'composite' %}
                 {# Rebuilds each pane as its own standalone card again (see
                    layout.html.twig's [data-split-item] handler +
@@ -42,7 +45,13 @@
                    widget's OWN data-widget-params (its 'panes' array),
                    already present unconditionally below since a composite
                    is always adHoc. #}
-                <button type="button" class="item-split" data-split-item title="{{ 'customize.split'|trans({}, 'admin') }}"><i class="fa-solid fa-object-ungroup"></i></button>
+                {# fa-scissors, not fa-object-ungroup - reported live as
+                   visually too detailed/busy (fine connector-dot linework)
+                   next to its siblings here, all simple bold shapes (grip
+                   dots, eye, solid square, trash can). Scissors reads as
+                   the same "split apart" concept at a glance, with the
+                   same visual weight as the rest of the row. #}
+                <button type="button" class="item-split" data-split-item title="{{ 'customize.split'|trans({}, 'admin') }}"><i class="fa-solid fa-scissors"></i></button>
             {% endif %}
             {# Every widget gets a remove button now, code-defined or
                ad-hoc alike (see LayoutConfig's own 'deleted' flag +

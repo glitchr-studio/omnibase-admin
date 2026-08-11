@@ -1,0 +1,86 @@
+{# Rendered via Base\Admin\Widget\EntityViewsWidgetType - 'classes'/'entityClass'/
+   'entity'/'allInstances'/'instancesByClass'/'series'/'palette'/'events'
+   arrive as template vars (getTemplateVars()). Same chart/settings-panel
+   shell as analytics_card.html.twig (site-wide traffic), generalized from
+   what used to be this package's app-level, Article-only article_views.
+   html.twig: the class picker below is genuinely entity-agnostic (built
+   off LinkableEntityRegistry's discovery, not a hardcoded option list),
+   so this template never references Article/Destination/User/etc by name
+   either.
+
+   No range picker/live-refetch here (matches the widget this generalizes
+   from) - applying the settings panel writes the new entityClass/entityId
+   and relies on "Done" to reload+re-render with the new selection, same
+   as any other customize-mode edit without its own live preview.
+
+   'embedded' is never true for this widget today (composite panes aren't
+   wired up for it, matches analytics_card.html.twig's own note on the
+   same gap) - kept here only so this template doesn't silently break the
+   day it is. #}
+<div class="analytics-card {{ (embedded is not defined or not embedded) ? 'card' }}" data-entity-views-card>
+    <div class="analytics-card-header">
+        <h2 class="analytics-card-title" data-analytics-title>
+            {{ entity ? (widget.label ?: entity) : widget.label|trans({}, 'admin') }}
+        </h2>
+        {% if entity or allInstances %}
+            <div class="analytics-stat-row">
+                <div class="analytics-stat">
+                    <span class="analytics-stat-value">{{ series|reduce((carry, day) => carry + day.pageViews, 0) }}</span>
+                    <span class="analytics-stat-label">{{ 'analytics.label.page_views'|trans({}, 'admin') }}</span>
+                </div>
+            </div>
+        {% endif %}
+        <button type="button" class="item-settings" data-entity-views-settings-toggle title="{{ 'entity_views.settings.title'|trans({}, 'admin') }}"><i class="fa-solid fa-gear"></i></button>
+    </div>
+    <div class="widget-settings-panel" data-entity-views-settings-panel hidden
+         data-instances-by-class="{{ instancesByClass|map(list => list|map(item => {id: item.id, label: item ~ ''}))|json_encode|e('html_attr') }}">
+        <label class="widget-settings-field">
+            <span>{{ 'entity_views.settings.class_label'|trans({}, 'admin') }}</span>
+            <select data-entity-views-settings-class>
+                <option value="">{{ 'entity_views.settings.class_placeholder'|trans({}, 'admin') }}</option>
+                {% for class, label in classes %}
+                    <option value="{{ class }}"{{ entityClass == class ? ' selected' }}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label class="widget-settings-field">
+            <span>{{ 'entity_views.settings.entity_label'|trans({}, 'admin') }}</span>
+            {# Repopulated client-side from data-instances-by-class the
+               instant the class select above changes (see layout.html.
+               twig's own handler) - starts with just the CURRENTLY
+               selected class's own options (if any) so a fresh page load
+               already shows the right selection with no JS round trip
+               needed on open. #}
+            <select data-entity-views-settings-entity data-all-label="{{ 'entity_views.settings.all_instances'|trans({}, 'admin') }}"{{ entityClass ? '' : ' disabled' }}>
+                <option value="">{{ 'entity_views.settings.entity_placeholder'|trans({}, 'admin') }}</option>
+                {% if entityClass %}
+                    <option value="all"{{ allInstances ? ' selected' }}>{{ 'entity_views.settings.all_instances'|trans({}, 'admin') }}</option>
+                    {% for instance in instancesByClass[entityClass] %}
+                        <option value="{{ instance.id }}"{{ entity and entity.id == instance.id ? ' selected' }}>{{ instance }}</option>
+                    {% endfor %}
+                {% endif %}
+            </select>
+        </label>
+        <div class="widget-settings-actions">
+            <button type="button" class="analytics-range-btn" data-entity-views-settings-cancel>{{ 'entity_views.settings.cancel'|trans({}, 'admin') }}</button>
+            <button type="button" class="analytics-range-btn is-active" data-entity-views-settings-apply>{{ 'entity_views.settings.apply'|trans({}, 'admin') }}</button>
+        </div>
+    </div>
+    {% if entity or allInstances %}
+        <div class="analytics-chart-wrap">
+            <canvas data-admin-chart="{{ {
+                labels: series|map(day => day.date|date('d/m')),
+                datasets: ['pageViewsHuman', 'pageViewsBot', 'pageViewsAi']|map(key => {
+                    key: key,
+                    label: palette[key].label,
+                    data: series|map(day => day[key]),
+                    color: palette[key].color,
+                    colorDark: palette[key].colorDark,
+                }),
+                events: events|default([]),
+            }|json_encode }}"></canvas>
+        </div>
+    {% else %}
+        <p class="analytics-empty-state">{{ 'entity_views.empty_state'|trans({}, 'admin') }}</p>
+    {% endif %}
+</div>

@@ -22,13 +22,30 @@
        unchanged: "proportion" stops having one obvious meaning once panes
        wrap across two rows, so that case isn't covered here - no divider
        either, same condition as the ratio control it replaced. #}
-    <div class="composite-panes" data-composite-panes{% if panes|length == 2 %} style="grid-template-columns: {{ panes[0].size }}fr 10px {{ panes[1].size }}fr"{% endif %}>
+    {# 6px track, matching .composite-pane-divider's own CSS width exactly
+       (layout.html.twig) - kept in sync there, not computed from one
+       shared source, since this is plain server-rendered Twig with no CSS
+       variable plumbing between the two files. #}
+    <div class="composite-panes" data-composite-panes{% if panes|length == 2 %} style="grid-template-columns: {{ panes[0].size }}fr 6px {{ panes[1].size }}fr"{% endif %}>
         {% for pane in panes %}
-            <div class="composite-pane">
+            {# data-pane-index - lets layout.html.twig's generic
+               [data-analytics-title] input handler tell a pane's OWN title
+               apart from the composite's outer widgetBlock: without this,
+               closest('[data-sortable-item]') from inside a pane's title
+               only ever finds the composite as a whole (no
+               data-sortable-item on .composite-pane itself), so an edit
+               was silently written onto the wrong target - see that
+               handler's own comment for the params.panes[i].label branch
+               this enables. #}
+            <div class="composite-pane" data-pane-index="{{ loop.index0 }}">
                 {% set paneType = pane.blockName ? dashboard_widget_type(pane.blockName) : null %}
                 {% if paneType %}
                     {# embedded:true - see analytics_card.html.twig's own comment
-                       on why this drops its normally-own .card class here. #}
+                       on why this drops its normally-own .card class here.
+                       Its own heading already carries data-analytics-title
+                       (analytics_card.html.twig/entity_views.html.twig),
+                       so this branch needed no title markup change - only
+                       the data-pane-index wrapper above was missing. #}
                     {{ include(paneType.getTemplate(), paneType.getTemplateVars(pane)|merge({widget: pane, embedded: true})) }}
                 {% elseif pane.subItems is defined and pane.subItems is not empty %}
                     {# A link-list pane (CompositeWidgetType's 'subItems'
@@ -39,7 +56,13 @@
                        "never nest a card in a card" rule the block branch
                        above already follows via embedded:true. #}
                     {% if pane.icon %}<div class="widget-icon"><i class="{{ pane.icon }}"></i></div>{% endif %}
-                    <h2>{{ pane.label|trans({}, 'admin') }}</h2>
+                    {# data-analytics-title - was a plain, permanently
+                       static <h2> (found live: reported as "can't modify
+                       title" on a merged card) - _group.html.twig's own
+                       top-level title already gets this treatment, this
+                       branch was simply missed when composite panes were
+                       introduced. #}
+                    <h2 class="widget-group-title" data-analytics-title>{{ pane.label|trans({}, 'admin') }}</h2>
                     <ul>
                         {% for item in pane.subItems %}
                             {% if item.linkUrl %}
@@ -57,7 +80,7 @@
             {% if panes|length == 2 and not loop.last %}
                 {# Sits in DOM order between the two panes, which combined
                    with the 3-track grid-template-columns above (left pane
-                   fr / this 10px / right pane fr) is what actually lands
+                   fr / this 6px / right pane fr) is what actually lands
                    it visually between them - a real grid item, not an
                    absolutely-positioned overlay, so it never needs to
                    track the panes' own size independently. #}

@@ -39,12 +39,20 @@ class AnalyticsController extends AbstractController
             throw $this->createNotFoundException(\sprintf('Unknown analytics range "%s".', $range));
         }
 
-        $series = $this->analytics->dailyBreakdown(self::RANGES[$range]);
-
-        // Same date format as the range picker's own hint - a single day
-        // ("today") is unambiguous either way, but a long "all time" series
-        // spanning years needs the year to actually mean anything.
-        $dateFormat = \count($series) > 366 ? 'M Y' : 'd/m';
+        // "today" plots hour-by-hour (see Analytics::hourlyBreakdown()) -
+        // a daily rollup only ever has ONE point for today, which read as
+        // a flat, lineless chart (nothing to draw a line BETWEEN); every
+        // other range stays the calendar-day series it always was.
+        if ('today' === $range) {
+            $series = $this->analytics->hourlyBreakdown();
+            $dateFormat = 'H:00';
+        } else {
+            $series = $this->analytics->dailyBreakdown(self::RANGES[$range]);
+            // Same date format as the range picker's own hint - a single day
+            // ("today") is unambiguous either way, but a long "all time" series
+            // spanning years needs the year to actually mean anything.
+            $dateFormat = \count($series) > 366 ? 'M Y' : 'd/m';
+        }
 
         $formattedLabels = \array_map(
             fn (array $day) => (new \DateTimeImmutable($day['date']))->format($dateFormat),
