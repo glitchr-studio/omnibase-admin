@@ -1,0 +1,85 @@
+{# Editable heading for a CRUD page (index + detail share it so the two can
+   never drift apart).
+
+   Customization is stored in LayoutScope::CRUD keyed by `pageKey` - the
+   CRUD's URL slug - rather than on a sidebar menu item, because most CRUD
+   pages have no menu entry to hang it on. `stored` is that raw entry (or
+   null when nothing has been customized yet); an editable heading renders
+   either way, since the key is what the in-place editor posts back.
+
+   Params: editable (bool), pageKey (string), stored (array|null),
+           fallbackTitle (string), suffix (string|null),
+           recordTitle (string|null).
+
+   recordTitle switches the heading into DETAIL shape: the record's own name
+   becomes the <h1> and the CRUD's (editable) page title drops to a small
+   line beneath it - "Petit cours de prononciation..." over "Article #1147"
+   rather than "Article" over nothing. On a page about one record, the
+   record is the subject; the entity class is context. Index pages pass no
+   recordTitle and keep the original shape.
+#}
+{% set _loc = app.localizer.locale %}
+{% set _def = app.localizer.defaultLocale %}
+{# Default locale reads the plain label/description; every other locale
+   reads its own entry in the 'intl' map. Same contract as LayoutArranger -
+   an untouched locale deliberately falls through to the code-defined title
+   rather than showing another language's custom text. #}
+{% set _localized = stored ? (_loc == _def ? stored : (stored.intl[_loc] ?? {})) : {} %}
+{% set _title = _localized.label is defined and _localized.label ? _localized.label : null %}
+{% set _desc = _localized.description is defined and _localized.description ? _localized.description : null %}
+
+{% set _pageTitle = _title ?? fallbackTitle %}
+{% set _record = recordTitle is defined and recordTitle ? recordTitle : null %}
+
+{# The editable attributes travel with the CRUD's page title wherever it
+   lands, so customization works identically in both shapes. #}
+{%- set _editAttrs -%}
+    {%- if editable %} data-page-title data-menu-key="{{ pageKey }}" data-layout-scope="crud"{% endif -%}
+{%- endset -%}
+
+{# Wrapper is what makes the heading a STACK. .admin-header is a flex row,
+   so without it the title, the id line, the description and the locale
+   badges all became columns of one row - the CRUD pages were the only ones
+   missing it (page/system.html.twig and crud/_form.html.twig both wrap),
+   which is why their description never sat under the title. #}
+<div class="admin-header-titles">
+{% if _record %}
+    {# Deliberately the same shape crud/_form.html.twig already uses on the
+       edit screen - record name as the heading, "Article ID #1147" beneath
+       it - so detail and edit read alike instead of each inventing one. #}
+    <h1 class="admin-header-record" title="{{ _record }}">{{ _record }}</h1>
+    <div class="admin-header-subtitle">
+        <span{{ _editAttrs|raw }}>{{ _pageTitle }}</span>
+        {#- The per-entity part ("#1147") stays OUTSIDE the editable element:
+            the stored title belongs to the CRUD page as a whole, so letting
+            an entity id inside the contenteditable would save that one row's
+            number as every row's title. -#}
+        {%- if suffix is defined and suffix %} ID <span class="admin-header-suffix">{{ suffix }}</span>{% endif -%}
+    </div>
+{% else %}
+    <h1{{ _editAttrs|raw }}>{{ _pageTitle }}</h1>
+    {%- if suffix is defined and suffix %} <span class="admin-header-suffix">{{ suffix }}</span>{% endif -%}
+{% endif %}
+
+{# Description is optional: shown when set, and when customizing it always
+   renders (empty, with a placeholder) so there is something to click. #}
+{% if _desc or editable %}
+    <div class="admin-header-subtitle"{% if editable %} data-page-desc data-menu-key="{{ pageKey }}" data-layout-scope="crud" data-placeholder="{{ 'customize.description_hint'|trans({}, 'admin') }}"{% endif %}>
+        {{- _desc -}}
+    </div>
+{% endif %}
+
+{# Which language the two edits above are saved under - same row as
+   page/system.html.twig's, below the text it annotates. #}
+{% if editable and app.localizer.availableLocales|length > 1 %}
+    <span class="page-locale-badges" title="{{ 'customize.locale_hint'|trans({'%locale%': app.localizer.locale|lang_name|capitalize}, 'admin') }}">
+        {% for _locale in app.localizer.availableLocales %}
+            {% if _locale == app.localizer.locale %}
+                <span class="page-locale-badge is-active"><img alt="{{ _locale }}" src="{{ asset('bundles/base/images/flags/' ~ (_locale|country) ~ '.svg') }}"></span>
+            {% else %}
+                <a class="page-locale-badge" href="{{ path('_switch_locale', {_locale: _locale|lang}) }}" title="{{ _locale|lang_name|capitalize }}"><img alt="{{ _locale }}" src="{{ asset('bundles/base/images/flags/' ~ (_locale|country) ~ '.svg') }}"></a>
+            {% endif %}
+        {% endfor %}
+    </span>
+{% endif %}
+</div>

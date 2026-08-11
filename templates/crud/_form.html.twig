@@ -60,6 +60,21 @@
         {{ form_errors(form) }}
         <div class="form-grid">
         {% for child in form %}
+            {% if 'hidden' in child.vars.block_prefixes %}
+                {# The CSRF field (and any other HiddenType, e.g. a plain
+                   entity id) has no Symfony core hidden_label block to fall
+                   back to - lookup falls through to this theme's own
+                   form2_label (form_div_layout.html.twig), which always
+                   renders a real label-wrapper + debug badge. Every single
+                   create/edit form on this admin was showing a visible
+                   "Csrf token" label above its own hidden input, found live
+                   comparing against production (which renders it as a bare
+                   input, no label at all). Skipping the whole .form-row
+                   wrapper too, not just the label - its own margin-bottom
+                   would otherwise leave a blank gap in the grid for content
+                   that's never visible either way. #}
+                {{ form_widget(child) }}
+            {% else %}
             {# ->setColumns(N) on the field descriptor becomes a 12-column
                CSS grid span here - no explicit value spans the full width,
                matching how most fields are already declared. Values are
@@ -73,6 +88,7 @@
                 <div class="form-errors">{{ form_errors(child) }}</div>
                 {{ form_help(child) }}
             </div>
+            {% endif %}
         {% endfor %}
         </div>
     {{ form_end(form) }}

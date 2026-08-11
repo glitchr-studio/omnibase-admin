@@ -1,14 +1,41 @@
 {% extends '@Admin/layout.html.twig' %}
 
-{% block page_title %}{{ crud.entityLabelInSingular ?? crud.entityFqcn|split('\\')|last }} #{{ entityId }}{% endblock %}
+{% set _entityLabel = crud.entityLabelInSingular ?? crud.entityFqcn|split('\\')|last %}
+{# admin_display() is the entity's own label (Thread::__toString() -> its
+   title); it degrades to "ClassName #id" for an entity with no __toString,
+   which is why the record shape is only used when it yields something
+   different from the class label we would have shown anyway. #}
+{% set _record = admin_display(entity)|trim %}
+{% set _record = _record and _record != _entityLabel ? _record : null %}
+
+{% block page_title %}{{ _record ?? _entityLabel }} #{{ entity.id }}{% endblock %}
 
 {% block content_header %}
+{# Same slug-keyed customization as the index page - one stored title and
+   description per CRUD, shown on both. The entity id is passed as `suffix`
+   rather than baked into the heading text, so editing the title never
+   captures "#1147" as the CRUD's name (see the partial).
+   That suffix is the NUMERIC id, deliberately not `entityId`: since admin
+   URLs went slug-first, entityId is the slug, and printing it here put the
+   whole "#petit-cours-de-prononciation-du-japonais-grace-au-patinage-
+   artistique" across the header. #}
+{% set _editable = customize_enabled is defined and customize_enabled and crud_page_key is defined %}
 <div class="admin-header">
-    <h1>{{ crud.pageTitle('detail') ?? block('page_title') }}</h1>
-    <div class="global-actions">
-        {% for action in actions.getAll('detail') %}
+    {% include '@Admin/crud/_page_heading.html.twig' with {
+        editable: _editable,
+        pageKey: crud_page_key ?? null,
+        stored: crud_page ?? null,
+        fallbackTitle: crud.pageTitle('detail') ?? _entityLabel,
+        suffix: '#' ~ entity.id,
+        recordTitle: _record,
+    } only %}
+    {# Reorderable in customize mode - see crud/index.html.twig's twin. #}
+    <div class="global-actions"{% if _editable %} data-action-row data-page-key="{{ crud_page_key }}"{% endif %}>
+        {# Stored button order; unknown actions sort last (see index). #}
+        {% set _order = crud_action_order|default({}) %}
+        {% for action in actions.getAll('detail')|sort((a, b) => (_order[a.name] ?? 999) <=> (_order[b.name] ?? 999)) %}
             {% if action.name == 'delete' %}
-                <form method="post" action="{{ admin_url(controller_fqcn, 'delete', entityId) }}" style="display:contents"
+                <form method="post" action="{{ admin_url(controller_fqcn, 'delete', entityId) }}" style="display:contents"{% if _editable %} data-action-key="{{ action.name }}"{% endif %}
                       data-confirm="{{ 'action.delete_confirm'|trans({}, 'admin') }}">
                     <input type="hidden" name="_token" value="{{ csrf_token('admin-batch-' ~ crud.entityFqcn) }}">
                     <button class="btn btn-icon text-danger" title="{{ action.label|trans }}"><i class="fa-solid fa-trash"></i></button>
@@ -17,7 +44,7 @@
                 {% set href = admin_action_url(action, entity, controller_fqcn) %}
                 {% if href %}
                     {% set isIconOnly = action.htmlAttributes['tooltip'] is defined %}
-                    <a class="btn {{ isIconOnly ? 'btn-icon' }} {{ action.name == 'edit' ? 'btn-primary' }}" href="{{ href }}"
+                    <a class="btn {{ isIconOnly ? 'btn-icon' }} {{ action.name == 'edit' ? 'btn-primary' }}" href="{{ href }}"{% if _editable %} data-action-key="{{ action.name }}"{% endif %}
                        {%- if action.htmlAttributes['target'] is defined %} target="{{ action.htmlAttributes['target'] }}"{% endif %}
                        {%- if isIconOnly %} title="{{ action.label|trans }}"{% endif %}>
                         {%- if action.icon -%}<i class="{{ action.icon }}"></i>{%- endif -%}

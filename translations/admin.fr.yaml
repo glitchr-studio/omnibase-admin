@@ -2,7 +2,34 @@ dashboard:
     title: Tableau de bord
     welcome: Bienvenue dans votre administration. Choisissez une section dans le menu pour gérer vos contenus.
     welcome_title: Bienvenue
+    generic_title: Générique
     analytics_title: Trafic
+    entity_views_title: Vues
+    counter_title: Compteur
+
+entity_views:
+    empty_state: "Choisissez un élément dans les paramètres de ce widget pour voir son trafic."
+    settings:
+        title: Paramètres du widget
+        class_label: Type
+        class_placeholder: "— Sélectionner un type —"
+        entity_label: Élément
+        entity_placeholder: "— Sélectionner un élément —"
+        all_instances: "— Tous —"
+        cancel: Annuler
+        apply: Appliquer
+
+counter:
+    empty_state: "Choisissez un élément dans les paramètres de ce widget pour voir son compteur."
+    settings:
+        title: Paramètres du widget
+        class_label: Type
+        class_placeholder: "— Sélectionner un type —"
+        entity_label: Élément
+        entity_placeholder: "— Sélectionner un élément —"
+        all_instances: "— Tous —"
+        cancel: Annuler
+        apply: Appliquer
 
 topbar:
     appearance: Apparence
@@ -12,26 +39,35 @@ topbar:
     language: Langue
     customize: Personnaliser la mise en page
     collapse_sidebar: Réduire le menu latéral
+    open_menu: Ouvrir le menu
     active_admins: "%count% admin(s) actif(s)"
     online: En ligne
     recently_active: Actif récemment
 
 sidebar:
-    home: Retour au site
+    home: Tableau de bord
     stats: Statistiques
-    exit: Déconnexion
+    exit: Quitter l'administration
 
 customize:
+    description_hint: Ajouter une description…
     reorder: Glisser pour réorganiser
     toggle_visibility: Afficher/masquer
+    toggle_background: Afficher/masquer le fond de la carte
     resize: Glisser pour redimensionner
     remove: Supprimer
     split: Séparer
     add_widget: Ajouter un widget
+    restore_widget: Restaurer un widget
+    loading: Chargement…
     columns: "Colonnes (max)"
     columns_hint: "Nombre de colonnes visé sur un grand écran - réduit automatiquement sur un écran plus étroit pour que les cartes ne soient jamais trop serrées."
     done: Terminé
     saved: Mise en page enregistrée.
+    locale_hint: "Le titre et la description sont modifiés pour la langue active (%locale%). Cliquez sur un autre drapeau pour éditer cette langue."
+    icon_hint: "Cliquer pour changer l'icône (synchronisée avec le menu latéral). Vider le champ puis Entrée pour rétablir l'icône par défaut."
+    icon_search: "Rechercher une icône…"
+    icon_clear: "Effacer la recherche"
 
 composite:
     settings:
@@ -78,6 +114,7 @@ datagrid:
 page:
     new: Nouveau %entity%
     edit: "Modifier %entity% #%id%"
+    edit_named: "Modifier « %name% »"
 
 login:
     title: Administration
@@ -100,14 +137,18 @@ flash:
     batch_deleted: Les éléments sélectionnés ont été supprimés.
 
 filters:
-    apply: Filtrer
-    reset: Réinitialiser
+    apply: Appliquer
+    reset: Effacer
+    title: Filtres
+    open: Filtres
 
 page.settings:
     title: Paramètres du site
+    description: Éléments configurables du site.
     empty: Aucun paramètre à afficher.
 page.apikey:
     title: Clefs API
+    description: Informations sensibles permettant la connexion aux API de services.
     empty: Aucune clef API à afficher.
 
 manual:
@@ -135,9 +176,3 @@ analytics:
         30d: 30 jours
         all: Depuis toujours
         since_prefix: "Depuis le"
-    settings:
-        title: Paramètres du widget
-        title_label: Titre
-        series_label: Courbes affichées
-        cancel: Annuler
-        apply: Appliquer

@@ -3,17 +3,82 @@
 {% block page_title %}{{ crud.entityLabelInPlural ?? crud.entityFqcn|split('\\')|last }}{% endblock %}
 
 {% block content_header %}
+{# Same selected-menu-item resolution as page/system.html.twig's own
+   content_header (see the comment there): a customized label replaces the
+   code-defined title, and customize mode gets the data-menu-key hook that
+   keeps the sidebar entry in sync with an in-place title edit. #}
+{# _section, NOT _parent: '_parent' is Twig's own internal for-loop scope
+   key - see page/system.html.twig's comment. #}
+{% set _current = null %}
+{% set _section = null %}
+{% if admin_context is defined %}
+    {% for item in admin_context.mainMenu %}
+        {% if item.selected %}{% set _current = item %}{% set _section = null %}{% endif %}
+        {% for subItem in item.subItems %}
+            {% if subItem.selected %}{% set _current = subItem %}{% set _section = item %}{% endif %}
+        {% endfor %}
+    {% endfor %}
+{% endif %}
+{# The customization is keyed by the CRUD SLUG, not by the selected menu
+   item, and so is NOT gated on _current: most CRUD pages have no sidebar
+   entry at all (the menu only lists Settings, API keys and a few filtered
+   Users links), so gating on _current left every CRUD title permanently
+   uneditable - reported live. _current is still consulted below purely to
+   prefer a customized sidebar LABEL where one does happen to exist. #}
+{% set _editable = customize_enabled is defined and customize_enabled and crud_page_key is defined %}
 <div class="admin-header">
-    <h1>{{ crud.pageTitle('index') ?? crud.entityLabelInPlural ?? crud.entityFqcn|split('\\')|last }}</h1>
-    <div class="global-actions">
+    {% include '@Admin/crud/_page_heading.html.twig' with {
+        editable: _editable,
+        pageKey: crud_page_key ?? null,
+        stored: crud_page ?? null,
+        fallbackTitle: (_current and _current.labelCustomized)
+            ? _current.label|trans({}, 'admin')
+            : (crud.pageTitle('index') ?? crud.entityLabelInPlural ?? crud.entityFqcn|split('\\')|last),
+    } only %}
+    {# data-action-row marks this as reorderable in customize mode (see
+       layout.html.twig's drag handler); the stored order is applied below.
+       The search form and the filter button are deliberately OUTSIDE the
+       sortable set - they are page controls, not entity actions, and the
+       stored order only ever names real action keys. #}
+    <div class="global-actions"{% if _editable %} data-action-row data-page-key="{{ crud_page_key }}"{% endif %}>
         <form class="search-form" method="get" action="{{ admin_url(controller_fqcn, 'index') }}">
             <input type="search" name="query" value="{{ query ?? '' }}" placeholder="{{ 'datagrid.search_placeholder'|trans({}, 'admin') }}">
         </form>
-        {% for action in actions.globalActions('index') %}
+        {# Opens the filter panel below. Sits before the create action so the
+           row reads search / filter / create, matching production. The count
+           badge is what makes a collapsed panel honest: with the old always-
+           open bar you could see at a glance that something was filtering the
+           list, and hiding it behind a button would otherwise lose that. #}
+        {% if filters is defined and not filters.isEmpty %}
+            {# Count filters that actually constrain the list, not every key
+               present. A submitted form posts EVERY field, so filter_values
+               always carries an entry per filter - counting those showed "3"
+               on a list narrowed by a single term. A composite filter's
+               'comparison' is excluded because an operator with no value
+               beside it filters nothing.
+               Written with |filter rather than a loop with a counter on
+               purpose: a {% set %} inside a Twig {% for %} does not survive
+               the loop, so the obvious counter version silently yields 0. #}
+            {% set active_filter_count = (filter_values|default({}))|filter(v =>
+                v is iterable
+                    ? (v|filter((sv, sk) => sk != 'comparison' and sv is not empty)|length > 0)
+                    : v is not empty
+            )|length %}
+            <button type="button" class="btn" id="filter-toggle" aria-expanded="false" aria-controls="filter-modal">
+                <i class="fa-solid fa-filter"></i> {{ 'filters.open'|trans({}, 'admin') }}
+                {% if active_filter_count %}<span class="filter-count">{{ active_filter_count }}</span>{% endif %}
+            </button>
+        {% endif %}
+        {# Apply the superadmin's stored button order. An action with no
+           stored position gets 999 so it lands after the ordered ones -
+           adding a new action to a CRUD must not make it disappear just
+           because an old saved order predates it. #}
+        {% set _order = crud_action_order|default({}) %}
+        {% for action in actions.globalActions('index')|sort((a, b) => (_order[a.name] ?? 999) <=> (_order[b.name] ?? 999)) %}
             {% if action.crudActionName == 'new' and new_variants is defined and new_variants|length > 1 %}
                 {# inheritance-tree entity: creating means choosing WHICH
                    concrete subclass - the historical discriminator dropdown #}
-                <details class="new-dropdown">
+                <details class="new-dropdown"{% if _editable %} data-action-key="{{ action.name }}"{% endif %}>
                     <summary class="btn btn-primary">{% if action.icon %}<i class="{{ action.icon }}"></i> {% endif %}{{ action.label|trans }} <i class="fa-solid fa-caret-down"></i></summary>
                     <div class="new-dropdown-menu">
                         {% for variant in new_variants %}
@@ -22,7 +87,13 @@
                     </div>
                 </details>
             {% else %}
-                <a class="btn btn-primary {{ action.cssClass }}" href="{{ admin_url(controller_fqcn, action.crudActionName ?? 'new') }}">
+                {# action.cssClass already carries its own "btn btn-X" variant
+                   (see Actions::configureNewAction()/etc - e.g. "action-new
+                   btn btn-primary"), so hardcoding "btn btn-primary" here
+                   too just duplicated it verbatim on every rendered button
+                   (found live: class="btn btn-primary action-new btn btn-
+                   primary" on every list page's own create button). #}
+                <a class="{{ action.cssClass }}" href="{{ admin_url(controller_fqcn, action.crudActionName ?? 'new') }}"{% if _editable %} data-action-key="{{ action.name }}"{% endif %}>
                     {% if action.icon %}<i class="{{ action.icon }}"></i> {% endif %}{{ action.label|trans }}
                 </a>
             {% endif %}
@@ -33,20 +104,41 @@
 
 {% block content %}
 {% if filters is defined and not filters.isEmpty %}
-<form class="filter-bar" method="get" action="{{ admin_url(controller_fqcn, 'index') }}">
+{# Collapsed into a dialog behind the "Filtres" button above, instead of the
+   always-visible inline bar this used to be - the bar put every filter of
+   every type on one wrapped row, so the controls never lined up and the
+   page header shifted down on entities with many filters.
+
+   The FORM itself is unchanged (same GET, same filters[...] field names), so
+   filtering semantics, bookmarkable URLs and the sidebar's pre-filtered
+   links all keep working exactly as before - this is presentation only.
+
+   One behavioural change on purpose: the selects no longer carry the
+   autosubmit hook. Applying on every change made sense for a bar that was
+   always on screen; inside a dialog with its own Appliquer button it would
+   submit and close the dialog halfway through setting up a filter. #}
+<div class="filter-modal" id="filter-modal" hidden>
+    <div class="filter-modal-backdrop" data-filter-close></div>
+    <form class="filter-modal-panel" method="get" action="{{ admin_url(controller_fqcn, 'index') }}" role="dialog" aria-modal="true" aria-label="{{ 'filters.title'|trans({}, 'admin') }}">
+    <div class="filter-modal-header">
+        <a class="btn" href="{{ admin_url(controller_fqcn, 'index') }}"><i class="fa-solid fa-xmark"></i> {{ 'filters.reset'|trans({}, 'admin') }}</a>
+        <span class="filter-modal-title"><i class="fa-solid fa-filter"></i> {{ 'filters.title'|trans({}, 'admin') }}</span>
+        <button class="btn btn-primary" type="submit"><i class="fa-solid fa-check"></i> {{ 'filters.apply'|trans({}, 'admin') }}</button>
+    </div>
+    <div class="filter-modal-body">
     {% if query %}<input type="hidden" name="query" value="{{ query }}">{% endif %}
     {% for property, filter in filters.all %}
         {% set value = filter_values[property]|default(null) %}
         <label>
             <span>{{ filter.label ?? property|humanize }}</span>
             {% if filter.type == 'boolean' %}
-                <select name="filters[{{ property }}]" data-autosubmit>
+                <select name="filters[{{ property }}]">
                     <option value=""></option>
                     <option value="1" {{ value == '1' ? 'selected' }}>✓</option>
                     <option value="0" {{ value == '0' ? 'selected' }}>✕</option>
                 </select>
             {% elseif filter.type == 'choice' %}
-                <select name="filters[{{ property }}]" data-autosubmit>
+                <select name="filters[{{ property }}]">
                     <option value=""></option>
                     {% for choiceValue, choiceLabel in filter.choices %}
                         <option value="{{ choiceValue }}" {{ value == choiceValue ? 'selected' }}>{{ choiceLabel|trans }}</option>
@@ -58,7 +150,7 @@
                    silent no-op most of the time, but skip it entirely to
                    rule out a real entity happening to collide with an
                    actual translation key #}
-                <select name="filters[{{ property }}]" data-autosubmit>
+                <select name="filters[{{ property }}]">
                     <option value=""></option>
                     {% for choiceValue, choiceLabel in filter.choices %}
                         <option value="{{ choiceValue }}" {{ value == choiceValue ? 'selected' }}>{{ choiceLabel }}</option>
@@ -66,8 +158,8 @@
                 </select>
             {% elseif filter.type == 'date' %}
                 <span class="filter-range">
-                    <input type="date" name="filters[{{ property }}][from]" value="{{ value.from|default('') }}" data-autosubmit>
-                    <input type="date" name="filters[{{ property }}][to]" value="{{ value.to|default('') }}" data-autosubmit>
+                    <input type="date" name="filters[{{ property }}][from]" value="{{ value.from|default('') }}">
+                    <input type="date" name="filters[{{ property }}][to]" value="{{ value.to|default('') }}">
                 </span>
             {% elseif filter.type == 'numeric' or filter.type == 'text' %}
                 {# comparison + value pair (filters[x][comparison]=gt&filters[x][value]=3,
@@ -76,7 +168,7 @@
                 {% set rawValue = value is iterable ? (value.value ?? '') : (value ?? '') %}
                 {% set rawComparison = value is iterable ? (value.comparison ?? null) : null %}
                 <span class="filter-comparison">
-                    <select name="filters[{{ property }}][comparison]" data-autosubmit>
+                    <select name="filters[{{ property }}][comparison]">
                         {% for op, symbol in filter.comparisons %}
                             <option value="{{ op }}" {{ rawComparison == op ? 'selected' }}>{{ symbol }}</option>
                         {% endfor %}
@@ -89,9 +181,9 @@
             {% endif %}
         </label>
     {% endfor %}
-    <button class="btn" type="submit"><i class="fa-solid fa-filter"></i> {{ 'filters.apply'|trans({}, 'admin') }}</button>
-    <a class="btn" href="{{ admin_url(controller_fqcn, 'index') }}"><i class="fa-solid fa-xmark"></i> {{ 'filters.reset'|trans({}, 'admin') }}</a>
-</form>
+    </div>
+    </form>
+</div>
 {% endif %}
 <div class="card">
     {% if rows is empty %}

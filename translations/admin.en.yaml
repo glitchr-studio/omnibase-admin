@@ -2,7 +2,34 @@ dashboard:
     title: Dashboard
     welcome: Welcome to your administration. Pick a section in the menu to start managing your content.
     welcome_title: Welcome
+    generic_title: Generic
     analytics_title: Traffic
+    entity_views_title: Views
+    counter_title: Counter
+
+entity_views:
+    empty_state: "Pick something in this widget's settings to see its traffic."
+    settings:
+        title: Widget settings
+        class_label: Type
+        class_placeholder: "— Select a type —"
+        entity_label: Item
+        entity_placeholder: "— Select an item —"
+        all_instances: "— All —"
+        cancel: Cancel
+        apply: Apply
+
+counter:
+    empty_state: "Pick something in this widget's settings to see its counter."
+    settings:
+        title: Widget settings
+        class_label: Type
+        class_placeholder: "— Select a type —"
+        entity_label: Item
+        entity_placeholder: "— Select an item —"
+        all_instances: "— All —"
+        cancel: Cancel
+        apply: Apply
 
 topbar:
     appearance: Appearance
@@ -12,22 +39,31 @@ topbar:
     language: Language
     customize: Customize layout
     collapse_sidebar: Collapse sidebar
+    open_menu: Open menu
     active_admins: "%count% admin(s) active"
     online: Online now
     recently_active: Recently active
 
 sidebar:
-    home: Back to site
+    home: Dashboard
     stats: Statistics
-    exit: Sign out
+    exit: Exit admin
 
 customize:
+    description_hint: Add a description…
     reorder: Drag to reorder
     toggle_visibility: Show/hide
+    toggle_background: Show/hide card background
+    locale_hint: "Title and description edits apply to the active language (%locale%). Click another flag to edit that language."
+    icon_hint: "Click to change the icon (kept in sync with the sidebar menu). Clear the field and press Enter to restore the default icon."
+    icon_search: "Search icons…"
+    icon_clear: "Clear search"
     resize: Drag to resize
     remove: Remove
     split: Split apart
     add_widget: Add widget
+    restore_widget: Restore a widget
+    loading: Loading…
     columns: "Columns (max)"
     columns_hint: "Target column count on a wide screen - automatically reduced on a narrower one so cards never get cramped."
     done: Done
@@ -78,6 +114,7 @@ datagrid:
 page:
     new: New %entity%
     edit: "Edit %entity% #%id%"
+    edit_named: "Edit “%name%”"
 
 login:
     title: Administration
@@ -101,13 +138,17 @@ flash:
 
 filters:
     apply: Apply
-    reset: Reset
+    reset: Clear
+    title: Filters
+    open: Filters
 
 page.settings:
     title: Site settings
+    description: Configurable elements of the site.
     empty: No setting to display.
 page.apikey:
     title: API keys
+    description: Sensitive information used to connect to third-party service APIs.
     empty: No API key to display.
 
 manual:
@@ -135,9 +176,3 @@ analytics:
         30d: 30 days
         all: All time
         since_prefix: "Since"
-    settings:
-        title: Widget settings
-        title_label: Title
-        series_label: Lines shown
-        cancel: Cancel
-        apply: Apply

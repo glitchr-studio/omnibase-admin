@@ -2,4 +2,21 @@
 
 {% block page_title %}{{ block('form_title') }}{% endblock %}
 
-{% block form_title %}{{ crud.pageTitle('edit') ?? 'page.edit'|trans({'%entity%': crud.entityLabelInSingular ?? crud.entityFqcn|split('\\')|last, '%id%': entityId}, 'admin') }}{% endblock %}
+{% set _entityLabel = crud.entityLabelInSingular ?? crud.entityFqcn|split('\\')|last %}
+{# Same record-first heading as crud/detail.html.twig: name the row being
+   edited rather than repeating the class name, which _form.html.twig
+   already prints underneath as "Article ID #1147".
+
+   %id% is the NUMERIC id, deliberately not `entityId`: since admin URLs
+   went slug-first entityId is the slug, and this heading was rendering
+   "Modifier Article #petit-cours-de-prononciation-du-japonais-grace-au-
+   patinage-artistique". #}
+{% set _record = admin_display(entity)|trim %}
+{% set _record = _record and _record != _entityLabel ? _record : null %}
+
+{% block form_title %}
+    {{- crud.pageTitle('edit')
+        ?? (_record
+            ? 'page.edit_named'|trans({'%name%': _record}, 'admin')
+            : 'page.edit'|trans({'%entity%': _entityLabel, '%id%': entity.id}, 'admin')) -}}
+{% endblock %}
