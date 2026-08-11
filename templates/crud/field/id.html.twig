@@ -1,6 +1,10 @@
 {%- set raw = field.value -%}
 {%- if field.customOption('addLink') and entity is defined -%}
-    <a class="field-id" href="{{ admin_url(controller_fqcn, 'detail', raw) }}">#{{ raw }}</a>
+    {#- Shows the id but LINKS by the canonical identifier (slug/uuid where
+        the entity has one). Linking by raw id still works - detail() redirects
+        it - but that costs a redirect hop on every click from the list, and
+        puts the id in the address bar for a moment before it flips. -#}
+    <a class="field-id" href="{{ admin_url(controller_fqcn, 'detail', admin_entity_id(entity)) }}">#{{ raw }}</a>
 {%- else -%}
     <span class="field-id">#{{ raw }}</span>
 {%- endif -%}

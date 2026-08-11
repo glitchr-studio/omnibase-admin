@@ -2,6 +2,8 @@
 
 namespace Base\Admin\Router;
 
+use Symfony\Component\String\Inflector\EnglishInflector;
+
 /**
  * Maps CRUD controller FQCNs to their generated route names and URL slugs.
  * Fed by the compiler pass with every service tagged base.admin.crud_controller.
@@ -85,15 +87,85 @@ class AdminRouteRegistry
         return $slug;
     }
 
+    /**
+     * Slugs are hierarchical now ("articles/comments"), so "/" has to be
+     * folded into the route name alongside "-" - otherwise the generated
+     * name carries a slash and no longer round-trips through Symfony's
+     * router or through path('admin_crud_..._index').
+     */
+    /** @var array<string, string>|null entity FQCN => controller FQCN */
+    protected ?array $byEntity = null;
+
+    /**
+     * The registered CRUD controller that manages a given entity, or null if
+     * nothing does.
+     *
+     * This is what lets a related entity rendered in a field become a link
+     * to its own admin page without every field having to name a controller
+     * by hand - the association/select templates auto-resolve through here
+     * and only fall back to an explicit crudControllerFqcn option when the
+     * mapping is ambiguous or absent.
+     *
+     * Walks the PARENT CHAIN, not just the exact class, for two reasons: a
+     * Doctrine proxy's class is a generated subclass of the real entity, and
+     * an inheritance tree (Thread -> Article/Comment/...) is often managed
+     * by one controller registered against the base class. The exact class
+     * always wins over an ancestor so a subclass with its own CRUD keeps it.
+     */
+    public function getControllerForEntity(string|object $entity): ?string
+    {
+        if (null === $this->byEntity) {
+            $this->byEntity = [];
+            foreach ($this->controllers as $fqcn => $slug) {
+                if (!is_subclass_of($fqcn, \Base\Admin\Controller\CrudControllerInterface::class)) {
+                    continue;
+                }
+
+                $entityFqcn = $fqcn::getEntityFqcn();
+                // First registration wins: the App\-over-bundle preference
+                // was already applied when $this->controllers was built.
+                $this->byEntity[$entityFqcn] ??= $fqcn;
+            }
+        }
+
+        $class = \is_object($entity) ? $entity::class : $entity;
+
+        for ($candidate = $class; false !== $candidate; $candidate = get_parent_class($candidate)) {
+            if (isset($this->byEntity[$candidate])) {
+                return $this->byEntity[$candidate];
+            }
+        }
+
+        return null;
+    }
+
     public function getRouteName(string $controllerFqcn, string $action = 'index'): string
     {
-        return self::ROUTE_PREFIX . str_replace('-', '_', $this->getSlug($controllerFqcn)) . '_' . $action;
+        return self::ROUTE_PREFIX . str_replace(['-', '/'], '_', $this->getSlug($controllerFqcn)) . '_' . $action;
     }
 
     /**
-     * "App\Controller\Admin\Crud\Layout\WidgetCrudController" => "layout-widget".
-     * The namespace segments after "Crud\" keep the slug unique across
-     * App/Base variants of the same entity tree.
+     * Controller FQCN => a REST-ish, hierarchical, pluralised URL slug:
+     *
+     *   Crud\Article\ArticleCrudController      => "articles"
+     *   Crud\Article\CommentCrudController      => "articles/comments"
+     *   Crud\Article\CommentReplyCrudController => "articles/comment-replies"
+     *   Crud\UserCrudController                 => "users"
+     *
+     * Previously this flattened the namespace with "-" and left it
+     * singular ("article-article", "article-comment"), which read as an
+     * internal class path rather than a URL. Each namespace segment after
+     * "Crud\" is now kebab-cased and pluralised, then joined with "/" so
+     * the grouping shows up as real nesting.
+     *
+     * The consecutive-duplicate collapse is what stops "Article\Article"
+     * (a group whose own main entity repeats the group name) becoming
+     * "articles/articles"; it is applied on the pluralised segments so
+     * "Article\Article" and any future "Foo\Foo" behave the same way.
+     *
+     * NOTE: the multi-segment result means one entity's collection path is
+     * a PREFIX of another's ("/admin/articles" vs "/admin/articles/comments"),
+     * which the loader has to order deepest-first - see AdminRouteLoader::load().
      */
     public static function slugify(string $controllerFqcn): string
     {
@@ -101,6 +173,43 @@ class AdminRouteRegistry
         $pos = strpos($name, 'Crud\\');
         $name = false !== $pos ? substr($name, $pos + 5) : substr($name, (int) strrpos($name, '\\') + 1);
 
-        return strtolower(preg_replace('/(?<=[a-z0-9])([A-Z])/', '-$1', str_replace('\\', '-', $name)));
+        $segments = [];
+        foreach (explode('\\', $name) as $segment) {
+            if ('' === $segment) {
+                continue;
+            }
+
+            $kebab = strtolower(preg_replace('/(?<=[a-z0-9])([A-Z])/', '-$1', $segment));
+            $plural = static::pluralize($kebab);
+
+            // collapse "articles/articles" => "articles"
+            if ($plural === end($segments)) {
+                continue;
+            }
+
+            $segments[] = $plural;
+        }
+
+        return implode('/', $segments);
+    }
+
+    /**
+     * Pluralises the LAST word of a kebab-cased segment ("comment-reply" =>
+     * "comment-replies"), leaving the qualifier words alone. EnglishInflector
+     * can return several candidates for an ambiguous word; the first is its
+     * best guess and is what we want for a URL. A word it cannot inflect
+     * (or one already plural, where it returns nothing usable) is left as-is.
+     */
+    protected static function pluralize(string $kebab): string
+    {
+        $parts = explode('-', $kebab);
+        $last = array_pop($parts);
+
+        $candidates = (new EnglishInflector())->pluralize($last);
+        $plural = $candidates[0] ?? $last;
+
+        $parts[] = $plural;
+
+        return implode('-', $parts);
     }
 }

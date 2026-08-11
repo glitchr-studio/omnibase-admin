@@ -16,6 +16,8 @@ final class AssociationField implements FieldInterface
 
     public const OPTION_CRUD_CONTROLLER = 'crudControllerFqcn';
     public const OPTION_DISPLAY_LIMIT = 'displayLimit';
+    /** @see SelectField::OPTION_ENTITY_DISPLAY - same option, same meaning. */
+    public const OPTION_ENTITY_DISPLAY = 'entityDisplay';
     public const OPTION_ICON_ALIGN = 'iconAlign';
 
     public const OPTION_SHOW_FIRST = 'showFirst';
@@ -150,6 +152,17 @@ final class AssociationField implements FieldInterface
     public function setDisplayLimit(int $limit = 2)
     {
         $this->setCustomOption(self::OPTION_DISPLAY_LIMIT, $limit);
+
+        return $this;
+    }
+
+    /**
+     * @param string $mode one of FieldValueResolver::DISPLAY_*
+     * @return $this
+     */
+    public function setEntityDisplay(string $mode = FieldValueResolver::DISPLAY_USERNAME)
+    {
+        $this->setCustomOption(self::OPTION_ENTITY_DISPLAY, $mode);
 
         return $this;
     }

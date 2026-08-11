@@ -34,7 +34,15 @@ return function (ContainerConfigurator $configurator) {
 
     $services->set(AdminContext::class);
 
-    $services->set(FieldValueResolver::class);
+    // All three declared explicitly (rather than relying on constructor
+    // defaults) so AdminExtension can override the last two by NAME from
+    // admin.url_identifier config: named arguments only resolve cleanly
+    // when no earlier positional slot is left as a gap.
+    $services->set(FieldValueResolver::class)
+        ->arg('$accessor', null)
+        ->arg('$identifierFields', null)
+        ->arg('$identifierFieldsByEntity', [])
+        ->arg('$lowercaseIdentifiers', false);
 
     $services->set(FieldFormBuilder::class)
         ->args([service('form.factory')]);
@@ -56,7 +64,9 @@ return function (ContainerConfigurator $configurator) {
         ->tag('security.voter');
 
     $services->set(\Base\Admin\Twig\AdminTwigExtension::class)
-        ->args([service(AdminUrlGenerator::class), service(\Base\Admin\Field\FieldValueResolver::class)])
+        // Registry: lets admin_entity_crud() resolve a related entity to the
+        // CRUD that manages it, so association chips link themselves.
+        ->args([service(AdminUrlGenerator::class), service(\Base\Admin\Field\FieldValueResolver::class), service(AdminRouteRegistry::class)])
         ->tag('twig.extension');
 
     $services->set(\Base\Admin\EventSubscriber\NestHeaderSubscriber::class)
@@ -116,7 +126,7 @@ return function (ContainerConfigurator $configurator) {
     ]);
 
     $services->set(LayoutController::class)
-        ->args([service(LayoutStore::class)])
+        ->args([service(LayoutStore::class), service('localizer')->nullOnInvalid(), service('base.service.icon')->nullOnInvalid()])
         ->call('setContainer', [$controllerServiceLocator])
         ->public(true)
         ->tag('controller.service_arguments');
@@ -128,7 +138,7 @@ return function (ContainerConfigurator $configurator) {
         ->tag('controller.service_arguments');
 
     $services->set(\Base\Admin\Controller\DashboardWidgetController::class)
-        ->args([service(\Base\Admin\Widget\PaletteWidgetTypeRegistry::class), service('translator')])
+        ->args([service(\Base\Admin\Widget\PaletteWidgetTypeRegistry::class), service('translator'), service(LayoutStore::class)])
         ->call('setContainer', [$controllerServiceLocator])
         ->public(true)
         ->tag('controller.service_arguments');
@@ -146,6 +156,27 @@ return function (ContainerConfigurator $configurator) {
 
     $services->set(\Base\Admin\Widget\WelcomeWidgetType::class)
         ->args([service('translator')])
+        ->tag('base.admin.dashboard_widget_type')
+        ->tag('base.admin.dashboard_widget_type.palette');
+
+    $services->set(\Base\Admin\Widget\LinkableEntityRegistry::class)
+        ->args([service('doctrine.orm.entity_manager')]);
+
+    $services->set(\Base\Admin\Widget\EntityViewsWidgetType::class)
+        ->args([
+            service(\Base\Service\Analytics::class),
+            service(\Base\Admin\Widget\LinkableEntityRegistry::class),
+            service('translator'),
+            service(\Base\Admin\Widget\TimelineEventRegistry::class),
+        ])
+        ->tag('base.admin.dashboard_widget_type')
+        ->tag('base.admin.dashboard_widget_type.palette');
+
+    $services->set(\Base\Admin\Widget\CounterWidgetType::class)
+        ->args([
+            service(\Base\Service\Analytics::class),
+            service(\Base\Admin\Widget\LinkableEntityRegistry::class),
+        ])
         ->tag('base.admin.dashboard_widget_type')
         ->tag('base.admin.dashboard_widget_type.palette');
 
@@ -168,6 +199,10 @@ return function (ContainerConfigurator $configurator) {
         ->args([service(DashboardWidgetTypeRegistry::class)])
         ->tag('twig.extension');
 
+    $services->set(\Base\Admin\Twig\DevVersionTwigExtension::class)
+        ->args(['%kernel.debug%'])
+        ->tag('twig.extension');
+
     $services->set(\Base\Admin\Menu\MenuBuilder::class)
         ->args([
             service(AdminRouteRegistry::class),
@@ -178,6 +213,7 @@ return function (ContainerConfigurator $configurator) {
             service('security.authorization_checker'),
             service(LayoutStore::class),
             service(LayoutArranger::class),
+            service('localizer')->nullOnInvalid(),
             tagged_iterator('base.admin.dashboard_controller'),
         ]);
 };

@@ -13,6 +13,7 @@ class AdminTwigExtension extends AbstractExtension
     public function __construct(
         protected readonly AdminUrlGenerator $adminUrlGenerator,
         protected readonly FieldValueResolver $fieldValueResolver,
+        protected readonly ?\Base\Admin\Router\AdminRouteRegistry $routeRegistry = null,
     ) {
     }
 
@@ -22,7 +23,28 @@ class AdminTwigExtension extends AbstractExtension
             new TwigFunction('admin_url', $this->adminUrl(...)),
             new TwigFunction('admin_action_url', $this->adminActionUrl(...)),
             new TwigFunction('admin_display', $this->fieldValueResolver->formatValue(...)),
+            // Display-mode aware variants of admin_display() - see
+            // FieldValueResolver::entityLabel()/entityAvatar().
+            new TwigFunction('admin_entity_label', $this->fieldValueResolver->entityLabel(...)),
+            new TwigFunction('admin_entity_avatar', $this->fieldValueResolver->entityAvatar(...)),
+            new TwigFunction('admin_entity_crud', $this->adminEntityCrud(...)),
+            new TwigFunction('admin_entity_id', $this->fieldValueResolver->entityIdentifier(...)),
         ];
+    }
+
+    /**
+     * The CRUD controller managing a related entity, so a field template can
+     * link it to its own admin page without the field naming a controller.
+     * Null when nothing manages that class - the templates then render plain
+     * text, exactly as before.
+     */
+    public function adminEntityCrud(mixed $entity): ?string
+    {
+        if (!\is_object($entity) || null === $this->routeRegistry) {
+            return null;
+        }
+
+        return $this->routeRegistry->getControllerForEntity($entity);
     }
 
     /**
@@ -52,7 +74,10 @@ class AdminTwigExtension extends AbstractExtension
 
         // index takes no entity - passing one would only leak a stray
         // ?entityId= query param into an otherwise clean listing URL
-        return $this->adminUrl($controllerFqcn, $crudAction, 'index' === $crudAction ? null : $entity->getId());
+        // Slug/uuid-first identifier, not the raw id - see
+        // FieldValueResolver::entityIdentifier(). Every row action
+        // (view/edit/delete/...) inherits readable URLs from here.
+        return $this->adminUrl($controllerFqcn, $crudAction, 'index' === $crudAction ? null : $this->fieldValueResolver->entityIdentifier($entity));
     }
 
     public function adminUrl(string $controllerFqcn, string $action = 'index', mixed $entityId = null, array $parameters = []): string

@@ -28,6 +28,22 @@ class AdminExtension extends AbstractBaseExtension
         $processor = new Processor();
         $configuration = new AdminConfiguration();
         $config = $processor->processConfiguration($configuration, $configs);
+
+        // Injected straight into the service rather than left to
+        // setConfiguration() below: that helper recurses into EVERY array
+        // it meets, so a LIST like ['slug','uuid'] would be flattened into
+        // admin.url_identifier.fields.0 / .1 parameters instead of one
+        // array parameter - and the entities map, whose keys are FQCNs,
+        // would fare worse still. Pulled out of $config so it never
+        // reaches that recursion.
+        $urlIdentifier = $config['url_identifier'] ?? [];
+        unset($config['url_identifier']);
+
+        $container->getDefinition(\Base\Admin\Field\FieldValueResolver::class)
+            ->setArgument('$identifierFields', $urlIdentifier['fields'] ?? \Base\Admin\Field\FieldValueResolver::DEFAULT_IDENTIFIER_FIELDS)
+            ->setArgument('$identifierFieldsByEntity', $urlIdentifier['entities'] ?? [])
+            ->setArgument('$lowercaseIdentifiers', $urlIdentifier['lowercase'] ?? false);
+
         $this->setConfiguration($container, $config, $configuration->getTreeBuilder()->buildTree()->getName());
 
         // NB: no setConfigurationAliases() here - Base\Admin IS the canonical

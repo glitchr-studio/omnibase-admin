@@ -25,6 +25,21 @@ class SelectField implements FieldInterface
     public const OPTION_FILTER = 'choice_filter';
 
     public const OPTION_DISPLAY_LIMIT = 'displayLimit';
+    /**
+     * How a related entity is labelled in the cell - one of
+     * FieldValueResolver::DISPLAY_* (username | fullname | avatar). Shares
+     * the option NAME with AssociationField on purpose: the two render
+     * through different templates but the choice means the same thing, and
+     * a single name keeps the templates and any future field consistent.
+     */
+    public const OPTION_ENTITY_DISPLAY = 'entityDisplay';
+    /**
+     * Makes each rendered entity a link to its own CRUD detail page. Same
+     * option name as AssociationField::OPTION_CRUD_CONTROLLER for the same
+     * reason - a SelectField over a real association (Comment::owners) had
+     * no way to be clickable at all before this.
+     */
+    public const OPTION_CRUD_CONTROLLER = 'crudControllerFqcn';
     public const OPTION_ICON_ALIGN = 'iconAlign';
 
     public const OPTION_RENDER_FORMAT = 'renderFormat';
@@ -210,6 +225,28 @@ class SelectField implements FieldInterface
      *
      * @return $this
      */
+    /**
+     * @param string $mode one of FieldValueResolver::DISPLAY_*
+     * @return $this
+     */
+    public function setEntityDisplay(string $mode = FieldValueResolver::DISPLAY_USERNAME)
+    {
+        $this->setCustomOption(self::OPTION_ENTITY_DISPLAY, $mode);
+
+        return $this;
+    }
+
+    /**
+     * @param string $crudControllerFqcn
+     * @return $this
+     */
+    public function setCrudController(string $crudControllerFqcn)
+    {
+        $this->setCustomOption(self::OPTION_CRUD_CONTROLLER, $crudControllerFqcn);
+
+        return $this;
+    }
+
     public function setEnumClass(string $class)
     {
         $this->setCustomOption(self::OPTION_ENUM_CLASS, $class);

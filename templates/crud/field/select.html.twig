@@ -1,5 +1,35 @@
 {%- set choices = field.customOption('choices') ?? {} -%}
 {%- set enumClass = field.customOption('enumClass') -%}
+{%- set entityDisplay = field.customOption('entityDisplay') -%}
+{#- Explicit option wins; otherwise resolved per value from its own class
+    so a SelectField over a real association links itself. See
+    association.html.twig for the same fallback. -#}
+{%- set crudFqcn = field.customOption('crudControllerFqcn') -%}
+{#- Renders ONE related entity: avatar or text per entityDisplay, wrapped in
+    a link to its CRUD detail page when the field names a controller. Falls
+    back to the plain badge for anything that isn't an object (a scalar
+    choice/enum value), which is what keeps this macro safe to use for
+    every iterable case rather than only associations. -#}
+{%- macro entity(item, choices, enumClass, entityDisplay, crudFqcn) -%}
+    {%- if not entityDisplay and not crudFqcn and not admin_entity_crud(item) -%}
+        {#- Neither option configured: the historical path, untouched. A
+            plain choice/enum SelectField must keep its icon+colour badge. -#}
+        {{- _self.badge(admin_display(item), choices, enumClass) -}}
+    {%- else -%}
+        {%- set label = admin_entity_label(item, entityDisplay ?: 'username') -%}
+        {%- set crudFqcn = crudFqcn ?? admin_entity_crud(item) -%}
+        {%- set avatar = 'avatar' == entityDisplay ? admin_entity_avatar(item) : null -%}
+        {%- if crudFqcn and item is not null and item.id is defined -%}
+            <a class="badge badge-accent badge-entity" href="{{ admin_url(crudFqcn, 'detail', admin_entity_id(item)) }}" title="{{ label }}">
+                {%- if avatar %}<img class="badge-avatar" src="{{ avatar }}" alt="{{ label }}">{% else %}{{ label }}{% endif -%}
+            </a>
+        {%- else -%}
+            <span class="badge badge-accent badge-entity" title="{{ label }}">
+                {%- if avatar %}<img class="badge-avatar" src="{{ avatar }}" alt="{{ label }}">{% else %}{{ label }}{% endif -%}
+            </span>
+        {%- endif -%}
+    {%- endif -%}
+{%- endmacro -%}
 {%- macro badge(raw, choices, enumClass) -%}
     {%- set label = choices[raw] ?? null -%}
     {%- set enumLabel = enumClass ? raw|trans_enum(enumClass) : null -%}
@@ -32,10 +62,26 @@
                turns each into the same safe string FieldValueResolver
                already produces for a scalar field (__toString(), or
                "ClassName #id" when there is none), so choices[] lookup
-               below never tries to use an object as an array key. #}
-            {{ _self.badge(admin_display(item), choices, enumClass) }}
+               below never tries to use an object as an array key.
+
+               entityDisplay/crudControllerFqcn (both optional) let a field
+               over a real association render the related entity as its
+               full name or avatar instead of __toString(), and link to its
+               own CRUD page - reported live: Comment "Owners" showed bare
+               usernames ("NN") with no way to click through. Neither is
+               set by default, so a plain choice/enum SelectField renders
+               exactly as before. #}
+            {{ _self.entity(item, choices, enumClass, entityDisplay, crudFqcn ?? admin_entity_crud(item)) }}
         {%- endfor -%}
     </span>
+{%- elseif raw is not iterable and raw.id is defined -%}
+    {#- A to-ONE association (SelectField over a single related entity, e.g.
+        an Article's Destination parent). This branch used to fall through to
+        the scalar badge below and render formattedValue as dead text, so a
+        single-valued association was the one shape that never linked while
+        every to-many one did. Same macro as the collection above, so the two
+        cannot drift. -#}
+    {{ _self.entity(raw, choices, enumClass, entityDisplay, crudFqcn ?? admin_entity_crud(raw)) }}
 {%- else -%}
     {{ _self.badge(field.formattedValue, choices, enumClass) }}
 {%- endif -%}

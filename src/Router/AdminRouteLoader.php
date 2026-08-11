@@ -24,6 +24,7 @@ class AdminRouteLoader extends Loader
 {
     public const TYPE = 'base_admin';
 
+
     public function __construct(protected readonly AdminRouteRegistry $registry)
     {
         parent::__construct();
@@ -39,7 +40,19 @@ class AdminRouteLoader extends Loader
         $routes = new RouteCollection();
         $prefix = rtrim($this->registry->getUrlPrefix(), '/');
 
-        foreach ($this->registry->getControllers() as $fqcn => $slug) {
+        // Deepest slug FIRST. Slugs are hierarchical now, so one entity's
+        // collection path is a prefix of another's: "articles" vs
+        // "articles/comments". Symfony matches in registration order, so
+        // with the natural (registry) order the parent's catch-all detail
+        // route "/admin/articles/{entityId}" would match "/admin/articles/
+        // comments" and hand the comments controller's whole subtree to
+        // the Article detail action with entityId="comments". Registering
+        // "articles/comments" first means the literal path wins and only
+        // genuinely unmatched segments fall through to {entityId}.
+        $controllers = $this->registry->getControllers();
+        uasort($controllers, static fn (string $a, string $b) => substr_count($b, '/') <=> substr_count($a, '/'));
+
+        foreach ($controllers as $fqcn => $slug) {
             $add = function (string $action, string $path, array $methods) use ($routes, $prefix, $slug, $fqcn) {
                 $routes->add(
                     $this->registry->getRouteName($fqcn, $action),
@@ -83,7 +96,38 @@ class AdminRouteLoader extends Loader
         $routes->add('admin_layout_save', new Route(
             $prefix . '/layout/{scope}',
             ['_controller' => \Base\Admin\Controller\LayoutController::class . '::save'],
-            ['scope' => 'sidebar|dashboard'],
+            ['scope' => implode('|', \Base\Admin\Layout\LayoutScope::all())],
+            [],
+            '',
+            [],
+            ['POST']
+        ));
+
+        // Single-field quick-save (title/text only) - same "one small
+        // request on blur" pattern as the sidebar brand title's own
+        // admin_settings_quick, extended to dashboard widgets - see
+        // LayoutController::quickSave()'s own doc comment for why this
+        // stays narrowly scoped to just those two fields, not a general
+        // per-field PATCH endpoint.
+        // The page-icon picker's search source (GET, read-only, superadmin
+        // check inside the action) - see LayoutController::icons().
+        $routes->add('admin_icon_search', new Route(
+            $prefix . '/layout/icons',
+            ['_controller' => \Base\Admin\Controller\LayoutController::class . '::icons'],
+            [],
+            [],
+            '',
+            [],
+            ['GET']
+        ));
+
+        $routes->add('admin_layout_quick', new Route(
+            $prefix . '/layout/{scope}/quick',
+            ['_controller' => \Base\Admin\Controller\LayoutController::class . '::quickSave'],
+            // sidebar too, not just dashboard: page title/description edits
+            // persist onto the page's own SIDEBAR menu item (see
+            // layout.html.twig's data-page-title handler).
+            ['scope' => implode('|', \Base\Admin\Layout\LayoutScope::all())],
             [],
             '',
             [],
@@ -110,8 +154,11 @@ class AdminRouteLoader extends Loader
     }
 
     /**
-     * The dashboard "+ Add widget" palette - see DashboardWidgetController.
-     * GET + no CSRF (read-only, neither action persists anything).
+     * The dashboard "+ Add widget" palette (types/newInstance), the
+     * merge/split gestures, and the restore-a-deleted-widget action - see
+     * DashboardWidgetController. All GET + no CSRF except restore, which
+     * is POST + CSRF-checked since it's the one that actually persists
+     * something (see its own docblock).
      */
     private function addDashboardWidgetRoutes(RouteCollection $routes, string $prefix): void
     {
@@ -150,6 +197,17 @@ class AdminRouteLoader extends Loader
             '',
             [],
             ['GET']
+        ));
+        // Unlike the three read-only routes above: POST + CSRF-checked,
+        // see DashboardWidgetController::restore()'s own docblock.
+        $routes->add('admin_dashboard_widget_restore', new Route(
+            $prefix . '/dashboard/widget/restore',
+            ['_controller' => \Base\Admin\Controller\DashboardWidgetController::class . '::restore'],
+            [],
+            [],
+            '',
+            [],
+            ['POST']
         ));
     }
 

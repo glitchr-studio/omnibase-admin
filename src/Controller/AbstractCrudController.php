@@ -39,6 +39,8 @@ abstract class AbstractCrudController extends AbstractController implements Crud
     protected AdminUrlGenerator $adminUrlGenerator;
     protected AdminContext $adminContext;
     protected \Base\Admin\Menu\MenuBuilder $menuBuilder;
+    protected \Base\Admin\Layout\LayoutStore $layoutStore;
+    protected \Base\Admin\Router\AdminRouteRegistry $routeRegistry;
 
     #[Required]
     public function setAdminServices(
@@ -48,6 +50,8 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         AdminUrlGenerator $adminUrlGenerator,
         AdminContext $adminContext,
         \Base\Admin\Menu\MenuBuilder $menuBuilder,
+        \Base\Admin\Layout\LayoutStore $layoutStore,
+        \Base\Admin\Router\AdminRouteRegistry $routeRegistry,
     ): void {
         $this->entityManager = $entityManager;
         $this->fieldFormBuilder = $fieldFormBuilder;
@@ -55,6 +59,8 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         $this->adminUrlGenerator = $adminUrlGenerator;
         $this->adminContext = $adminContext;
         $this->menuBuilder = $menuBuilder;
+        $this->layoutStore = $layoutStore;
+        $this->routeRegistry = $routeRegistry;
     }
 
     /**
@@ -339,6 +345,9 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         $this->denyAccessUnlessGrantedToRun($crud);
 
         $entity = $this->findEntity($entityId);
+        if (null !== $redirect = $this->canonicalIdentifierRedirect($request, $entity, $entityId, Action::DETAIL)) {
+            return $redirect;
+        }
         $this->adminContext->setEntity($entity);
 
         return $this->renderCrud('@Admin/crud/detail.html.twig', [
@@ -382,6 +391,9 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         $this->denyAccessUnlessGrantedToRun($crud);
 
         $entity = $this->findEntity($entityId);
+        if (null !== $redirect = $this->canonicalIdentifierRedirect($request, $entity, $entityId, Action::EDIT)) {
+            return $redirect;
+        }
         $this->adminContext->setEntity($entity);
 
         $form = $this->fieldFormBuilder->createForm($entity, $this->getFields(Crud::PAGE_EDIT), FieldDescriptor::PAGE_EDIT, $crud->getEditFormOptions());
@@ -676,11 +688,87 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         return $clean;
     }
 
+    /**
+     * Resolves the {entityId} route parameter, which may be a SLUG, a UUID
+     * or the numeric id - URLs are generated with the first of those the
+     * entity has (see FieldValueResolver::entityIdentifier), but all three
+     * keep working so older links and bookmarks never break.
+     *
+     * A purely numeric value is tried as the primary key FIRST: that is the
+     * overwhelmingly common case and skips two pointless queries. Anything
+     * else goes to the slug/uuid lookups, and only those fields that
+     * actually exist on the entity's Doctrine metadata are queried - asking
+     * for a missing field would throw rather than simply miss.
+     */
+    /**
+     * Redirects a record reached by a NON-canonical identifier (typically the
+     * numeric id) to its canonical one (the slug) so the readable URL is what
+     * ends up in the address bar and in bookmarks.
+     *
+     * GET only, and never for a submitted form: redirecting a POST would
+     * discard the request body, i.e. silently throw away the user's edits.
+     * 302 rather than 301 - a slug is editable, so a permanent redirect the
+     * browser caches would outlive the mapping it describes.
+     *
+     * The comparison is CASE-INSENSITIVE: identifier lookups run through the
+     * database's collation, which for this app is case-insensitive, so
+     * "/admin/users/marki" and "/admin/users/Marki" already load the same
+     * record. Bouncing one to the other would be a redirect that changes
+     * nothing a reader can act on. A difference in anything OTHER than case
+     * (a stale slug, an id, an accent the collation folded) still redirects.
+     */
+    protected function canonicalIdentifierRedirect(Request $request, object $entity, string $entityId, string $action): ?Response
+    {
+        if (!$request->isMethod('GET')) {
+            return null;
+        }
+
+        $canonical = (string) $this->fieldValueResolver->entityIdentifier($entity);
+        if ('' === $canonical || mb_strtolower($canonical) === mb_strtolower($entityId)) {
+            return null;
+        }
+
+        return $this->redirect(
+            $this->adminUrlGenerator->setController(static::class)->setAction($action)->setEntityId($canonical)->generateUrl()
+        );
+    }
+
     protected function findEntity(string $entityId): object
     {
-        $entity = $this->entityManager->find(static::getEntityFqcn(), $entityId);
+        $fqcn = static::getEntityFqcn();
+        $entity = null;
+
+        if (ctype_digit($entityId)) {
+            $entity = $this->entityManager->find($fqcn, $entityId);
+        }
+
         if (null === $entity) {
-            throw $this->createNotFoundException(sprintf('No "%s" found for id "%s".', static::getEntityFqcn(), $entityId));
+            $metadata = $this->entityManager->getClassMetadata($fqcn);
+            $repository = $this->entityManager->getRepository($fqcn);
+
+            // Asks the resolver rather than holding its own list, so what we
+            // RESOLVE always covers what entityIdentifier() GENERATES under
+            // the current admin.url_identifier config - and then some: this
+            // list is deliberately the WIDER one, so narrowing the config
+            // shortens new URLs without 404ing links already in the wild.
+            foreach ($this->fieldValueResolver->resolvableIdentifierFieldsFor($fqcn) as $field) {
+                if (!$metadata->hasField($field)) {
+                    continue;
+                }
+
+                $entity = $repository->findOneBy([$field => $entityId]);
+                if (null !== $entity) {
+                    break;
+                }
+            }
+        }
+
+        // Last resort: a non-numeric primary key (a string id) still
+        // resolves, and so does a numeric one whose row was missed above.
+        $entity ??= $this->entityManager->find($fqcn, $entityId);
+
+        if (null === $entity) {
+            throw $this->createNotFoundException(sprintf('No "%s" found for identifier "%s".', $fqcn, $entityId));
         }
 
         return $entity;
@@ -705,13 +793,66 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         $submitAction = $request->request->getString('submit_action', Action::SAVE_AND_RETURN);
         $url = $this->adminUrlGenerator->setController(static::class);
 
-        $id = method_exists($entity, 'getId') ? $entity->getId() : null;
+        // Same slug/uuid-first identifier the rest of the admin links
+        // with, so "save and continue" lands on the readable URL.
+        $id = $this->fieldValueResolver->entityIdentifier($entity);
 
         return $this->redirect(match ($submitAction) {
             Action::SAVE_AND_CONTINUE => $url->setAction(Action::EDIT)->setEntityId($id)->generateUrl(),
             Action::SAVE_AND_ADD_ANOTHER => $url->setAction(Action::NEW)->generateUrl(),
             default => $url->setAction(Action::INDEX)->generateUrl(),
         });
+    }
+
+    /**
+     * The superadmin-customizable title/description for THIS CRUD page.
+     *
+     * Keyed by the CRUD's URL slug (LayoutScope::CRUD), not by a sidebar
+     * menu item: the sidebar-backed customization the system pages use is
+     * unreachable here because most CRUD pages have no menu entry at all,
+     * so nothing is ever marked selected and the editable header never
+     * renders. The slug is stable, unique per CRUD, and already the
+     * identity the router uses.
+     *
+     * Returns the stored item plus the key, so a template can render an
+     * editable header even when nothing has been customized yet (the key
+     * is what the in-place editor posts back).
+     */
+    protected function crudPageCustomization(): array
+    {
+        $slug = $this->routeRegistry->getSlug(static::class);
+        $item = null;
+
+        // ->toArray() is the whole config (['items' => [...]]), not the item
+        // list - quickSave writes into $array['items'] and this has to read
+        // the same level back.
+        $stored = $this->layoutStore->get(\Base\Admin\Layout\LayoutScope::CRUD)->toArray();
+
+        foreach (\is_array($stored['items'] ?? null) ? $stored['items'] : [] as $candidate) {
+            if (($candidate['key'] ?? null) === $slug) {
+                $item = $candidate;
+                break;
+            }
+        }
+
+        // action name => position, for the top-right button row. Stored as
+        // the entry's children (see LayoutController::quickSave) so the
+        // order is just the child order. A map rather than a list because
+        // the templates sort with it and an O(1) lookup keeps that simple;
+        // an action with no stored position sorts after the known ones,
+        // so a newly added action appears at the end instead of vanishing.
+        $order = [];
+        foreach (\is_array($item['children'] ?? null) ? $item['children'] : [] as $position => $child) {
+            if (\is_string($child['key'] ?? null) && '' !== $child['key']) {
+                $order[$child['key']] = $position;
+            }
+        }
+
+        return [
+            'crud_page_key' => $slug,
+            'crud_page' => $item,
+            'crud_action_order' => $order,
+        ];
     }
 
     protected function renderCrud(string $template, array $parameters): Response
@@ -727,6 +868,6 @@ abstract class AbstractCrudController extends AbstractController implements Crud
             'admin_context' => $this->adminContext,
             'controller_fqcn' => static::class,
             'customize_enabled' => $this->isGranted(\Base\Enum\UserRole::SUPERADMIN),
-        ]);
+        ] + $this->crudPageCustomization());
     }
 }
