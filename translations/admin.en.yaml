@@ -153,9 +153,15 @@ page.apikey:
 
 manual:
     title: Documentation
-    empty: No page selected. Choose a topic from the sidebar.
-    last_update: Last updated
-
+    empty: No page selected. Pick a topic from the menu.
+    last_update: Last update
+    search: Search
+    search_placeholder: "Search the documentation…"
+    no_results: No results.
+    on_this_page: On this page
+    overrides: This page overrides the base one
+    nav_hint: navigate
+    open_hint: open
 analytics:
     today: Today
     last_7_days: Last 7 days

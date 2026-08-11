@@ -155,7 +155,13 @@ manual:
     title: Documentation
     empty: Aucune page sélectionnée. Choisissez un sujet dans le menu.
     last_update: Dernière mise à jour
-
+    search: Rechercher
+    search_placeholder: "Rechercher dans la documentation…"
+    no_results: Aucun résultat.
+    on_this_page: Sur cette page
+    overrides: Cette page remplace celle du socle
+    nav_hint: naviguer
+    open_hint: ouvrir
 analytics:
     today: Aujourd'hui
     last_7_days: 7 derniers jours
