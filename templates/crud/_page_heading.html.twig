@@ -37,6 +37,17 @@
     {%- if editable %} data-page-title data-menu-key="{{ pageKey }}" data-layout-scope="crud"{% endif -%}
 {%- endset -%}
 
+{# Leading icon, the way production and page/system.html.twig both lead.
+   Resolved from the selected menu item rather than passed in, so index,
+   detail and edit cannot drift and none of them repeats the walk - see
+   AdminTwigExtension::adminMenuCurrent(). Rendered only when that item
+   actually carries an icon: a question-mark placeholder on every CRUD
+   would be worse than no box at all. Sits OUTSIDE .admin-header-titles,
+   as a sibling, because .admin-header is the flex row it lines up in. #}
+{% set _menuIcon = admin_menu_current() ? admin_menu_current().icon : null %}
+{% set _icon = _menuIcon ?: (entityFqcn is defined ? admin_entity_icon(entityFqcn) : null) %}
+{% if _icon %}<span class="admin-header-icon"><i class="{{ _icon }}"></i></span>{% endif %}
+
 {# Wrapper is what makes the heading a STACK. .admin-header is a flex row,
    so without it the title, the id line, the description and the locale
    badges all became columns of one row - the CRUD pages were the only ones

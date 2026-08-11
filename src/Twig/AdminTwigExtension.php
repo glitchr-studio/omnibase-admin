@@ -14,7 +14,56 @@ class AdminTwigExtension extends AbstractExtension
         protected readonly AdminUrlGenerator $adminUrlGenerator,
         protected readonly FieldValueResolver $fieldValueResolver,
         protected readonly ?\Base\Admin\Router\AdminRouteRegistry $routeRegistry = null,
+        protected readonly ?\Base\Admin\Context\AdminContext $adminContext = null,
     ) {
+    }
+
+    /**
+     * The menu item matching the page being rendered, or null.
+     *
+     * A function rather than a template variable because the templates that
+     * need it are included with `only` - and because three of them would
+     * otherwise each repeat the same two-level walk over mainMenu. Selection
+     * itself is decided once, by MenuBuilder::markSelected() (longest
+     * matching path prefix), so a detail or edit page resolves to the CRUD's
+     * own item rather than to nothing.
+     */
+    public function adminMenuCurrent(): ?\Base\Admin\Config\Menu\MenuItem
+    {
+        foreach ($this->adminContext?->getMainMenu() ?? [] as $item) {
+            if ($item->isSelected()) {
+                return $item;
+            }
+
+            foreach ($item->getSubItems() as $subItem) {
+                if ($subItem->isSelected()) {
+                    return $subItem;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * An entity's own icon, from the app's IconizeInterface convention
+     * (__iconizeStatic() returns a list, first entry wins).
+     *
+     * The header's fallback when the CRUD's menu item declares no icon of
+     * its own, which is the common case for content CRUDs - the menu item
+     * is generated, the entity is hand-written and usually already says
+     * what it looks like (Article -> fa-newspaper).
+     */
+    public function adminEntityIcon(?string $entityFqcn): ?string
+    {
+        if (null === $entityFqcn || !class_exists($entityFqcn) || !method_exists($entityFqcn, '__iconizeStatic')) {
+            return null;
+        }
+
+        $icons = $entityFqcn::__iconizeStatic();
+        $icon = \is_array($icons) ? ($icons[0] ?? null) : $icons;
+
+        return \is_string($icon) && '' !== $icon ? $icon : null;
     }
 
     public function getFunctions(): array
@@ -29,6 +78,8 @@ class AdminTwigExtension extends AbstractExtension
             new TwigFunction('admin_entity_avatar', $this->fieldValueResolver->entityAvatar(...)),
             new TwigFunction('admin_entity_crud', $this->adminEntityCrud(...)),
             new TwigFunction('admin_entity_id', $this->fieldValueResolver->entityIdentifier(...)),
+            new TwigFunction('admin_menu_current', $this->adminMenuCurrent(...)),
+            new TwigFunction('admin_entity_icon', $this->adminEntityIcon(...)),
         ];
     }
 

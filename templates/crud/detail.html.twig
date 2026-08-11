@@ -22,6 +22,7 @@
 {% set _editable = customize_enabled is defined and customize_enabled and crud_page_key is defined %}
 <div class="admin-header">
     {% include '@Admin/crud/_page_heading.html.twig' with {
+        entityFqcn: crud.entityFqcn,
         editable: _editable,
         pageKey: crud_page_key ?? null,
         stored: crud_page ?? null,
