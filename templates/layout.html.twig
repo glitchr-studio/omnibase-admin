@@ -865,7 +865,44 @@
            plain in-flow text. Hiding it isn't a functional regression, just
            containment of dead markup until/unless a real confirm
            interaction is built for it. #}
-        form.admin-form .modal.fade { display: none; }
+        .modal.fade { display: none; }
+        {# ...but it IS shown, by BooleanField's confirm dialog ("Action
+           demandée sur ...", Annuler/Confirmer) and by the image-preview
+           dialogs. Bootstrap's JS reveals a modal with an INLINE
+           display:block, which beats the rule above - and with no Bootstrap
+           CSS loaded the markup then has no overlay geometry at all, so it
+           landed as a block of plain text in the middle of the form
+           (reported live: "wrong modal positioning").
+
+           Given real geometry here instead of hiding it harder: the dialog
+           is a genuine interaction, it just had no styling to arrive in.
+           Both reveal shapes are matched - the .show class and the inline
+           display - so it works whether Bootstrap's JS is present or a
+           consumer toggles the style directly. #}
+        .modal.fade.show,
+        .modal.fade[style*="display: block"],
+        .modal.fade[style*="display:block"] {
+            display: flex !important; position: fixed; inset: 0; z-index: 100030;
+            align-items: center; justify-content: center;
+            background: rgba(0, 0, 0, .45);
+            {# Padding, not an inset offset: the element IS the backdrop, so it
+               must stay edge-to-edge or the sidebar shows through un-dimmed.
+               Padding shifts the flex-centred dialog onto the content column
+               instead - same placement as .filter-modal. #}
+            padding: 1rem 1rem 1rem calc(1rem + var(--admin-aside-w));
+        }
+        .modal .modal-dialog { width: min(30rem, 100%); margin: 0; }
+        .modal .modal-content { background: var(--admin-surface); border: 1px solid var(--admin-border);
+                                border-radius: 10px; box-shadow: 0 20px 60px rgba(0, 0, 0, .35); overflow: hidden; }
+        .modal .modal-header { display: flex; align-items: center; justify-content: space-between;
+                               gap: .5rem; padding: .7rem 1rem; border-bottom: 1px solid var(--admin-border); }
+        .modal .modal-body { padding: 1rem; }
+        .modal .modal-footer { display: flex; align-items: center; justify-content: flex-end; gap: .5rem;
+                               padding: .7rem 1rem; border-top: 1px solid var(--admin-border); }
+        .modal .btn-close { border: 0; background: none; cursor: pointer; color: var(--admin-muted);
+                            font-size: 1.1rem; line-height: 1; padding: .2rem .35rem; border-radius: 6px; }
+        .modal .btn-close:hover { background: var(--admin-bg); color: var(--admin-text); }
+        .modal img { max-width: 100%; height: auto; display: block; }
         {# select2/tag widgets otherwise compute their own fixed pixel width
            from the underlying <select> at init time, which can end up
            narrower than - or fail to track - their actual CSS grid column
