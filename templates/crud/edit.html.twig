@@ -1,22 +1,12 @@
 {% extends '@Admin/crud/_form.html.twig' %}
 
-{% block page_title %}{{ block('form_title') }}{% endblock %}
-
-{% set _entityLabel = crud.entityLabelInSingular ?? crud.entityFqcn|split('\\')|last %}
-{# Same record-first heading as crud/detail.html.twig: name the row being
-   edited rather than repeating the class name, which _form.html.twig
-   already prints underneath as "Article ID #1147".
-
-   %id% is the NUMERIC id, deliberately not `entityId`: since admin URLs
-   went slug-first entityId is the slug, and this heading was rendering
-   "Modifier Article #petit-cours-de-prononciation-du-japonais-grace-au-
-   patinage-artistique". #}
-{% set _record = admin_display(entity)|trim %}
-{% set _record = _record and _record != _entityLabel ? _record : null %}
-
-{% block form_title %}
-    {{- crud.pageTitle('edit')
-        ?? (_record
-            ? 'page.edit_named'|trans({'%name%': _record}, 'admin')
-            : 'page.edit'|trans({'%entity%': _entityLabel, '%id%': entity.id}, 'admin')) -}}
+{# No form_title override either: the shared heading names the record and
+   drops the entity + "#id" to the subtitle, the same shape detail uses.
+   page.edit_named / page.edit are still used for the browser tab. #}
+{% block page_title %}
+    {%- set _entityLabel = crud.entityLabelInSingular ?? crud.entityFqcn|split('\\')|last -%}
+    {%- set _record = admin_display(entity)|trim -%}
+    {{- _record and _record != _entityLabel
+        ? 'page.edit_named'|trans({'%name%': _record}, 'admin')
+        : 'page.edit'|trans({'%entity%': _entityLabel, '%id%': entity.id}, 'admin') -}}
 {% endblock %}

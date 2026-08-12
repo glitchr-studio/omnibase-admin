@@ -8,13 +8,26 @@
    the form footer - form="admin-form" targets them at the form by id
    regardless of where they sit in the document. #}
 {% block content_header %}
+{% set _entityLabel = crud.entityLabelInSingular ?? crud.entityFqcn|split('\\')|last %}
+{# The same editable heading index/detail use, rather than a plain <h1>:
+   the form pages were the only ones without the entity icon or an editable
+   title. On NEW there is no record yet, so the heading is just the entity -
+   "Article", not "Nouveau Article", which was wrong French anyway (nouvel
+   before a vowel) and reported as such. On EDIT the record names itself and
+   the entity drops to the subtitle, exactly as on detail. #}
+{% set _record = entity is defined and entity is not null and entity.id
+    ? (admin_display(entity)|trim ?: null) : null %}
+{% set _record = _record and _record != _entityLabel ? _record : null %}
 <div class="admin-header">
-    <div class="admin-header-titles">
-        <h1>{% block form_title %}{% endblock %}</h1>
-        {% if entity is defined and entity.id %}
-            <div class="admin-header-subtitle">{{ crud.entityLabelInSingular ?? crud.entityFqcn|split('\\')|last }} ID #{{ entity.id }}</div>
-        {% endif %}
-    </div>
+    {% include '@Admin/crud/_page_heading.html.twig' with {
+        entityFqcn: crud.entityFqcn,
+        editable: customize_enabled is defined and customize_enabled and crud_page_key is defined,
+        pageKey: crud_page_key ?? null,
+        stored: crud_page ?? null,
+        fallbackTitle: crud.pageTitle(crud.currentPage) ?? _entityLabel,
+        suffix: entity is defined and entity is not null and entity.id ? '#' ~ entity.id : null,
+        recordTitle: _record,
+    } only %}
     <div class="global-actions">
         {% for action in actions.getAll(crud.currentPage) %}
             {% if action.htmlElement == 'button' %}

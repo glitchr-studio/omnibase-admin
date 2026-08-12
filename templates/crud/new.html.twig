@@ -1,5 +1,8 @@
 {% extends '@Admin/crud/_form.html.twig' %}
 
-{% block page_title %}{{ block('form_title') }}{% endblock %}
-
-{% block form_title %}{{ crud.pageTitle('new') ?? 'page.new'|trans({'%entity%': crud.entityLabelInSingular ?? crud.entityFqcn|split('\\')|last}, 'admin') }}{% endblock %}
+{# No form_title override: the shared heading (see crud/_form.html.twig)
+   shows the entity's icon and its class name, editable like every other
+   admin page title. It used to print "Nouveau %entity%", which is wrong
+   French before a vowel ("Nouvel Article") and duplicated what the Créer
+   button already says. #}
+{% block page_title %}{{ crud.entityLabelInSingular ?? crud.entityFqcn|split('\\')|last }}{% endblock %}
