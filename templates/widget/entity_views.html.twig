@@ -68,7 +68,8 @@
     </div>
     {% if entity or allInstances %}
         <div class="analytics-chart-wrap">
-            <canvas data-admin-chart="{{ {
+            {# see analytics_card.html.twig for why this carries an id #}
+            <canvas id="admin-chart-{{ widget.key|default('entity-views')|replace({'.': '-'}) }}" data-admin-chart="{{ {
                 labels: series|map(day => day.date|date('d/m')),
                 datasets: ['pageViewsHuman', 'pageViewsBot', 'pageViewsAi']|map(key => {
                     key: key,

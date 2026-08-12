@@ -101,7 +101,15 @@
            is a plain sequential list (0,1,2...) the same way
            article_views.html.twig's own hardcoded key list already is,
            so mapping over THAT keeps datasets a real JSON array. #}
-        <canvas data-admin-chart="{{ {
+        {# id, not just data-admin-chart: transparentJS carries existing
+           canvases across a page swap so a chart is not redrawn, and it
+           matches old to new BY ID. Without one it falls back to locating
+           the equivalent parent in the incoming DOM, which fails inside
+           the nest overlay - it then logs "Unexpected canvas without ID
+           found" AND returns false, aborting the loop so every later
+           canvas is skipped too. The widget key makes it stable across
+           renders and unique per card. #}
+        <canvas id="admin-chart-{{ widget.key|default('analytics')|replace({'.': '-'}) }}" data-admin-chart="{{ {
             labels: series|map(day => day.date|date('d/m')),
             datasets: palette|keys|map(key => {
                 key: key,
