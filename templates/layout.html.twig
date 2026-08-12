@@ -720,6 +720,33 @@
         .btn-success { background: var(--admin-success); border-color: var(--admin-success); color: #fff; }
         .btn-success:hover { color: #fff; filter: brightness(1.08); }
         .text-danger, .btn.text-danger { color: var(--admin-danger); }
+        {# A submit is in flight: lock the button that started it.
+           transparentJS swaps the page over AJAX, so nothing about the
+           button changes on its own - it stayed fully live and clickable
+           while the request ran, with no sign anything was happening
+           (reported live: "the button remains clickable many times and it
+           isn't clear whether the click was successful").
+
+           Driven by html.loading, which transparentJS sets for exactly the
+           duration of the navigation, rather than by disabling the button in
+           JS: a disabled attribute has to be un-set again, and any failure
+           path that forgets leaves a permanently dead button. This state
+           cannot get stuck - it disappears with the class. #}
+        html.loading form button[type="submit"],
+        html.loading form input[type="submit"],
+        html.loading .global-actions button[type="submit"] {
+            pointer-events: none; opacity: .6; cursor: progress;
+        }
+        {# The spinner marks WHICH control is working - the settings form has
+           its save button far from the field being edited, so dimming alone
+           is easy to miss. #}
+        html.loading form button[type="submit"]::after,
+        html.loading .global-actions button[type="submit"]::after {
+            content: ''; width: .8em; height: .8em; margin-left: .1em;
+            border: 2px solid currentColor; border-right-color: transparent;
+            border-radius: 50%; animation: admin-submit-spin .6s linear infinite;
+        }
+        @keyframes admin-submit-spin { to { transform: rotate(360deg); } }
         {# Row actions (edit/detail/goto/delete) carry only an icon, no
            label, but shared the same left/right padding as text buttons
            ("Filtrer", "Créer"...) - that padding is sized for text, so an
@@ -3499,6 +3526,55 @@
                 }
             });
         });
+
+        // ---- why did Enregistrer do nothing? -------------------------
+        //
+        // base-bundle's translatable-form handler ends its invalid-form
+        // branch with `return false`, which jQuery turns into
+        // preventDefault() AND stopPropagation(). So on an invalid form the
+        // click dies there: no submit, no navigation, and nothing
+        // downstream (transparentJS included) ever gets to say why. The
+        // button just looks broken - reported live on /admin/settings,
+        // where one empty required file input silently killed every click.
+        //
+        // That handler does try to point at the offender, but it looks for
+        // it by locale-prefixed id inside the translation tabs, so a field
+        // that isn't shaped that way - a file input, anything outside a
+        // locale pane - never matches and the user is told nothing at all.
+        //
+        // CAPTURE phase, so this runs BEFORE the handler that stops the
+        // event. Read-only: it reports, it never submits, so it cannot
+        // double-fire a save.
+        document.addEventListener('click', function (e) {
+            var button = e.target.closest('button[type="submit"], input[type="submit"]');
+            if (!button || button.classList.contains('skip-validation')) return;
+
+            var form = button.form || button.closest('form');
+            if (!form || form.checkValidity()) return;
+
+            var invalid = Array.prototype.find.call(form.elements, function (field) {
+                return field.willValidate && !field.checkValidity();
+            });
+            if (!invalid) return;
+
+            // A field inside a collapsed locale tab cannot be shown or
+            // scrolled to - reveal its pane first, or the bubble would be
+            // anchored to something invisible.
+            var pane = invalid.closest('.tab-pane');
+            if (pane && !pane.classList.contains('active')) {
+                var tab = document.querySelector('[data-bs-target="#' + pane.id + '"], [href="#' + pane.id + '"]');
+                if (tab) tab.click();
+            }
+
+            // Instant, not smooth: the native bubble anchors to wherever the
+            // field is at the moment reportValidity() runs, so a scroll still
+            // in flight leaves the message pinned to the top of the viewport,
+            // pointing at nothing. Deterministic beats pretty here.
+            if (invalid.scrollIntoView) invalid.scrollIntoView({block: 'center'});
+            requestAnimationFrame(function () {
+                if (invalid.reportValidity) invalid.reportValidity();
+            });
+        }, true);
         document.addEventListener('click', function (e) {
             var btn = e.target.closest('[data-analytics-range-picker] [data-range]');
             if (!btn || btn.classList.contains('is-active')) return;

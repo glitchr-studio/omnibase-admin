@@ -975,8 +975,34 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                     }
 
                     if(!$(el).hasClass("skip-validation") && !form.checkValidity()) {
-                        console.error("Invalid form submission.", el);
                         form.classList.add('was-validated');
+
+                        // Tell the USER, not only the console. Returning null
+                        // here sends the click straight into __main__'s
+                        // preventDefault(), so a submit blocked by validation
+                        // was indistinguishable from a dead button: nothing
+                        // moved, nothing was said. Reported live on
+                        // /admin/settings, where one empty required file
+                        // input made "Enregistrer" do nothing at all.
+                        //
+                        // The form carries novalidate (the needs-validation
+                        // pattern), which suppresses the browser's own bubble
+                        // on submit - but calling reportValidity() on the
+                        // FIELD still shows it. Scroll first: on a long
+                        // settings form the offending field is usually off
+                        // screen, and a bubble nobody can see is no better
+                        // than silence.
+                        var invalid = Array.prototype.find.call(form.elements, function (field) {
+                            return field.willValidate && !field.checkValidity();
+                        });
+
+                        if (invalid) {
+                            if (invalid.scrollIntoView) invalid.scrollIntoView({block: 'center', behavior: 'smooth'});
+                            if (invalid.reportValidity) invalid.reportValidity();
+                            else if (form.reportValidity) form.reportValidity();
+                        }
+
+                        console.error("Invalid form submission.", invalid || el);
                         return null;
                     }
 
