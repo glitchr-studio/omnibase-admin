@@ -590,7 +590,12 @@
             .admin-mobile-nav-backdrop { display: none; position: fixed; inset: 0; z-index: 18; background: rgba(0,0,0,.4); }
             html.is-mobile-nav-open .admin-mobile-nav-backdrop { display: block; }
         }
-        .admin-main { flex: 1; padding: 1.5rem 2rem; min-width: 0; }
+        {# position:relative so the flash stack can overlay INSIDE this
+           column (see .flashes): absolute against the scrollable page
+           rather than fixed to the viewport, so a notification scrolls
+           away with the content it belongs to instead of following the
+           reader down the page. #}
+        .admin-main { flex: 1; padding: 1.5rem 2rem; min-width: 0; position: relative; }
         {# sticks right under the topbar (itself sticky at top:0) so the
            title/entity-actions stay reachable while scrolling a long form
            or datagrid, matching production - top offset matches the
@@ -736,17 +741,23 @@
            duration of the navigation, rather than by disabling the button in
            JS: a disabled attribute has to be un-set again, and any failure
            path that forgets leaves a permanently dead button. This state
-           cannot get stuck - it disappears with the class. #}
-        html.loading form button[type="submit"],
-        html.loading form input[type="submit"],
-        html.loading .global-actions button[type="submit"] {
+           cannot get stuck - it disappears with the class.
+
+           Scoped to .is-submitting - the button that was actually clicked -
+           and NOT to every submit button on the page. html.loading is set for
+           ANY navigation, so keyed on that alone a plain link click made
+           "Enregistrer" dim and spin as though it were saving (reported
+           live). The marker is added on the clicking button and cleared the
+           moment loading ends. #}
+        html.loading button[type="submit"].is-submitting,
+        html.loading input[type="submit"].is-submitting {
             pointer-events: none; opacity: .6;
         }
         {# The spinner marks WHICH control is working - the settings form has
            its save button far from the field being edited, so dimming alone
            is easy to miss. #}
-        html.loading form button[type="submit"]::after,
-        html.loading .global-actions button[type="submit"]::after {
+        html.loading button[type="submit"].is-submitting::after,
+        html.loading input[type="submit"].is-submitting::after {
             content: ''; width: .8em; height: .8em; margin-left: .1em;
             border: 2px solid currentColor; border-right-color: transparent;
             border-radius: 50%; animation: admin-submit-spin .6s linear infinite;
@@ -1335,10 +1346,9 @@
            pointer-events:none on the stack, auto on each flash: the empty
            column spans the width of the content and would otherwise
            swallow clicks aimed at whatever is behind it. #}
-        .flashes { position: fixed; top: 4.2rem; left: var(--admin-aside-w); right: 0;
-                   z-index: 100020; width: min(560px, calc(100vw - var(--admin-aside-w) - 2rem));
-                   margin: 0 auto; display: flex; flex-direction: column; gap: .4rem;
-                   pointer-events: none; }
+        .flashes { position: absolute; top: .5rem; left: 2rem; right: 2rem;
+                   z-index: 30; width: auto; max-width: 560px; margin: 0 auto;
+                   display: flex; flex-direction: column; gap: .4rem; pointer-events: none; }
         .flash { padding: .6rem .9rem; border-radius: 6px; border: 1px solid var(--admin-border);
                  background: var(--admin-surface); pointer-events: auto;
                  box-shadow: 0 10px 30px rgba(0, 0, 0, .18); }
@@ -3578,7 +3588,17 @@
             if (!button || button.classList.contains('skip-validation')) return;
 
             var form = button.form || button.closest('form');
-            if (!form || form.checkValidity()) return;
+            if (!form) return;
+
+            if (form.checkValidity()) {
+                // Mark THIS button as the one submitting, so the busy state
+                // (see .is-submitting) applies to it alone. html.loading is
+                // set for any navigation, so styling every submit button off
+                // that class made "Enregistrer" spin when the reader merely
+                // clicked a link.
+                button.classList.add('is-submitting');
+                return;
+            }
 
             var invalid = Array.prototype.find.call(form.elements, function (field) {
                 return field.willValidate && !field.checkValidity();
@@ -3603,6 +3623,17 @@
                 if (invalid.reportValidity) invalid.reportValidity();
             });
         }, true);
+
+        // Clear the marker the moment the navigation ends. Without this the
+        // button keeps .is-submitting, and the NEXT unrelated navigation
+        // (any link click sets html.loading) would light it up again as if it
+        // were saving.
+        new MutationObserver(function () {
+            if (document.documentElement.classList.contains('loading')) return;
+            document.querySelectorAll('.is-submitting').forEach(function (el) {
+                el.classList.remove('is-submitting');
+            });
+        }).observe(document.documentElement, {attributes: true, attributeFilter: ['class']});
         document.addEventListener('click', function (e) {
             var btn = e.target.closest('[data-analytics-range-picker] [data-range]');
             if (!btn || btn.classList.contains('is-active')) return;
