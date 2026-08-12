@@ -1,7 +1,25 @@
 {%- set raw = field.value -%}
+{#- showOnIndex('title') records that choice as the `show_field` custom
+    option, but nothing ever read it: the field fell straight through to the
+    collection branch and rendered "1 element" on the index AND the detail
+    page, where the admin being replaced shows the actual (truncated) title.
+
+    Resolved here, preferring the active locale's translation and falling
+    back to the first one that exists, so a record translated in only one
+    language still reads instead of showing a count. -#}
+{%- set showField = field.customOption('show_field') -%}
+{%- set translated = null -%}
+{%- if showField and raw is iterable and raw|length -%}
+    {%- set translated = attribute(raw, app.localizer.locale) ?? raw|first -%}
+{%- endif -%}
+{%- set shown = translated is not null ? attribute(translated, showField) : null -%}
 <span class="field-translatable">
     <i class="fa-solid fa-language badge-muted" title="{{ 'field.translatable'|trans({}, 'admin') }}"></i>
-    {%- if raw is iterable -%}
+    {%- if shown is not null and shown != '' -%}
+        {%- set max = field.customOption('maxLength') ?? 50 -%}
+        {%- set shown = '' ~ shown -%}
+        {{ shown|length > max ? shown|slice(0, max) ~ '…' : shown }}
+    {%- elseif raw is iterable -%}
         {%- set count = raw|length -%}
         {%- if count == 0 -%}
             <span class="badge-muted">—</span>
