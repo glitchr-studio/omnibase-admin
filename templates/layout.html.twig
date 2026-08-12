@@ -40,6 +40,7 @@
             color-scheme: light;
             --admin-bg: #f6f7f9; --admin-surface: #fff; --admin-border: #e3e6ea;
             --admin-text: #1f2429; --admin-muted: #6b7683; --admin-accent: #2563eb;
+            --admin-aside-w: 260px;
             --admin-danger: #dc2626; --admin-success: #16a34a; --admin-radius: 8px;
             {# Not an admin token - base-async's own. It ships
                `.text-muted{color:var(--text-muted)!important}` but only
@@ -184,7 +185,11 @@
            aside; the flyout's own z-index:30 only ever wins within THIS
            element's local stacking context, never against .admin-main's
            content sitting in a different one entirely. #}
-        .admin-aside { width: 260px; flex-shrink: 0; display: flex; flex-direction: column; background: var(--admin-surface); border-right: 1px solid var(--admin-border); padding: 0 0 1rem;
+        {# --admin-aside-w is what the fixed overlays below (flash stack,
+           filter modal) centre themselves against. Without it they centre
+           on the VIEWPORT, which is 130px off-centre from the content
+           column the reader is actually looking at - reported live. #}
+        .admin-aside { width: var(--admin-aside-w); flex-shrink: 0; display: flex; flex-direction: column; background: var(--admin-surface); border-right: 1px solid var(--admin-border); padding: 0 0 1rem;
                       position: sticky; top: 0; height: 100vh; overflow-y: auto; scroll-behavior: smooth; z-index: 20; }
         {# Fixed height (matching .admin-topbar's own, below) instead of
            content-driven padding, so the brand row's bottom border and the
@@ -345,7 +350,7 @@
            longer visible inline. Ungrouped top-level items get a plain
            native title="" tooltip instead - a single link never needed a
            whole flyout for one label. #}
-        html.is-sidebar-collapsed .admin-aside { width: 4.5rem; }
+        html.is-sidebar-collapsed { --admin-aside-w: 4.5rem; }
         html.is-sidebar-collapsed .admin-aside .brand { justify-content: center; padding-left: 0; padding-right: 0; }
         html.is-sidebar-collapsed .admin-aside .brand-text, html.is-sidebar-collapsed .admin-aside .account-caret { display: none; }
         {# .admin-menu a is display:block normally (no flex, so nothing to
@@ -735,7 +740,7 @@
         html.loading form button[type="submit"],
         html.loading form input[type="submit"],
         html.loading .global-actions button[type="submit"] {
-            pointer-events: none; opacity: .6; cursor: progress;
+            pointer-events: none; opacity: .6;
         }
         {# The spinner marks WHICH control is working - the settings form has
            its save button far from the field being edited, so dimming alone
@@ -1330,9 +1335,10 @@
            pointer-events:none on the stack, auto on each flash: the empty
            column spans the width of the content and would otherwise
            swallow clicks aimed at whatever is behind it. #}
-        .flashes { position: fixed; top: 4.2rem; left: 50%; transform: translateX(-50%);
-                   z-index: 100020; width: min(560px, calc(100vw - 2rem)); margin: 0;
-                   display: flex; flex-direction: column; gap: .4rem; pointer-events: none; }
+        .flashes { position: fixed; top: 4.2rem; left: var(--admin-aside-w); right: 0;
+                   z-index: 100020; width: min(560px, calc(100vw - var(--admin-aside-w) - 2rem));
+                   margin: 0 auto; display: flex; flex-direction: column; gap: .4rem;
+                   pointer-events: none; }
         .flash { padding: .6rem .9rem; border-radius: 6px; border: 1px solid var(--admin-border);
                  background: var(--admin-surface); pointer-events: auto;
                  box-shadow: 0 10px 30px rgba(0, 0, 0, .18); }
@@ -1787,8 +1793,15 @@
            inner markup (label / .filter-range / .filter-comparison) is
            reused verbatim inside the panel body. #}
         .filter-modal[hidden] { display: none; }
-        .filter-modal { position: fixed; inset: 0; z-index: 100020; display: flex; align-items: flex-start; justify-content: center; padding: 4rem 1rem 1rem; }
-        .filter-modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.35); }
+        {# left offset by the sidebar for the same reason as .flashes: a
+           viewport-centred panel sits visibly left of the datagrid it is
+           filtering. The backdrop still covers everything. #}
+        .filter-modal { position: fixed; inset: 0 0 0 var(--admin-aside-w); z-index: 100020; display: flex; align-items: flex-start; justify-content: center; padding: 4rem 1rem 1rem; }
+        {# Stretched back over the sidebar: .filter-modal is inset by the
+           aside width so its PANEL centres on the content column, but the
+           scrim must still cover the whole viewport or the sidebar stays
+           bright and clickable behind an open modal. #}
+        .filter-modal-backdrop { position: absolute; inset: 0 0 0 calc(-1 * var(--admin-aside-w)); background: rgba(0,0,0,.35); }
         .filter-modal-panel { position: relative; width: min(38rem, 100%); max-height: calc(100vh - 6rem); display: flex; flex-direction: column;
             background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: var(--admin-radius); box-shadow: 0 16px 48px rgba(0,0,0,.25); overflow: hidden; }
         {# 3 columns with the title centred, so Effacer/Appliquer sit hard

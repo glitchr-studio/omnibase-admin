@@ -783,10 +783,12 @@ html.progress-bar-native.ready:not(.first).progress-bar-active body::before {
    a plain in-page navigation (link click, form submit) left the pointer
    looking exactly like it does when nothing is happening - the only
    feedback was the 3px top bar, easy to miss if your eyes are elsewhere. */
-html.progress-bar-native.ready:not(.first).loading,
-html.progress-bar-native.ready:not(.first).loading body {
-	cursor: progress;
-}
+/* No cursor:progress. It turned the pointer into the "busy" cursor on the
+   whole document for every single click - including plain button presses -
+   which reads as the app hanging rather than as feedback (reported live).
+   The 4px top bar and the per-button busy state (dim + spinner, see
+   layout.html.twig) already carry that signal without touching the cursor
+   the user is aiming with. */
 
 /* Opaque, not transparent: the nested page's own transparentJS instance
    does real DOM swaps while navigating internally (menu clicks, edit/save),
