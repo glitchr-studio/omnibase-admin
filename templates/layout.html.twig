@@ -1579,6 +1579,26 @@
         .analytics-range-btn:hover { border-color: var(--admin-accent); color: var(--admin-text); }
         .analytics-range-btn.is-active { background: var(--admin-accent); border-color: var(--admin-accent); color: #fff; }
         .analytics-chart-wrap { position: relative; height: 240px; }
+        {# Pinned-day marker: a vertical rule at the clicked point, drawn as
+           a DOM overlay rather than a Chart.js plugin so it needs nothing
+           from the built admin-charts bundle (the chart instance is already
+           exposed on the canvas, its x scale gives the pixel). pointer-
+           events:none or it would eat the click that moves it. #}
+        .analytics-daymark { position: absolute; width: 1px; pointer-events: none; z-index: 2;
+                             background: var(--admin-accent); opacity: .75; }
+        .analytics-daymark::before { content: ''; position: absolute; left: -3px; top: -3px; width: 7px; height: 7px;
+                                     border-radius: 50%; background: var(--admin-accent); }
+        {# The counters change meaning while a day is pinned, so the state
+           has to be visible and reversible from the header itself - not
+           only by finding the line again in the chart. #}
+        .analytics-day-chip { display: inline-flex; align-items: center; gap: .4rem; margin-left: .1rem;
+                              padding: .15rem .3rem .15rem .55rem; border-radius: 999px;
+                              border: 1px solid var(--admin-accent); color: var(--admin-accent);
+                              background: var(--admin-surface); font-size: .74rem; font-weight: 600; }
+        .analytics-day-chip button { border: 0; background: none; color: inherit; cursor: pointer;
+                                     font: inherit; line-height: 1; padding: .1rem .25rem; border-radius: 50%; }
+        .analytics-day-chip button:hover { background: var(--admin-bg); }
+        .analytics-card.is-day-pinned .analytics-stat-change { display: none; }
         {# Generic "nothing to show yet" message inside an analytics-style
            card (e.g. App\Admin\Widget\ArticleViewsWidgetType before an
            article has been picked in its settings panel) - not article-
@@ -2593,7 +2613,16 @@
             <div class="flashes">
                 {% for type, messages in flashes %}
                     {% for message in messages %}
-                        <div class="flash flash-{{ type }}">{{ message|trans }}</div>
+                        {# |raw, matching base-bundle's own flashbag.html.twig
+                           (and the EasyAdmin override it replaced). These
+                           messages are APP-AUTHORED translation strings and
+                           several carry markup on purpose - maintenance.banner
+                           is "Ce site est en cours de <b>maintenance</b>." -
+                           so escaping them printed the tags to the operator,
+                           reported live. Anything user-supplied interpolated
+                           into one of these must be escaped where it is put
+                           in, not here. #}
+                        <div class="flash flash-{{ type }}">{{ message|trans|raw }}</div>
                     {% endfor %}
                 {% endfor %}
             </div>
@@ -3334,6 +3363,142 @@
                 if (number) animateStatNumber(number, sums[key]);
             });
         }
+
+        // ---- pinning a single day -----------------------------------
+        //
+        // Clicking a point pins that day: a vertical rule marks it and the
+        // stat row switches from "total over the range" to "that day".
+        // Clicking it again (or the chip's ×, or Escape) unpins and the row
+        // goes back to the range totals.
+        //
+        // The % badges are HIDDEN while a day is pinned rather than
+        // recomputed day-over-day. They mean period-over-period, and this
+        // client-side data has no matching prior day to compare a pinned
+        // day against - same reason recomputeStatsFromChart() above leaves
+        // them alone instead of faking a number in the same badge style.
+
+        // Same key mapping as recomputeStatsFromChart(), one index instead
+        // of the whole series - pageViews is Human+Bot+AI combined, every
+        // other stat is one dataset 1:1.
+        function statsAtIndex(chart, index) {
+            var sums = { pageViews: 0, uniqueVisitors: 0, uniqueUsers: 0 };
+            var pageViewKeys = { pageViewsHuman: true, pageViewsBot: true, pageViewsAi: true };
+            chart.data.datasets.forEach(function (ds, i) {
+                if (chart.getDatasetMeta(i).hidden) return;
+                var value = Number((ds.data || [])[index]) || 0;
+                if (pageViewKeys[ds.key]) sums.pageViews += value;
+                else if (ds.key === 'uniqueVisitors' || ds.key === 'uniqueUsers') sums[ds.key] = value;
+            });
+            return sums;
+        }
+
+        function applyStats(card, sums) {
+            var row = card.querySelector('.analytics-stat-row');
+            if (!row) return;
+            Object.keys(sums).forEach(function (key) {
+                var number = row.querySelector('[data-stat="' + key + '"] .analytics-stat-number');
+                if (number) animateStatNumber(number, sums[key]);
+            });
+        }
+
+        function placeDaymark(card, chart, index) {
+            var wrap = chart.canvas.closest('.analytics-chart-wrap');
+            var scale = chart.scales && chart.scales.x;
+            if (!wrap || !scale) return;
+
+            var mark = wrap.querySelector('.analytics-daymark');
+            if (!mark) {
+                mark = document.createElement('div');
+                mark.className = 'analytics-daymark';
+                wrap.appendChild(mark);
+            }
+            // Positioned against the WRAP, so the canvas's own offset inside
+            // it has to be added - they are not always flush (the canvas is
+            // sized by Chart.js, the wrap by CSS).
+            mark.style.left = (chart.canvas.offsetLeft + scale.getPixelForValue(index)) + 'px';
+            mark.style.top = (chart.canvas.offsetTop + chart.chartArea.top) + 'px';
+            mark.style.height = (chart.chartArea.bottom - chart.chartArea.top) + 'px';
+        }
+
+        function pinDay(card, chart, index) {
+            card._pinnedDay = index;
+            card.classList.add('is-day-pinned');
+            placeDaymark(card, chart, index);
+            applyStats(card, statsAtIndex(chart, index));
+
+            var header = card.querySelector('.analytics-card-header');
+            var chip = card.querySelector('.analytics-day-chip');
+            if (header && !chip) {
+                chip = document.createElement('span');
+                chip.className = 'analytics-day-chip';
+                header.appendChild(chip);
+            }
+            if (chip) {
+                chip.innerHTML = '';
+                chip.appendChild(document.createTextNode(chart.data.labels[index] || ''));
+                var close = document.createElement('button');
+                close.type = 'button';
+                close.setAttribute('aria-label', 'Reset');
+                close.textContent = '×';
+                chip.appendChild(close);
+            }
+        }
+
+        function unpinDay(card) {
+            var canvas = card.querySelector('[data-admin-chart]');
+            var chart = canvas && canvas._adminChart;
+            card._pinnedDay = null;
+            card.classList.remove('is-day-pinned');
+
+            var mark = card.querySelector('.analytics-daymark');
+            if (mark) mark.remove();
+            var chip = card.querySelector('.analytics-day-chip');
+            if (chip) chip.remove();
+
+            // Back to the totals for the whole range - and recomputed from
+            // the chart rather than restored from a snapshot, so a legend
+            // series toggled while a day was pinned is still respected.
+            if (chart) recomputeStatsFromChart(card, chart);
+        }
+
+        document.addEventListener('click', function (e) {
+            var card = e.target.closest('[data-analytics-card]');
+            if (!card) return;
+
+            if (e.target.closest('.analytics-day-chip button')) {
+                unpinDay(card);
+                return;
+            }
+
+            var canvas = e.target.closest('[data-admin-chart]');
+            var chart = canvas && canvas._adminChart;
+            if (!chart) return;
+
+            // intersect:false so anywhere in the day's column works - having
+            // to hit the 3px point itself would make this feel broken.
+            var points = chart.getElementsAtEventForMode(e, 'index', { intersect: false }, true);
+            if (!points.length) return;
+
+            var index = points[0].index;
+            if (card._pinnedDay === index) unpinDay(card);
+            else pinDay(card, chart, index);
+        });
+
+        document.addEventListener('keydown', function (e) {
+            if ('Escape' !== e.key) return;
+            document.querySelectorAll('.analytics-card.is-day-pinned').forEach(unpinDay);
+        });
+
+        // The marker is placed in pixels, so it has to follow a resize -
+        // otherwise it drifts away from the day it marks.
+        window.addEventListener('resize', function () {
+            document.querySelectorAll('.analytics-card.is-day-pinned').forEach(function (card) {
+                var canvas = card.querySelector('[data-admin-chart]');
+                if (canvas && canvas._adminChart && null != card._pinnedDay) {
+                    placeDaymark(card, canvas._adminChart, card._pinnedDay);
+                }
+            });
+        });
         document.addEventListener('click', function (e) {
             var btn = e.target.closest('[data-analytics-range-picker] [data-range]');
             if (!btn || btn.classList.contains('is-active')) return;
@@ -3343,6 +3508,11 @@
             var card = picker.closest('.analytics-card');
             var canvas = card && card.querySelector('[data-admin-chart]');
             if (!url || !canvas) return;
+
+            // A pinned day is an INDEX into the current series; the new
+            // range renumbers every index, so keeping the pin would silently
+            // move the marker to a different date. Drop it.
+            if (card.classList.contains('is-day-pinned')) unpinDay(card);
 
             picker.querySelectorAll('[data-range]').forEach(function (b) { b.classList.remove('is-active'); });
             btn.classList.add('is-active');
@@ -3957,7 +4127,17 @@
             // the tooltip. Persisting that choice for every OTHER admin
             // (below) stays gated to customize mode, same as any other
             // layout edit.
-            recomputeStatsFromChart(card, chart);
+            //
+            // While a day is pinned the row is showing THAT day, so it has
+            // to be recomputed for the same day - recomputing the range
+            // totals here would silently unpin the row while the marker
+            // stayed on the chart, leaving the two contradicting each other.
+            if (card.classList.contains('is-day-pinned') && null != card._pinnedDay) {
+                applyStats(card, statsAtIndex(chart, card._pinnedDay));
+                placeDaymark(card, chart, card._pinnedDay);
+            } else {
+                recomputeStatsFromChart(card, chart);
+            }
 
             if (!document.body.classList.contains('is-customizing')) return;
             var widgetBlock = card.closest('[data-sortable-item]');
