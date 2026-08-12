@@ -56,7 +56,10 @@
 
 {% block content %}
 <div class="card">
-    {{ form_start(form, {attr: {id: 'admin-form', class: 'admin-form', novalidate: 'novalidate'}}) }}
+    {# action set explicitly - see page/system.html.twig: a form with none
+       posts to the document URL, which is "about:srcdoc" inside the nest
+       overlay. #}
+    {{ form_start(form, {action: app.request.pathInfo, attr: {id: 'admin-form', class: 'admin-form', novalidate: 'novalidate'}}) }}
         {{ form_errors(form) }}
         <div class="form-grid">
         {% for child in form %}

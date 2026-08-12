@@ -1319,8 +1319,23 @@
         dl.detail dt { font-weight: 600; color: var(--admin-muted); }
         dl.detail dd { margin: 0; }
         .empty-state { padding: 3rem; text-align: center; color: var(--admin-muted); }
-        .flashes { margin-bottom: 1rem; }
-        .flash { padding: .6rem .9rem; border-radius: 6px; margin-bottom: .4rem; border: 1px solid var(--admin-border); background: var(--admin-surface); }
+        {# Floating, not in flow. These sat in the normal document flow, so
+           every flash pushed the whole page down by its own height - the
+           maintenance banner in particular, which is present on every
+           render while the mode is on, permanently displaced the content
+           under it (reported live: "should be absolute with an overlay,
+           but it is relative"). Fixed and centred near the top instead, so
+           a message appearing or clearing never reflows the page.
+
+           pointer-events:none on the stack, auto on each flash: the empty
+           column spans the width of the content and would otherwise
+           swallow clicks aimed at whatever is behind it. #}
+        .flashes { position: fixed; top: 4.2rem; left: 50%; transform: translateX(-50%);
+                   z-index: 100020; width: min(560px, calc(100vw - 2rem)); margin: 0;
+                   display: flex; flex-direction: column; gap: .4rem; pointer-events: none; }
+        .flash { padding: .6rem .9rem; border-radius: 6px; border: 1px solid var(--admin-border);
+                 background: var(--admin-surface); pointer-events: auto;
+                 box-shadow: 0 10px 30px rgba(0, 0, 0, .18); }
         .flash-success { border-color: #86efac; background: #f0fdf4; color: #166534; }
         .flash-warning { border-color: #fde68a; background: #fffbeb; color: #92400e; }
         .flash-danger, .flash-error { border-color: #fecaca; background: #fef2f2; color: #991b1b; }

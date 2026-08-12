@@ -969,10 +969,38 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
 
             case "INPUT":
             case "BUTTON":
-                var domainBaseURI = el.baseURI.split('/').slice(0, 3).join('/');
-                var domainFormAction = el.formAction.split('/').slice(0, 3).join('/');
+                // el.formAction is the browser's own resolution, and for a
+                // form with no action attribute inside a `srcdoc` iframe -
+                // how Transparent.nest mounts the website-in-website overlay
+                // - it is the opaque string "about:srcdoc". Split on "/" that
+                // yields "about:srcdoc", which matches no domain, so the
+                // same-domain test below rejected it and the submit was
+                // dropped: findLink() returned null and __main__ then
+                // preventDefault()ed the click. Reported live - saving from
+                // the nested admin produced no request at all.
+                //
+                // Resolved explicitly instead: the form's own action when it
+                // has one, else the document's real URL (which is what a
+                // form with no action posts to). currentOrigin()/
+                // currentPathname() are the srcdoc-safe readings of those.
+                var formEl = Transparent.findNearestForm(el);
+                var actionAttr = el.getAttribute("formaction")
+                    || (formEl ? formEl.getAttribute("action") : null)
+                    || "";
 
-                var pathname = el.formAction.replace(domainFormAction, "");
+                var resolvedAction;
+                try {
+                    resolvedAction = actionAttr
+                        ? new URL(actionAttr, currentOrigin() + currentPathname()).href
+                        : currentOrigin() + currentPathname() + currentSearch();
+                } catch (err) {
+                    return null;
+                }
+
+                var domainBaseURI = currentOrigin();
+                var domainFormAction = resolvedAction.split('/').slice(0, 3).join('/');
+
+                var pathname = resolvedAction.replace(domainFormAction, "");
                 if(!pathname) return null;
 
                 if (domainBaseURI == domainFormAction && el.getAttribute("type") == "submit") {

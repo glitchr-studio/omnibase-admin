@@ -96,7 +96,12 @@
 {% block content %}
 <div class="card">
     {% if form.children|length > 1 %}
-        {{ form_start(form, {attr: {class: 'admin-form'}}) }}
+        {# Explicit action: with none, the browser posts to the DOCUMENT's URL,
+   which inside Transparent.nest's srcdoc iframe is the opaque
+   "about:srcdoc" - no host, no path, so the submit could not be routed
+   and the click was dropped. An absolute path resolves identically in a
+   normal page and in the overlay. #}
+        {{ form_start(form, {action: app.request.pathInfo, attr: {class: 'admin-form'}}) }}
             {# Unlike crud/_form.html.twig's per-field {% for child in form %}
                loop (one .form-row per entity field, 12-col .form-grid), this
                form only ever has up to 3 top-level children (intl/unv/valid -

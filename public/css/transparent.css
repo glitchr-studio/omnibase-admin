@@ -769,7 +769,13 @@ html.progress-bar-native.ready:not(.first).progress-bar-active body::before {
 	   gradient and fades out with it at both ends. Keep the two in sync if
 	   the colour changes; the intent (make an easy-to-miss 4px bar
 	   noticeable) is unchanged. */
-	filter: drop-shadow(0 0 6px rgba(37,99,235,.6));
+	/* No shadow at all. A drop-shadow with zero offset glows in every
+	   direction, but this bar is flush against top:0 - the upward half is
+	   clipped off-screen, so all that can ever be seen is the downward
+	   half, which reads as a shadow hanging under the bar. Reported three
+	   times. Visibility is already handled by the 4px height and by
+	   MIN_PROGRESS_BAR_MS holding the bar on screen long enough to
+	   register; the glow only ever added the artefact. */
 	animation: transparent-nest-bar 1s linear infinite;
 }
 /* Same gap as the bar above, for the cursor: the nested overlay already
