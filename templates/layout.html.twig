@@ -752,12 +752,24 @@
            gets a full dedicated line at the very top instead of competing with
            the record title for the header's width. The search yields the space:
            it only needs to be large while you are typing in it. #}
-        .topbar-search input { transition: width .18s ease; }
-        .admin-topbar:has(.global-actions) .topbar-search input { width: 11rem; }
-        .admin-topbar .topbar-search:focus-within input { width: 26rem; }
+        {# The search grows by flex-basis, not by a fixed input width: a fixed
+           26rem pushed the icon cluster past the topbar's edge whenever the
+           action bar left less room than that. Flex can only distribute space
+           that exists, so the focused search now takes UP TO 26rem and stops
+           where its neighbours begin - nothing overflows to hide. #}
+        .admin-topbar .topbar-search { flex: 0 1 420px; min-width: 9rem; transition: flex-basis .18s ease; }
+        .admin-topbar:has(.global-actions) .topbar-search { flex-basis: 13rem; }
+        .admin-topbar .topbar-search:focus-within { flex-basis: 26rem; }
+        .admin-topbar .topbar-search input { width: 100%; }
         .admin-topbar .global-actions {
             margin-left: auto; display: flex; align-items: center; flex-wrap: nowrap;
-            gap: .4rem; flex: 0 1 auto; min-width: 0; }
+            gap: .4rem; flex: 0 1 auto; min-width: 0;
+            {# " | " between the groups: search | crud actions | user+settings.
+               Drawn as hairlines on the bar itself rather than markup, so they
+               exist exactly when the action bar does. #}
+            padding: 0 1rem; align-self: stretch;
+            border-left: 1px solid var(--admin-border);
+            border-right: 1px solid var(--admin-border); }
         {# Nothing in the topbar may push the icon cluster off the end. #}
         .admin-topbar .global-actions .btn { white-space: nowrap; }
         .admin-topbar-icons { flex: 0 0 auto; }
@@ -1309,28 +1321,22 @@
         form.admin-form .form-collection-more.has-error { border-color: var(--admin-danger); color: var(--admin-danger); }
         {# Per-entry actions (copy / preview / open) are bare <a> elements with
            no class, so with no CSS reset they rendered as browser-default links:
-           rgb(0,0,238) and underlined, inside a form full of neutral controls.
-           Given the same key-cap treatment as the primary button, scaled down -
-           surface face, tone rim, a 2px edge that depresses on press. #}
+           rgb(0,0,238) and underlined. FLAT on request - a muted glyph that
+           tints on hover, matching the action bar's own flat tier; the key-cap
+           variant tried here read as heavier than the row it decorates. #}
         form.admin-form .form-collection-item a:has(> i:only-child),
         form.admin-form .form-collection-items a:has(> i:only-child) {
-            --btn-tone: var(--admin-accent);
             display: inline-flex; align-items: center; justify-content: center;
-            width: 1.85rem; height: 1.7rem; padding-bottom: 2px;
-            border: 1px solid color-mix(in srgb, var(--btn-tone) 26%, var(--admin-border));
-            border-radius: 3px; background: var(--admin-surface);
-            color: var(--admin-muted); text-decoration: none;
-            box-shadow: inset 0 -2px 0 0 color-mix(in srgb, var(--btn-tone) 18%, var(--admin-surface));
-            transition: background .12s ease, color .12s ease, box-shadow .12s ease, transform .12s ease; }
+            width: 1.7rem; height: 1.6rem; border: 0; border-radius: 3px;
+            background: transparent; color: var(--admin-muted); text-decoration: none;
+            transition: background .12s ease, color .12s ease; }
         form.admin-form .form-collection-item a:has(> i:only-child):hover,
         form.admin-form .form-collection-items a:has(> i:only-child):hover {
-            background: color-mix(in srgb, var(--btn-tone) 12%, var(--admin-surface));
-            border-color: color-mix(in srgb, var(--btn-tone) 50%, transparent);
-            color: color-mix(in srgb, var(--btn-tone) 60%, var(--admin-text)); }
+            background: color-mix(in srgb, var(--admin-accent) 10%, transparent);
+            color: var(--admin-accent); }
         form.admin-form .form-collection-item a:has(> i:only-child):active,
         form.admin-form .form-collection-items a:has(> i:only-child):active {
-            transform: translateY(2px); padding-bottom: 0;
-            box-shadow: inset 0 -1px 0 0 color-mix(in srgb, var(--btn-tone) 26%, var(--admin-surface)); }
+            background: color-mix(in srgb, var(--admin-accent) 17%, transparent); }
         form.admin-form .form-collection-item a > i, form.admin-form .form-collection-items a > i {
             font-size: .78rem; }
         {# The translatable group carries padding-left:15px to indent its fields
