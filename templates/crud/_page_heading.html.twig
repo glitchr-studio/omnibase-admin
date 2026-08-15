@@ -66,6 +66,12 @@
             an entity id inside the contenteditable would save that one row's
             number as every row's title. -#}
         {%- if suffix is defined and suffix %} ID <span class="admin-header-suffix">{{ suffix }}</span>{% endif -%}
+        {#- The page description joins the SAME line, dash-separated - "Article
+            ID #1143 - Test en Francais" - instead of stacking a second subtitle
+            row under the first. Still its own span: the in-place editor targets
+            data-page-desc, and the id/suffix must stay outside anything
+            contenteditable. -#}
+        {%- if _desc or editable %} <span class="admin-header-sep">&ndash;</span> <span{% if editable %} data-page-desc data-menu-key="{{ pageKey }}" data-layout-scope="crud" data-placeholder="{{ 'customize.description_hint'|trans({}, 'admin') }}"{% endif %}>{{ _desc }}</span>{% endif -%}
     </div>
 {% else %}
     <h1{{ _editAttrs|raw }}>{{ _pageTitle }}</h1>
@@ -73,8 +79,10 @@
 {% endif %}
 
 {# Description is optional: shown when set, and when customizing it always
-   renders (empty, with a placeholder) so there is something to click. #}
-{% if _desc or editable %}
+   renders (empty, with a placeholder) so there is something to click. On a
+   record page it already joined the id line above, so this standalone row is
+   for the index/new shape only. #}
+{% if not _record and (_desc or editable) %}
     <div class="admin-header-subtitle"{% if editable %} data-page-desc data-menu-key="{{ pageKey }}" data-layout-scope="crud" data-placeholder="{{ 'customize.description_hint'|trans({}, 'admin') }}"{% endif %}>
         {{- _desc -}}
     </div>
