@@ -126,7 +126,8 @@ login:
 
 menu:
     profile: My profile
-    settings: Account settings
+    settings: My settings
+    signed_in_as: Signed in as
     logout: Sign out
     dashboard: Dashboard
 

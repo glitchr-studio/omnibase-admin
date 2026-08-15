@@ -126,7 +126,8 @@ login:
 
 menu:
     profile: Mon profil
-    settings: Paramètres du compte
+    settings: Mes paramètres
+    signed_in_as: Connecté en tant que
     logout: Déconnexion
     dashboard: Tableau de bord
 

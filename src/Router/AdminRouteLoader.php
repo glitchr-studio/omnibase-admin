@@ -59,7 +59,7 @@ class AdminRouteLoader extends Loader
                     new Route(
                         $prefix . '/' . $slug . $path,
                         ['_controller' => $fqcn . '::' . $action],
-                        ['entityId' => '[^/]+'],
+                        ['entityId' => '[^/]+', 'field' => '[A-Za-z0-9_]+'],
                         [],
                         '',
                         [],
@@ -75,6 +75,9 @@ class AdminRouteLoader extends Loader
             $add('edit', '/{entityId}/edit', ['GET', 'POST']);
             $add('delete', '/{entityId}/delete', ['POST']);
             $add('toggle', '/{entityId}/toggle', ['PATCH']);
+            // Lazy-loaded slice of an embedded collection - see
+            // AbstractCrudController::collectionEntries().
+            $add('collectionEntries', '/{entityId}/collection/{field}', ['GET']);
         }
 
         $this->addDashboardRoute($routes, $prefix);

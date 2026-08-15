@@ -41,7 +41,8 @@
             --admin-bg: #f6f7f9; --admin-surface: #fff; --admin-border: #e3e6ea;
             --admin-text: #1f2429; --admin-muted: #6b7683; --admin-accent: #2563eb;
             --admin-aside-w: 260px;
-            --admin-danger: #dc2626; --admin-success: #16a34a; --admin-radius: 8px;
+            --admin-danger: #dc2626; --admin-success: #16a34a; --admin-warning: #d97706;
+            --admin-radius: 8px;
             {# Not an admin token - base-async's own. It ships
                `.text-muted{color:var(--text-muted)!important}` but only
                DEFINES --text-muted inside a scope this admin never gets
@@ -85,14 +86,14 @@
                 color-scheme: dark;
                 --admin-bg: #16181d; --admin-surface: #1e2127; --admin-border: #2c3038;
                 --admin-text: #e6e8eb; --admin-muted: #8b94a1; --admin-accent: #6ea8fe;
-                --admin-danger: #f87171; --admin-success: #4ade80;
+                --admin-danger: #f87171; --admin-success: #4ade80; --admin-warning: #fbbf24;
             }
         }
         :root[data-theme="dark"] {
             color-scheme: dark;
             --admin-bg: #16181d; --admin-surface: #1e2127; --admin-border: #2c3038;
             --admin-text: #e6e8eb; --admin-muted: #8b94a1; --admin-accent: #6ea8fe;
-            --admin-danger: #f87171; --admin-success: #4ade80;
+            --admin-danger: #f87171; --admin-success: #4ade80; --admin-warning: #fbbf24;
         }
         {# Sticky at top:0 with no shadow, only a 1px border, gave the bar no
            visual weight of its own - at rest (no scroll needed, the negative
@@ -550,6 +551,31 @@
             left: 100%; right: auto; top: 0; margin-left: .5rem; min-width: 13rem;
         }
         .admin-usermenu a i { width: 1.1rem; text-align: center; }
+        {# Account header leading the dropdown. Non-interactive: it identifies
+           the session, the items below act on it. #}
+        {# Metrics lifted from the admin being replaced, measured live rather than
+           eyeballed: 48px avatar at 14px radius, 13px muted label over a 14px
+           regular-weight name. Beta had a 38px/8px avatar and a 600-weight name,
+           which made the block read tighter and heavier than production's. #}
+        .admin-usermenu-account {
+            display: flex; align-items: center; gap: .65rem; padding: .45rem .5rem; cursor: default; }
+        .admin-usermenu-avatar {
+            width: 48px; height: 48px; border-radius: 14px; object-fit: cover; flex-shrink: 0;
+            border: 1px solid var(--admin-border); background: var(--admin-surface); }
+        .admin-usermenu-avatar-empty {
+            display: inline-flex; align-items: center; justify-content: center; color: var(--admin-muted); }
+        .admin-usermenu-identity { display: flex; flex-direction: column; min-width: 0; gap: .1rem; }
+        .admin-usermenu-label { font-size: 13px; color: var(--admin-muted); line-height: 1.25; }
+        .admin-usermenu-name {
+            font-size: 14px; font-weight: 400; line-height: 1.25;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        {# Qualified with .admin-menu li: that rule sets display:flex and a
+           min-height of 2.4rem on every item, which outranked a bare
+           .admin-usermenu-divider and inflated the hairline into a 2.4rem slab
+           filled with the border colour. #}
+        .admin-menu li.admin-usermenu-divider {
+            display: block; min-height: 0; height: 1px; padding: 0;
+            margin: .3rem .5rem; background: var(--admin-border); }
         {# Desktop/tablet default: the hamburger has nothing to do (.admin-
            aside is always in-flow there, see .admin-shell's flex layout
            above) so it stays hidden outside its own @media block below,
@@ -629,7 +655,17 @@
            editable heading's dashed outline. cursor:help + title attr
            carry the "switch language to translate" hint. #}
         .page-locale-badges { display: none; }
-        body.is-customizing .page-locale-badges { display: inline-flex; gap: .25rem; margin-bottom: .25rem; }
+        {# Its own row under the subtitle, not a tail on the end of it: as an
+           inline-flex the flag strip crowded the text it followed. `flex` +
+           margin-top gives it a line of its own and lets the flags wrap when
+           a site has more locales than fit. #}
+        body.is-customizing .page-locale-badges {
+            display: flex; flex-wrap: wrap; gap: .25rem; margin: .35rem 0 0; }
+        {# The icon aligns with the TITLE, not with the centre of the whole
+           titles block. Once the flag row appears the block grows downward, so
+           centring pushed the icon below the title it belongs to and the header
+           read as misaligned. #}
+        .admin-header-icon { align-self: flex-start; margin-top: .1rem; }
         .page-locale-badge { display: inline-flex; align-items: center; padding: .2rem .3rem;
                              border: 1px solid var(--admin-border); border-radius: 5px; background: var(--admin-surface); }
         {# Inactive locales are links through _switch_locale - dimmed at
@@ -706,7 +742,41 @@
                           border: 1px solid transparent; border-radius: 6px; background: none; color: inherit; font-size: 1rem; cursor: pointer; }
         .page-icon-cell:hover { border-color: var(--admin-accent); color: var(--admin-accent); background: var(--admin-bg); }
         .admin-header-subtitle { font-size: .82rem; color: var(--admin-muted); margin-top: .2rem; }
-        .admin-header .global-actions { margin-left: auto; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .5rem; }
+        {# The action row keeps its natural width; the TITLE gives ground. With
+           both free to size themselves the heading took 551px of a 1165px
+           header and squeezed the toolbar into 464px, wrapping it onto three
+           lines. A long record title can ellipsize - the buttons cannot
+           usefully shrink, and a toolbar that reflows every time the title gets
+           longer is not a toolbar. #}
+        {# The action bar is hoisted into the TOPBAR (see the script below), so it
+           gets a full dedicated line at the very top instead of competing with
+           the record title for the header's width. The search yields the space:
+           it only needs to be large while you are typing in it. #}
+        .topbar-search input { transition: width .18s ease; }
+        .admin-topbar:has(.global-actions) .topbar-search input { width: 11rem; }
+        .admin-topbar .topbar-search:focus-within input { width: 26rem; }
+        .admin-topbar .global-actions {
+            margin-left: auto; display: flex; align-items: center; flex-wrap: nowrap;
+            gap: .4rem; flex: 0 1 auto; min-width: 0; }
+        {# Nothing in the topbar may push the icon cluster off the end. #}
+        .admin-topbar .global-actions .btn { white-space: nowrap; }
+        .admin-topbar-icons { flex: 0 0 auto; }
+        .admin-header .global-actions { margin-left: auto; display: flex; flex-wrap: wrap; justify-content: flex-end;
+                                        gap: .4rem; flex: 0 0 auto; }
+        .admin-header-titles { flex: 1 1 auto; min-width: 0; }
+        .admin-header-record, .admin-header h1 { overflow-wrap: anywhere; }
+        {# Narrow viewports: the header is a nowrap flex row, so the action
+           buttons wrapped into a tall right-hand column and squeezed the title
+           box down to ~26px - the heading then spilled out from under the
+           buttons and read as overlapping them (seen on a 390px capture).
+           Let the header itself wrap and give the actions their own full-width
+           row underneath the title. #}
+        @media (max-width: 720px) {
+            .admin-header { flex-wrap: wrap; align-items: flex-start; }
+            .admin-header-titles { flex: 1 1 auto; }
+            .admin-header .global-actions {
+                order: 3; width: 100%; margin-left: 0; justify-content: flex-start; }
+        }
         .card { background: var(--admin-surface); border: 1px solid var(--admin-border); border-radius: var(--admin-radius); }
         {# Generic "no card chrome" toggle any dashboard widget can carry
            (see MenuItem::$background's own docblock) - .widget-group IS
@@ -722,14 +792,133 @@
         .widget-group.no-card-bg, .widget-block.no-card-bg > .card {
             background: none; border-color: transparent; box-shadow: none;
         }
-        .btn { display: inline-flex; align-items: center; gap: .4rem; padding: .45rem .9rem; border-radius: 6px; border: 1px solid var(--admin-border);
-               background: var(--admin-surface); color: inherit; text-decoration: none; font-size: .9rem; cursor: pointer; }
-        .btn:hover { border-color: var(--admin-accent); color: var(--admin-accent); }
-        .btn-primary { background: var(--admin-accent); border-color: var(--admin-accent); color: #fff; }
-        .btn-primary:hover { color: #fff; filter: brightness(1.08); }
-        .btn-success { background: var(--admin-success); border-color: var(--admin-success); color: #fff; }
-        .btn-success:hover { color: #fff; filter: brightness(1.08); }
-        .text-danger, .btn.text-danger { color: var(--admin-danger); }
+        {# Two button roles, one look, modelled on gandi.net's own buttons.
+           A SECONDARY button is the same colour as the surface behind it -
+           it reads as a link with a hit area, and does not compete with the
+           one action that matters. The PRIMARY is a key cap: solid fill, a
+           darker band along its bottom edge (inset 0 -3px) and a small drop
+           shadow, so it looks like a physical key sitting above the page.
+
+           Pressing it sinks the cap rather than tinting it: the bottom
+           padding moves to the top and the edge disappears, which is what
+           makes it feel like a key going down. That is the whole trick -
+           no colour change is needed for the pressed state.
+
+           The edge colour is derived from the fill with color-mix, so a
+           variant only ever declares its own background and the two stay in
+           step - including in dark mode, where a hand-picked pair drifts. #}
+        {# 3px on every button, gandi's own radius - the cap used to be the only
+           3px control in a sea of 6px ones, which is what made it look like a
+           different component rather than the emphasised member of one family. #}
+        .btn { display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
+               padding: .45rem .9rem; border-radius: 3px; border: 1px solid var(--admin-border);
+               background: transparent; color: inherit; text-decoration: none; font-size: .9rem;
+               cursor: pointer; transition: background .12s ease, border-color .12s ease, color .12s ease, box-shadow .12s ease; }
+        {# Two tiers, after gandi.net's `.button--tertiary`: that button is neutral
+           at rest and only tints on interaction - its face picks up a faint fill
+           (#e0d9ff), a matching rim (#8566fe) and a matching key edge (#c2b3ff).
+
+           Same mechanism here, but the tint follows the button's SEMANTIC rather
+           than one fixed brand colour, so a destructive action reads red the
+           moment you reach for it while sitting quiet in the layout until then.
+           One custom property carries it: --btn-tone, defaulted to the accent and
+           overridden per variant. Every interaction rule below is written against
+           that single property, so adding a variant is one declaration, not four.
+
+           Gandi's navbar also carries exactly ONE filled cap among six items - a
+           cap only means "this is the action" while its neighbours lack one - so
+           the cap is reserved for the committing action and everything else is
+           neutral. #}
+        .btn { --btn-tone: var(--admin-accent); }
+        .btn-primary { --btn-tone: var(--admin-accent); }
+        .btn-success { --btn-tone: var(--admin-success); }
+        .btn-danger  { --btn-tone: var(--admin-danger); }
+        .btn-warning { --btn-tone: var(--admin-warning); }
+
+        {# Tier 2 - the default: neutral until touched. Text stays the body colour
+           and only leans toward the tone on hover, so the cue is legible without
+           shouting (mixing with --admin-text keeps it "faint" and keeps contrast
+           in dark mode, where a raw danger red on a dark panel is harsh). #}
+        .btn { background: transparent; border-color: transparent; color: inherit; box-shadow: none; }
+        .btn:hover {
+            border-color: transparent;
+            color: color-mix(in srgb, var(--btn-tone) 72%, var(--admin-text));
+            background: color-mix(in srgb, var(--btn-tone) 10%, transparent); }
+        .btn:active {
+            background: color-mix(in srgb, var(--btn-tone) 18%, transparent);
+            color: color-mix(in srgb, var(--btn-tone) 85%, var(--admin-text));
+            transform: translateY(1px); box-shadow: none; }
+
+        {# Tier 1 - the cap, filled in the button's own tone. Scoped to the one
+           committing action: the first control in a page's action bar, and a
+           modal's confirm. Everything else stays neutral above. #}
+        .global-actions .btn[data-primary-action],
+        .admin-confirm-actions .btn-danger, .admin-confirm-actions .btn-primary,
+        .modal-footer .btn-primary, .modal-footer .btn-success, .modal-footer .btn-danger {
+            {# Measured off gandi's Log in at REST, which is the shape being asked
+               for and the opposite of what was here: a WHITE face (#fff), a
+               neutral 1px rim (#9999ac), a barely-there pale inset edge
+               (#ebebf6), near-black text, and a soft blue-tinted drop shadow
+               `rgba(20,20,96,.1) 0 4px 3px`. This was a saturated fill with white
+               text on a dark edge - the inverse - which is why it read as loud
+               and unrelated to the rest of the row.
+
+               The semantic tone is kept, but as a *tint* rather than a fill: the
+               rim and edge carry it faintly at rest and the face only takes
+               colour on hover, exactly like gandi's own tertiary. #}
+            --btn-edge: color-mix(in srgb, var(--btn-tone) 22%, var(--admin-surface));
+            background: var(--admin-surface);
+            color: color-mix(in srgb, var(--btn-tone) 42%, var(--admin-text));
+            border: 1px solid color-mix(in srgb, var(--btn-tone) 32%, var(--admin-border));
+            padding-bottom: calc(.45rem + 4px); transform: none;
+            box-shadow: inset 0 -4px 0 0 var(--btn-edge),
+                        0 4px 3px 0 color-mix(in srgb, var(--btn-tone) 14%, transparent); }
+        .global-actions .btn[data-primary-action]:hover,
+        .admin-confirm-actions .btn-danger:hover, .admin-confirm-actions .btn-primary:hover,
+        .modal-footer .btn-primary:hover, .modal-footer .btn-success:hover, .modal-footer .btn-danger:hover {
+            background: color-mix(in srgb, var(--btn-tone) 14%, var(--admin-surface));
+            border-color: color-mix(in srgb, var(--btn-tone) 55%, transparent);
+            color: color-mix(in srgb, var(--btn-tone) 55%, var(--admin-text));
+            --btn-edge: color-mix(in srgb, var(--btn-tone) 38%, var(--admin-surface));
+            filter: none; }
+        {# Pressed: the cap travels down onto its edge. Keeping a 1px edge (rather
+           than dropping the inset outright) reads as depressed instead of gone
+           flat, and darkening matters because :active is also :hover - the hover
+           brightness alone made a pressed key come out lighter than a resting one. #}
+        .global-actions .btn[data-primary-action]:active,
+        .admin-confirm-actions .btn-danger:active, .admin-confirm-actions .btn-primary:active,
+        .modal-footer .btn-primary:active, .modal-footer .btn-success:active, .modal-footer .btn-danger:active {
+            padding-bottom: calc(.45rem + 1px); transform: translateY(3px);
+            filter: none;
+            background: color-mix(in srgb, var(--btn-tone) 20%, var(--admin-surface));
+            box-shadow: inset 0 -1px 0 0 var(--btn-edge),
+                        0 1px 1px 0 color-mix(in srgb, var(--btn-tone) 12%, transparent); }
+
+        .text-danger { color: var(--admin-danger); }
+        {# A destructive *button* takes its danger as a tone, not as a permanent
+           colour: the delete action in an edit header was a saturated red trash
+           sitting among neutral controls, the single loudest thing on the page
+           and louder than the submit itself. Neutral at rest, red the moment you
+           reach for it - same rule as every other semantic button.
+
+           !important is needed, reluctantly: a Bootstrap utility still reaches
+           this admin as `.text-danger { color: red !important }` - note *pure*
+           red, not --admin-danger - and !important outranks specificity, so the
+           plain override lost. Matching it with a more specific !important is
+           the only way to win without deleting their rule. #}
+        .btn.text-danger { --btn-tone: var(--admin-danger); color: inherit !important; }
+        {# Inside a data row the destructive action DOES carry its colour at
+           rest: production paints it outright, and in a dense grid of near
+           identical icon buttons "which one deletes" must not depend on
+           hovering each. Only in a row - a toolbar keeps the neutral default. #}
+        .datagrid td.actions .btn.text-danger {
+            color: var(--admin-danger) !important; }
+        .datagrid td.actions .btn.text-danger:hover {
+            color: #fff !important; background: var(--admin-danger); }
+        .btn.text-danger:hover {
+            color: color-mix(in srgb, var(--btn-tone) 72%, var(--admin-text)) !important; }
+        .btn.text-danger:active {
+            color: color-mix(in srgb, var(--btn-tone) 85%, var(--admin-text)) !important; }
         {# A submit is in flight: lock the button that started it.
            transparentJS swaps the page over AJAX, so nothing about the
            button changes on its own - it stayed fully live and clickable
@@ -811,7 +1000,14 @@
         .datagrid th.actions { background: var(--admin-bg); z-index: 6; }
         .datagrid tr:hover td.actions { background: var(--admin-bg); }
         .datagrid .actions a, .datagrid .actions button { margin-left: .35rem; }
-        .paginator { display: flex; align-items: center; gap: .75rem; padding: .75rem .9rem; color: var(--admin-muted); font-size: .9rem; }
+        {# Sticky: on a full page of rows the pager sat below the fold, so
+           reaching page 2 meant scrolling past 20 rows first. Pinned to the
+           bottom of the datagrid card it is reachable from any scroll
+           position, and it needs its own background + top border or the rows
+           show through underneath it. #}
+        .paginator { display: flex; align-items: center; gap: .75rem; padding: .75rem .9rem; color: var(--admin-muted); font-size: .9rem;
+                     position: sticky; bottom: 0; z-index: 7;
+                     background: var(--admin-surface); border-top: 1px solid var(--admin-border); }
         .paginator .pages { margin-left: auto; display: flex; gap: .25rem; }
         .paginator .page-current { background: var(--admin-accent); border-color: var(--admin-accent); color: #fff; cursor: default; }
         .paginator .pages-ellipsis { border: none; background: none; cursor: default; }
@@ -820,7 +1016,10 @@
         dialog#admin-confirm::backdrop { background: rgba(15, 23, 42, .45); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
         dialog#admin-confirm p { margin: 0 0 1.25rem; }
         .admin-confirm-actions { display: flex; justify-content: flex-end; gap: .5rem; }
-        .btn-danger { background: var(--admin-danger); border-color: var(--admin-danger); color: #fff; }
+        {# Was `.btn-danger { background: var(--admin-danger) }` - a leftover that
+           filled every destructive button everywhere and overrode the neutral
+           default below it in the cascade. The tone system handles the colour
+           now; only the confirm cap is filled. #}
         .form-footer-danger { border-top: none; padding-top: 0; }
         form.admin-form .form-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 0 1.25rem; padding: 1.25rem; }
         form.admin-form .form-row { grid-column: span var(--col-span, 12); min-width: 0; margin-bottom: 1rem; }
@@ -853,9 +1052,27 @@
            for the native chrome CSS can't reach - keep both. #}
         form.admin-form input[type=text], form.admin-form input[type=email], form.admin-form input[type=number],
         form.admin-form input[type=password], form.admin-form select, form.admin-form textarea {
-            width: 100%; padding: .5rem .65rem; border: 1px solid var(--admin-border); border-radius: 6px; font: inherit; color: inherit; background: var(--admin-bg);
+            width: 100%; padding: .5rem .65rem; border: 1px solid var(--admin-border); border-radius: 6px; font: inherit; color: inherit; background: var(--admin-surface);
         }
-        form.admin-form .form-errors { color: var(--admin-danger); font-size: .85rem; margin-top: .25rem; }
+        {# Editable fields are white; the page grey is reserved for controls you
+           genuinely cannot type into. This was --admin-bg for *every* control,
+           so an enabled field looked exactly like a disabled one - a live
+           comparison shows production giving editable inputs #fff and greying
+           only the read-only slug. Restoring that distinction. #}
+        form.admin-form input:disabled, form.admin-form select:disabled, form.admin-form textarea:disabled,
+        form.admin-form input[readonly], form.admin-form textarea[readonly] {
+            background: var(--admin-bg); color: var(--admin-muted); cursor: not-allowed;
+        }
+        {# base-async.scss paints .form-errors as a lightpink/lightcoral box - an
+           EasyAdmin-era look this admin doesn't use, showing errors as plain red
+           text instead. The admin was only overriding the colour, so the box's
+           background and border survived; with padding reset to 0 elsewhere in
+           that same stylesheet an *empty* container collapsed to a 2px pink line
+           drawn under every single field, error or not. Drop the box here (the
+           public site keeps it) and hide the container entirely when empty. #}
+        form.admin-form .form-errors { color: var(--admin-danger); font-size: .85rem; margin-top: .25rem;
+            background: none; border: 0; padding: 0; }
+        form.admin-form .form-errors:empty { display: none; }
         @media (max-width: 720px) { form.admin-form .form-row { grid-column: span 12 !important; } }
         {# BooleanField's confirm-modal markup (form_div_layout.html.twig) is
            Bootstrap ".modal fade" markup: it only ever hides/shows via
@@ -1034,8 +1251,118 @@
            mentions anything specific to this page). #}
         form.admin-form .system-form-body .form-password > .form-group { padding: 0; }
         form.admin-form .label-wrapper { display: flex; align-items: center; gap: .4rem; margin-bottom: .3rem; }
+        {# Collapsible collection entries. The markup is Bootstrap's accordion
+           (data-bs-toggle="collapse" + .accordion-collapse.collapse), but this
+           admin ships no Bootstrap, so neither the CSS that hides a collapsed
+           panel nor the JS that toggles it existed: every entry rendered fully
+           expanded. On a record with many related rows that is a wall of
+           sub-forms, and each one pulls its own related data - the N+1 this was
+           reported as. Collapsed is the resting state; the header opens one on
+           demand. #}
+        form.admin-form .accordion-collapse.collapse:not(.show) { display: none; }
+        form.admin-form .accordion-item { border: 1px solid var(--admin-border); border-radius: 6px;
+                                          margin-bottom: .4rem; background: var(--admin-surface); overflow: hidden; }
+        form.admin-form .accordion-header { margin: 0; }
+        form.admin-form .accordion-button {
+            display: flex; align-items: center; gap: .5rem; width: 100%; text-align: left;
+            padding: .5rem .7rem; border: 0; background: none; color: inherit; font: inherit;
+            cursor: pointer; }
+        form.admin-form .accordion-button:hover { background: var(--admin-bg); }
+        {# The chevron IS the affordance - without Bootstrap's own ::after there
+           was nothing to say a row could be opened. Rotates when expanded. #}
+        form.admin-form .accordion-button::after {
+            content: "\f078"; font-family: "Font Awesome 6 Free"; font-weight: 900;
+            margin-left: auto; font-size: .75rem; color: var(--admin-muted);
+            transition: transform .15s ease; }
+        form.admin-form .accordion-button:not(.collapsed)::after { transform: rotate(180deg); }
+        form.admin-form .accordion-body { padding: .7rem; border-top: 1px solid var(--admin-border); }
+        {# Icons in a collection header are metadata chips, not content: muted
+           and evenly spaced so they read as one group beside the label rather
+           than a row of loose glyphs. #}
+        form.admin-form .form-collection-item .label-wrapper i,
+        form.admin-form .accordion-button i { color: var(--admin-muted); font-size: .8rem; }
+        form.admin-form .accordion-button .badge.label { margin-left: .25rem; }
+        {# "Load N more" for a windowed collection. Reads as one of the entry
+           rows rather than a page control, since that is where it sits. #}
+        form.admin-form .form-collection-more {
+            display: flex; align-items: center; justify-content: center; gap: .45rem;
+            width: 100%; margin-top: .1rem; padding: .45rem .7rem;
+            border: 1px dashed var(--admin-border); border-radius: 3px;
+            background: var(--admin-surface); color: var(--admin-muted);
+            font: inherit; font-size: .85rem; cursor: pointer; }
+        form.admin-form .form-collection-more:hover {
+            border-color: color-mix(in srgb, var(--admin-accent) 45%, transparent);
+            color: var(--admin-accent); }
+        form.admin-form .form-collection-more.is-loading { opacity: .6; cursor: progress; }
+        form.admin-form .form-collection-more.has-error { border-color: var(--admin-danger); color: var(--admin-danger); }
+        {# Per-entry actions (copy / preview / open) are bare <a> elements with
+           no class, so with no CSS reset they rendered as browser-default links:
+           rgb(0,0,238) and underlined, inside a form full of neutral controls.
+           Given the same key-cap treatment as the primary button, scaled down -
+           surface face, tone rim, a 2px edge that depresses on press. #}
+        form.admin-form .form-collection-item a:has(> i:only-child),
+        form.admin-form .form-collection-items a:has(> i:only-child) {
+            --btn-tone: var(--admin-accent);
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 1.85rem; height: 1.7rem; padding-bottom: 2px;
+            border: 1px solid color-mix(in srgb, var(--btn-tone) 26%, var(--admin-border));
+            border-radius: 3px; background: var(--admin-surface);
+            color: var(--admin-muted); text-decoration: none;
+            box-shadow: inset 0 -2px 0 0 color-mix(in srgb, var(--btn-tone) 18%, var(--admin-surface));
+            transition: background .12s ease, color .12s ease, box-shadow .12s ease, transform .12s ease; }
+        form.admin-form .form-collection-item a:has(> i:only-child):hover,
+        form.admin-form .form-collection-items a:has(> i:only-child):hover {
+            background: color-mix(in srgb, var(--btn-tone) 12%, var(--admin-surface));
+            border-color: color-mix(in srgb, var(--btn-tone) 50%, transparent);
+            color: color-mix(in srgb, var(--btn-tone) 60%, var(--admin-text)); }
+        form.admin-form .form-collection-item a:has(> i:only-child):active,
+        form.admin-form .form-collection-items a:has(> i:only-child):active {
+            transform: translateY(2px); padding-bottom: 0;
+            box-shadow: inset 0 -1px 0 0 color-mix(in srgb, var(--btn-tone) 26%, var(--admin-surface)); }
+        form.admin-form .form-collection-item a > i, form.admin-form .form-collection-items a > i {
+            font-size: .78rem; }
+        {# The translatable group carries padding-left:15px to indent its fields
+           under the locale tab strip. renderSingleLocale() hides that strip, so
+           the indent had nothing to sit under and every sub-field from Title
+           down was nudged 15px right of Tags/Slug above it - a visible step in
+           the form's left edge. No strip, no indent. #}
+        {# !important to match base-async's own `.form-translatable { padding:
+           0 1em !important }` - specificity alone loses to it. #}
+        form.admin-form .form-translatable.form-group { padding-left: 0 !important; padding-right: 0 !important; }
+
+        {# Editor and dropzone are input surfaces and should look like one. Both
+           render as bare DIVs, so they missed the input rule (which targets
+           input/select/textarea) and base-async explicitly strips the background
+           off a non-input .form-control - leaving Content and Audio as floating
+           text on the page with no outline at all. #}
+        form.admin-form .form-editor-codex,
+        form.admin-form .dropzone.form-control {
+            background: var(--admin-surface); border: 1px solid var(--admin-border);
+            border-radius: 6px; padding: .5rem .65rem; box-sizing: border-box; }
+        form.admin-form .form-editor-codex:focus-within {
+            border-color: var(--admin-accent); }
+        {# The "open in a new tab" affordance beside a related record was rendering
+           at rgb(0,0,238) - the browser's default unvisited-link blue, not our
+           accent. This admin ships no CSS reset, so a bare <a> keeps the UA
+           colour; eight of them per edit form read as loud blue squares. Muted
+           by default, accent on hover, like every other secondary affordance. #}
+        form.admin-form .fa-external-link-square-alt,
+        form.admin-form a:has(> .fa-external-link-square-alt) { color: var(--admin-muted); }
+        form.admin-form a:hover > .fa-external-link-square-alt,
+        form.admin-form a:has(> .fa-external-link-square-alt):hover { color: var(--admin-accent); }
+        {# A wrapper with no label of its own is pure spacer + badges. This grid
+           doesn't need the spacer (each .form-row stacks its own label), so all
+           it produced was a database badge floating between Slug and Title with
+           nothing to describe - the translation panel, whose sub-fields already
+           carry their own badges. #}
+        form.admin-form .label-wrapper-unlabelled { display: none; }
         form.admin-form .label-wrapper label { margin-bottom: 0; }
-        form.admin-form .badge.label { display: inline-flex; align-items: center; gap: .25rem; padding: .15rem .35rem; border-radius: 5px;
+        {# Padding is deliberately tighter horizontally than vertically: the
+           glyphs are wider than they are tall, so equal padding reads as too
+           much air on the sides. .3rem/.3rem measured out lopsided next to a
+           bold label - .25rem vertical against .3rem horizontal sits the chip
+           on the label's own baseline block instead of floating beside it. #}
+        form.admin-form .badge.label { display: inline-flex; align-items: center; gap: .3rem; padding: .25rem .3rem; border-radius: 5px;
                                        background: var(--admin-bg); color: var(--admin-muted); font-size: .72rem; line-height: 1; }
         {# fa-fw forces 1.25em fixed width per icon - inside this small
            chip that reads as lopsided horizontal padding around the
@@ -1050,7 +1377,30 @@
         form.admin-form .input-group { display: flex; align-items: stretch; position: relative; }
         form.admin-form .input-group-text { display: flex; align-items: center; padding: 0 .65rem; border: 1px solid var(--admin-border);
                                             border-right: 0; border-radius: 6px 0 0 6px; background: var(--admin-bg); color: var(--admin-muted); flex: 0 0 auto; }
-        form.admin-form .input-group input, form.admin-form .input-group select { border-radius: 0 6px 6px 0; }
+        {# Square off only the side an addon actually joins. This was a flat
+           `border-radius: 0 6px 6px 0`, which assumes every addon is a LEFT
+           prefix (true for the datetime calendar button). Slug's lock is an
+           *append*, so the input stayed square on the free left edge and kept
+           its rounded corner on the right - underneath the addon - which is
+           what made the lock read as a detached, half-clipped chip. #}
+        form.admin-form .input-group input, form.admin-form .input-group select { border-radius: 6px; }
+        form.admin-form .input-group > .input-group-text:first-child ~ input,
+        form.admin-form .input-group > .input-group-text:first-child ~ select {
+            border-top-left-radius: 0; border-bottom-left-radius: 0; }
+        form.admin-form .input-group:has(> .input-group-append) > input,
+        form.admin-form .input-group:has(> .input-group-append) > select,
+        form.admin-form .input-group:has(> .input-group-text:last-child) > input,
+        form.admin-form .input-group:has(> .input-group-text:last-child) > select {
+            border-top-right-radius: 0; border-bottom-right-radius: 0; }
+        {# The append wrapper carries no border of its own, so the addon inside
+           it has to close the group off: match the input's height and rounding
+           and drop the doubled edge where the two meet. #}
+        form.admin-form .input-group > .input-group-append {
+            display: flex; align-items: stretch; }
+        form.admin-form .input-group > .input-group-append > * {
+            display: flex; align-items: center; padding: 0 .65rem;
+            border: 1px solid var(--admin-border); border-left: 0;
+            border-radius: 0 6px 6px 0; background: var(--admin-bg); color: var(--admin-muted); }
         form.admin-form .input-group .form-password-revealer { color: var(--admin-muted); }
         form.admin-form .input-group .form-password-revealer:hover { color: var(--admin-accent); }
         {# Safari renders its own password-AutoFill key button (a gray
@@ -1392,6 +1742,18 @@
         .flash-success { border-color: #86efac; background: #f0fdf4; color: #166534; }
         .flash-warning { border-color: #fde68a; background: #fffbeb; color: #92400e; }
         .flash-danger, .flash-error { border-color: #fecaca; background: #fef2f2; color: #991b1b; }
+        {# A flash had no way out: no close control and no timeout, so one
+           "the website is now displayed in English" sat over the page until
+           the next full navigation. Every flash now carries a dismiss, and
+           the non-error ones retire themselves. #}
+        .flash { display: flex; align-items: flex-start; gap: .75rem; }
+        .flash-body { flex: 1; min-width: 0; }
+        .flash-close { flex-shrink: 0; border: 0; background: none; color: inherit; cursor: pointer;
+                       font: inherit; font-size: 1.15rem; line-height: 1; padding: 0 .1rem;
+                       opacity: .55; transition: opacity .12s ease; }
+        .flash-close:hover { opacity: 1; }
+        .flash.is-dismissing { opacity: 0; transform: translateY(-.35rem);
+                               transition: opacity .25s ease, transform .25s ease; }
         .search-form { display: inline-flex; gap: .4rem; }
         .search-form input { padding: .45rem .65rem; border: 1px solid var(--admin-border); border-radius: 6px; font: inherit; min-width: 220px;
                              background: var(--admin-bg); color: var(--admin-text); }
@@ -1915,6 +2277,30 @@
         .badge-accent { background: color-mix(in srgb, var(--admin-accent) 12%, transparent); border-color: color-mix(in srgb, var(--admin-accent) 35%, transparent); color: var(--admin-accent); }
         .badge-muted { color: var(--admin-muted); }
         .badge-list { display: flex; flex-wrap: wrap; gap: .3rem; }
+        {# No single chip may dictate a column's width. Table cells size to their
+           widest content, so one verbose label (a tag phrase, an author's full
+           name) stretched its column and pushed the whole grid past its
+           container - the Tags header was rendering as "Ta" with the chips
+           sliced mid-word. The full text stays available as the title tooltip. #}
+        {# Safety net for every OTHER cell type. Truncation in the field
+           templates handles the known offenders, but a table cell sizes to its
+           widest content whatever renders it, so one long value anywhere still
+           dictates a column. A ceiling with an ellipsis keeps any single column
+           from doing that; the full value stays in the title attribute where
+           the templates set one. #}
+        .datagrid td { max-width: 15rem; }   /* 240px, matching production's widest column */
+        {# :not(.badge) matters - a badge is inline-FLEX and uses `gap` to space
+           its icon from its label. Forcing inline-block here killed the gap and
+           the state pill rendered its icon jammed against the text. Badges do
+           their own eliding via .badge-list above. #}
+        .datagrid td .field-association a,
+        .datagrid td .field-translatable,
+        .datagrid td > span:only-child:not(.badge):not(.badge-list):not(.badges) {
+            display: inline-block; max-width: 100%; overflow: hidden;
+            text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+        .datagrid .badge-list { max-width: 14rem; }
+        .datagrid .badge-list > .badge {
+            max-width: 11rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         {# A related entity rendered as a badge (SelectField/AssociationField
            with entityDisplay and/or crudControllerFqcn set). text-decoration
            because the linked variant is an <a> and this admin loads no
@@ -1949,6 +2335,16 @@
         .field-mono { font-variant-numeric: tabular-nums; }
         .field-money, .field-number { font-variant-numeric: tabular-nums; white-space: nowrap; }
 
+        {# The identifier stays put while the grid scrolls sideways, exactly as
+           in the admin being replaced (`position: sticky; left: 0` on its ID
+           cell). On a 13-column grid the row you are reading otherwise loses
+           the only thing that names it. z-index below .actions so the two
+           pinned edges layer predictably. #}
+        .datagrid td.cell-id, .datagrid th.cell-id {
+            position: sticky; left: 0; z-index: 4; background: var(--admin-surface);
+            box-shadow: 8px 0 8px -8px rgba(0, 0, 0, .18); }
+        .datagrid th.cell-id { background: var(--admin-bg); z-index: 6; }
+        .datagrid tr:hover td.cell-id { background: var(--admin-bg); }
         .field-id { color: var(--admin-muted); font-size: .85rem; }
         .field-id a { color: inherit; text-decoration: none; }
         .field-id a:hover { color: var(--admin-accent); }
@@ -2448,7 +2844,32 @@
             {% block user_menu %}
                 {% if hasUserMenu %}
                 <ul class="admin-menu admin-usermenu admin-dropdown-menu" role="menu">
+                    {# The brand row above carries the SITE logo and title; the account
+                       it belongs to was only named there, never shown. Lead the dropdown
+                       with the signed-in user - their own avatar, not the site logo -
+                       the way the admin being replaced does, so the two images stay
+                       tellable apart at a glance. #}
+                    {% if app.user %}
+                        {% set accountAvatar = app.user.avatar is defined ? app.user.avatar : null %}
+                        <li class="admin-usermenu-account">
+                            {% if accountAvatar is not empty %}
+                                <img class="admin-usermenu-avatar" src="{{ accountAvatar|thumbnail(64, 64) }}" alt="">
+                            {% else %}
+                                <span class="admin-usermenu-avatar admin-usermenu-avatar-empty"><i class="fa-solid fa-user"></i></span>
+                            {% endif %}
+                            <span class="admin-usermenu-identity">
+                                <span class="admin-usermenu-label">{{ 'menu.signed_in_as'|trans({}, 'admin') }}</span>
+                                <span class="admin-usermenu-name">{{ app.user }}</span>
+                            </span>
+                        </li>
+                        <li class="admin-usermenu-divider" role="separator"></li>
+                    {% endif %}
                     {% for item in admin_context.userMenu %}
+                        {# Sign-out closes the menu and gets its own group, like production.
+                           Keyed off the loop position rather than the label: userMenu is
+                           host-configurable, and matching on 'menu.logout' silently did
+                           nothing the moment an app supplied its own label. #}
+                        {% if loop.last and not loop.first %}<li class="admin-usermenu-divider" role="separator"></li>{% endif %}
                         <li><a href="{{ item.linkUrl ?? '#' }}">{% if item.icon %}<i class="{{ item.icon }}"></i> {% endif %}{{ item.label|trans({}, 'admin') }}</a></li>
                     {% endfor %}
                 </ul>
@@ -2724,7 +3145,11 @@
                            reported live. Anything user-supplied interpolated
                            into one of these must be escaped where it is put
                            in, not here. #}
-                        <div class="flash flash-{{ type }}">{{ message|trans|raw }}</div>
+                        <div class="flash flash-{{ type }}" role="status">
+                            <span class="flash-body">{{ message|trans|raw }}</span>
+                            <button type="button" class="flash-close" data-flash-close
+                                    aria-label="{{ 'action.cancel'|trans({}, 'admin') }}">&times;</button>
+                        </div>
                     {% endfor %}
                 {% endfor %}
             </div>
@@ -4065,10 +4490,22 @@
 
             document.addEventListener('click', function (e) {
                 var moved = e.target.closest('[data-action-row] [data-action-key]');
-                if (moved && moved.dataset.justReordered) {
+                if (!moved) return;
+
+                if (moved.dataset.justReordered) {
                     delete moved.dataset.justReordered;
                     e.preventDefault();
                     e.stopPropagation();
+                    return;
+                }
+
+                // While customizing, a click EDITS the button rather than
+                // performing it - otherwise reaching for its icon navigates
+                // away (or worse, submits the form the button belongs to).
+                // preventDefault only: the icon-picker listener is on the
+                // bubble phase and still needs to receive this click.
+                if (document.body.classList.contains('is-customizing')) {
+                    e.preventDefault();
                 }
             }, true);
         })();
@@ -4087,6 +4524,23 @@
         }
 
         function applyPageIcon(box, value) {
+            // An ACTION icon lives on the CRUD page's own entry, as the icon of
+            // the child keyed by the action name - the same children that carry
+            // the button order. parentKey scopes the lookup to this page, since
+            // action names ("new", "delete") repeat across every CRUD.
+            if (box.dataset.actionKey) {
+                queueQuickSave(CRUD_QUICK_URL, {
+                    key: box.dataset.actionKey,
+                    parentKey: box.dataset.actionPage,
+                    field: 'icon',
+                    value: value
+                });
+                box.dataset.pageIconValue = value;
+                var actionIcon = box.querySelector('i');
+                if (actionIcon) actionIcon.className = value || 'fa-solid fa-circle-question';
+                return;
+            }
+
             var payload = { key: box.dataset.menuKey, field: 'icon', value: value };
             if (box.dataset.menuParentKey) payload.parentKey = box.dataset.menuParentKey;
             queueQuickSave(SIDEBAR_QUICK_URL, payload);
@@ -4107,8 +4561,193 @@
             menuIcon.className = value;
         }
 
+        // Flash dismissal. Delegated + re-scanned on transparentJS swaps, since
+        // a flash arrives with the swapped-in page rather than on a full load.
+        // Errors are NOT auto-retired: a failure the operator blinked past is
+        // worse than one they have to close.
+        (function () {
+            var AUTO_MS = 6000;
+
+            function dismiss(flash) {
+                if (!flash || flash.classList.contains('is-dismissing')) return;
+                flash.classList.add('is-dismissing');
+                setTimeout(function () {
+                    var box = flash.parentNode;
+                    flash.remove();
+                    // Drop the empty container too - it is absolutely positioned
+                    // over the page and would keep intercepting nothing forever.
+                    if (box && box.classList.contains('flashes') && !box.children.length) box.remove();
+                }, 260);
+            }
+
+            document.addEventListener('click', function (e) {
+                var btn = e.target.closest('[data-flash-close]');
+                if (btn) dismiss(btn.closest('.flash'));
+            });
+
+            function arm(root) {
+                (root || document).querySelectorAll('.flash:not([data-armed])').forEach(function (flash) {
+                    flash.setAttribute('data-armed', '');
+                    if (flash.classList.contains('flash-danger') || flash.classList.contains('flash-error')) return;
+                    setTimeout(function () { dismiss(flash); }, AUTO_MS);
+                });
+            }
+
+            arm(document);
+            document.addEventListener('DOMContentLoaded', function () { arm(document); });
+            // transparentJS replaces the main region wholesale; catch flashes
+            // that arrive with a swapped page.
+            new MutationObserver(function (records) {
+                for (var i = 0; i < records.length; i++) {
+                    for (var j = 0; j < records[i].addedNodes.length; j++) {
+                        var n = records[i].addedNodes[j];
+                        if (n.nodeType !== 1) continue;
+                        if (n.classList && n.classList.contains('flash')) arm(n.parentNode);
+                        else if (n.querySelector && n.querySelector('.flash')) arm(n);
+                    }
+                }
+            }).observe(document.body, { childList: true, subtree: true });
+        })();
+
+        // Accordion toggle for collection entries. data-bs-toggle="collapse" is
+        // Bootstrap's contract and nothing here implements it, so the headers
+        // were inert - the panels simply stayed open. Delegated, so entries
+        // added by the collection's own "add" button work without rebinding.
+        if (!window.__adminCollapseBound) {
+        window.__adminCollapseBound = true;
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest('[data-bs-toggle="collapse"]');
+            if (!btn) return;
+
+            var sel = btn.getAttribute('data-bs-target') || btn.getAttribute('href');
+            if (!sel) return;
+
+            var panel;
+            try { panel = document.querySelector(sel); } catch (err) { return; }
+            if (!panel) return;
+
+            e.preventDefault();
+            var open = panel.classList.toggle('show');
+            btn.classList.toggle('collapsed', !open);
+            btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        });
+        }
+
+        // Hoist the page's action bar into the topbar. It lives inside
+        // .admin-header in the templates (where each CRUD page renders it), but
+        // there it shares a line with the record title and a long title pushed
+        // it onto three rows. The topbar is full-width, already sticky, and has
+        // room once the idle search shrinks - so the buttons get a dedicated
+        // line at the very top. Moving the element itself (not a copy) keeps
+        // form= associations, the customize drag/drop and the icon picker all
+        // working untouched.
+        (function () {
+            if (window.__adminActionsHoisted) return;
+            window.__adminActionsHoisted = true;
+
+            function hoist() {
+                var bar = document.querySelector('.admin-header .global-actions');
+                var topbar = document.querySelector('.admin-topbar');
+                if (!bar || !topbar) return;
+
+                var icons = topbar.querySelector('.admin-topbar-icons');
+                if (icons) topbar.insertBefore(bar, icons);
+                else topbar.appendChild(bar);
+            }
+
+            function boot() {
+                hoist();
+                // transparentJS swaps the main region wholesale, which brings a
+                // fresh .admin-header (and a fresh action bar) with it.
+                new MutationObserver(function () { hoist(); })
+                    .observe(document.body, { childList: true, subtree: true });
+            }
+
+            if ('loading' === document.readyState) document.addEventListener('DOMContentLoaded', boot);
+            else boot();
+        })();
+
+        // Lazy-load the rest of a windowed collection.
+        //
+        // Entries past the cap are never built server-side (each one costs
+        // ~3 queries), so this asks for the next slice and appends it. The
+        // endpoint renders those entries through the same form, with the
+        // collection windowed to the requested range - so their field names
+        // carry their real indices and bind correctly on submit.
+        if (!window.__adminCollectionMoreBound) {
+        window.__adminCollectionMoreBound = true;
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest('[data-collection-more]');
+            if (!btn || btn.disabled) return;
+            e.preventDefault();
+
+            var list = btn.parentNode.querySelector('.form-collection-items');
+            if (!list) return;
+
+            // The endpoint is derived, not injected: the button is rendered by
+            // base-bundle's shared form theme, which has no business knowing an
+            // admin route. The edit URL already identifies the record, and the
+            // collection's own DOM id carries the field name
+            // ("crud_form_comments__collection" -> "comments").
+            var field = (list.id || '').replace(/^.*?_/, '').replace(/__collection$/, '');
+            var m = /^crud_form_(.+?)__collection$/.exec(list.id || '');
+            if (m) field = m[1];
+            if (!field) return;
+
+            var url = location.pathname.replace(/\/edit\/?$/, '') + '/collection/' + field;
+
+            var loaded = parseInt(btn.dataset.loaded, 10) || 0;
+            var total = parseInt(btn.dataset.total, 10) || 0;
+            var limit = parseInt(btn.dataset.limit, 10) || 10;
+
+            btn.disabled = true;
+            btn.classList.add('is-loading');
+
+            fetch(url + (url.indexOf('?') > -1 ? '&' : '?') + 'offset=' + loaded + '&limit=' + limit,
+                  { credentials: 'same-origin' })
+                .then(function (r) { return r.ok ? r.text() : Promise.reject(r.status); })
+                .then(function (html) {
+                    list.insertAdjacentHTML('beforeend', html);
+
+                    loaded = Math.min(total, loaded + limit);
+                    btn.dataset.loaded = String(loaded);
+
+                    if (loaded >= total) {
+                        btn.remove();
+                        return;
+                    }
+                    var label = btn.querySelector('[data-collection-more-label]');
+                    if (label) label.textContent = String(total - loaded);
+                })
+                .catch(function () {
+                    // Leave the button usable: a failed fetch must not strand
+                    // the operator with no way to retry.
+                    btn.classList.add('has-error');
+                })
+                .finally(function () {
+                    btn.disabled = false;
+                    btn.classList.remove('is-loading');
+                });
+        });
+        }
+
         var ICON_SEARCH_URL = '{{ path("admin_icon_search") }}';
 
+        // Capture phase on purpose: an action button's click is swallowed
+        // somewhere between the button and document before the bubble phase
+        // (verified live - the click reaches document-capture with
+        // defaultPrevented=true, then never arrives), so a bubble listener
+        // could open the picker for a page heading but never for a button in
+        // the action row. Capture sees it first either way.
+        // Registered ONCE per document. transparentJS re-executes this inline
+        // script on every page swap, so without the guard the handler stacks up:
+        // the first copy opens the popover, the next one sees it already open,
+        // decides the click landed outside it and closes it again - a click
+        // that visibly did nothing. Synthetic clicks dispatched before any swap
+        // worked, which is exactly what made this look like an event-plumbing
+        // problem rather than a duplicate-listener one.
+        if (!window.__adminIconPickerBound) {
+        window.__adminIconPickerBound = true;
         document.addEventListener('click', function (e) {
             if (iconPopover && !iconPopover.contains(e.target)) closeIconPopover();
             var box = e.target.closest('[data-page-icon]');
@@ -4247,11 +4886,21 @@
             // ("calendar") as a raw icon class would break the icon. The
             // explicit commit paths are Enter (raw class, power users) and
             // clicking a grid cell.
+            // Ignore the focus churn of the very click that opened this. A
+            // real mouse click focuses the button it landed on, so the input
+            // blurs microseconds after being focused and the popover closed
+            // itself ~10ms after opening - the picker looked like it never
+            // opened at all. A synthetic click moves no focus, which is why it
+            // appeared to work and sent this hunt after event plumbing.
+            var blurArmed = false;
+            setTimeout(function () { blurArmed = true; }, 200);
             input.addEventListener('blur', function () {
+                if (!blurArmed) { input.focus(); return; }
                 if (!iconPopover) return; // Escape already closed it
                 closeIconPopover();
             });
-        });
+        }, true);
+        }
 
         // Brand title: same "commit immediately on blur" idea as the
         // widget-title/text handler just above, just against a plain

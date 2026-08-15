@@ -54,8 +54,33 @@ class AdminTwigExtension extends AbstractExtension
      * is generated, the entity is hand-written and usually already says
      * what it looks like (Article -> fa-newspaper).
      */
-    public function adminEntityIcon(?string $entityFqcn): ?string
+    /**
+     * Accepts a class-string OR an entity instance. Templates iterating a
+     * collection hold objects, not class names, and the string-only signature
+     * turned that into a TypeError (a 500 on every index rendering an
+     * icon chip) rather than a missing icon. Sibling helpers here already take
+     * `mixed $entity`, so this now matches them.
+     */
+    public function adminEntityIcon(object|string|null $entityFqcn): ?string
     {
+        if (\is_object($entityFqcn)) {
+            // An INSTANCE gets its own icon first. __iconizeStatic() is the
+            // class-level fallback, so resolving straight to it rendered the
+            // generic "tag" glyph for every Tag instead of the per-record icon
+            // each one actually defines - production shows those, beta showed
+            // one identical icon down the whole column.
+            if (method_exists($entityFqcn, '__iconize')) {
+                $own = $entityFqcn->__iconize();
+                $own = \is_array($own) ? ($own[0] ?? null) : $own;
+
+                if (\is_string($own) && '' !== $own) {
+                    return $own;
+                }
+            }
+
+            $entityFqcn = $entityFqcn::class;
+        }
+
         if (null === $entityFqcn || !class_exists($entityFqcn) || !method_exists($entityFqcn, '__iconizeStatic')) {
             return null;
         }

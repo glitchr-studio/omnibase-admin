@@ -29,6 +29,14 @@ final class SlugField implements FieldInterface
     public function setTargetFieldName(string $fieldName): self
     {
         $this->setCustomOption(self::OPTION_TARGET_FIELD_NAME, $fieldName);
+        // ...and forward it to the form type, which is what actually resolves
+        // the path. Every other setter here uses setFormTypeOption(); this one
+        // only recorded a custom option that nothing read, so SlugType's
+        // "target" stayed null, the template's path walk iterated an empty
+        // array, and data-slug-target fell back to the root form id
+        // ("crud_form") instead of the title input. The slug therefore never
+        // followed the title.
+        $this->setFormTypeOption('target', $fieldName);
 
         return $this;
     }

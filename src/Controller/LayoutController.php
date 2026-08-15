@@ -278,7 +278,40 @@ class LayoutController extends AbstractController
             return false;
         };
 
-        $found = $apply($array['items']);
+        // A parentKey scopes the search to that entry's own children. Action
+        // keys are only unique WITHIN a CRUD page - every page has a "new", a
+        // "delete" - and $apply recurses across the whole tree, so an
+        // unscoped lookup for key "new" would happily rewrite the first
+        // page's action it happened to reach. Used by per-action icon edits.
+        $scopedParentKey = $data['parentKey'] ?? null;
+        $found = false;
+
+        if (\is_string($scopedParentKey) && '' !== $scopedParentKey && 'actions' !== $field) {
+            foreach ($array['items'] as &$parent) {
+                if (($parent['key'] ?? null) !== $scopedParentKey) {
+                    continue;
+                }
+
+                $children = \is_array($parent['children'] ?? null) ? $parent['children'] : [];
+                $found = $apply($children);
+
+                if (!$found && \in_array($field, ['label', 'icon'], true)) {
+                    // First customization of an action that has never been
+                    // touched: the page entry exists (its order was saved) but
+                    // this child does not yet.
+                    $children[] = ['key' => $key, $field => $value];
+                    $found = true;
+                }
+
+                $parent['children'] = $children;
+                break;
+            }
+            unset($parent);
+        }
+
+        if (!$found) {
+            $found = $apply($array['items']);
+        }
 
         if (!$found) {
             // label/description edits target a CODE-DEFINED item (a menu

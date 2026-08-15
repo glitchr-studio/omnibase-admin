@@ -15,13 +15,43 @@
     {%- set items = raw|default([]) -%}
     {%- set limit = field.customOption('displayLimit') ?? 2 -%}
     {%- set total = items|length -%}
+    {#- displayLimit(0) means "just say how many": the admin being replaced renders
+        a to-many whose labels carry no useful summary (a Comment stringifies to
+        "<article title> - <author> - <timestamp>") as a bare count badge. Printing
+        two of those labels made the Comments column 1350px wide on its own and
+        pushed the whole datagrid nearly 2000px past its container. -#}
+    {%- if limit == 0 -%}
+        <span class="badge{{ total == 0 ? ' badge-muted' }}">{{ total }}</span>
+    {%- else -%}
+    {#- showFirst()/show() record NO_SHOW=0, SHOW_NAME_ONLY=1, SHOW_ICON_ONLY=2,
+        SHOW_ALL=3 - but nothing read them, so a field asking for icon-only chips
+        still rendered full labels. Tags does exactly that, and printing the names
+        made its column 286px against production's 84px of icon chips.
+        `showFirst` applies to the first chip, `show` to the rest. -#}
+    {%- set showFirstMode = field.customOption('showFirst') -%}
+    {%- set showRestMode = field.customOption('show') ?? showFirstMode -%}
     <span class="badge-list">
+        {#- Chips are summaries, not the record. Long labels are elided so one
+            verbose association can't dictate the table's width. -#}
+        {%- set maxLength = field.customOption('maxLength') ?? 28 -%}
         {%- for item in items|slice(0, limit) -%}
             {%- set itemCrud = crudFqcnOption ?? admin_entity_crud(item) -%}
+            {%- set itemLabel = entityDisplay ? admin_entity_label(item, entityDisplay) : admin_display(item) -%}
+            {%- set itemLabel = '' ~ itemLabel -%}
+            {%- set shortLabel = itemLabel|length > maxLength ? itemLabel|slice(0, maxLength) ~ '…' : itemLabel -%}
+            {%- set mode = loop.first ? showFirstMode : showRestMode -%}
+            {%- set itemIcon = mode in [2, 3] ? admin_entity_icon(item) : null -%}
+            {#- Icon-only only holds when there IS an icon; otherwise keep the
+                label rather than emit an empty chip. -#}
+            {%- set withName = mode is null or mode in [1, 3] or (mode == 2 and not itemIcon) -%}
+            {%- set chipBody -%}
+                {%- if itemIcon %}<i class="{{ itemIcon }}"></i>{% endif -%}
+                {%- if withName %}{{ shortLabel }}{% endif -%}
+            {%- endset -%}
             {%- if itemCrud and item.id is defined -%}
-                <a class="badge" href="{{ admin_url(itemCrud, 'detail', admin_entity_id(item)) }}">{{ entityDisplay ? admin_entity_label(item, entityDisplay) : admin_display(item) }}</a>
+                <a class="badge{{ itemIcon and not withName ? ' badge-icon' }}" href="{{ admin_url(itemCrud, 'detail', admin_entity_id(item)) }}" title="{{ itemLabel }}">{{ chipBody }}</a>
             {%- else -%}
-                <span class="badge">{{ entityDisplay ? admin_entity_label(item, entityDisplay) : admin_display(item) }}</span>
+                <span class="badge{{ itemIcon and not withName ? ' badge-icon' }}" title="{{ itemLabel }}">{{ chipBody }}</span>
             {%- endif -%}
         {%- endfor -%}
         {%- if total > limit -%}
@@ -31,11 +61,18 @@
             <span class="badge-muted">—</span>
         {%- endif -%}
     </span>
+    {%- endif -%}
 {%- else -%}
+    {#- Same elision as the chips above: a to-ONE association had none, so a
+        Comment's parent article title made the "Parent" column 504px on its own
+        and pushed the grid ~700px past its container. -#}
     {%- set rawCrud = crudFqcnOption ?? admin_entity_crud(raw) -%}
+    {%- set maxLength = field.customOption('maxLength') ?? 40 -%}
+    {%- set rawLabel = '' ~ (entityDisplay ? admin_entity_label(raw, entityDisplay) : admin_display(raw)) -%}
+    {%- set shortRaw = rawLabel|length > maxLength ? rawLabel|slice(0, maxLength) ~ '…' : rawLabel -%}
     {%- if rawCrud and raw.id is defined -%}
-        <span class="field-association"><a href="{{ admin_url(rawCrud, 'detail', admin_entity_id(raw)) }}">{{ entityDisplay ? admin_entity_label(raw, entityDisplay) : admin_display(raw) }}</a></span>
+        <span class="field-association"><a href="{{ admin_url(rawCrud, 'detail', admin_entity_id(raw)) }}" title="{{ rawLabel }}">{{ shortRaw }}</a></span>
     {%- else -%}
-        {{ entityDisplay ? admin_entity_label(raw, entityDisplay) : admin_display(raw) }}
+        <span title="{{ rawLabel }}">{{ shortRaw }}</span>
     {%- endif -%}
 {%- endif -%}

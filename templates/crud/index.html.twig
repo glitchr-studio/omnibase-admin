@@ -79,8 +79,8 @@
             {% if action.crudActionName == 'new' and new_variants is defined and new_variants|length > 1 %}
                 {# inheritance-tree entity: creating means choosing WHICH
                    concrete subclass - the historical discriminator dropdown #}
-                <details class="new-dropdown"{% if _editable %} data-action-key="{{ action.name }}"{% endif %}>
-                    <summary class="btn btn-primary">{% if action.icon %}<i class="{{ action.icon }}"></i> {% endif %}{{ action.label|trans }} <i class="fa-solid fa-caret-down"></i></summary>
+                <details class="new-dropdown" data-primary-action{% if _editable %} data-action-key="{{ action.name }}" data-action-page="{{ crud_page_key }}" data-page-icon data-page-icon-value="{{ crud_action_icons[action.name] ?? action.icon }}"{% endif %}>
+                    <summary class="btn btn-primary">{% set _icon = crud_action_icons[action.name] ?? action.icon %}{% if _icon %}<i class="{{ _icon }}"></i> {% endif %}{{ action.label|trans }} <i class="fa-solid fa-caret-down"></i></summary>
                     <div class="new-dropdown-menu">
                         {% for variant in new_variants %}
                             <a href="{{ variant.url }}">{{ variant.label }}</a>
@@ -94,8 +94,8 @@
                    too just duplicated it verbatim on every rendered button
                    (found live: class="btn btn-primary action-new btn btn-
                    primary" on every list page's own create button). #}
-                <a class="{{ action.cssClass }}" href="{{ admin_url(controller_fqcn, action.crudActionName ?? 'new') }}"{% if _editable %} data-action-key="{{ action.name }}"{% endif %}>
-                    {% if action.icon %}<i class="{{ action.icon }}"></i> {% endif %}{{ action.label|trans }}
+                <a class="{{ action.cssClass }}"{% if action.crudActionName == 'new' %} data-primary-action{% endif %} href="{{ admin_url(controller_fqcn, action.crudActionName ?? 'new') }}"{% if _editable %} data-action-key="{{ action.name }}" data-action-page="{{ crud_page_key }}" data-page-icon data-page-icon-value="{{ crud_action_icons[action.name] ?? action.icon }}"{% endif %}>
+                    {% set _icon = crud_action_icons[action.name] ?? action.icon %}{% if _icon %}<i class="{{ _icon }}"></i> {% endif %}{{ action.label|trans }}
                 </a>
             {% endif %}
         {% endfor %}
@@ -200,7 +200,10 @@
             <th class="batch"><input type="checkbox" onclick="this.closest('table').querySelectorAll('tbody input[type=checkbox]').forEach(c => c.checked = this.checked); this.closest('form').querySelector('.batch-toolbar').hidden = !this.checked;"></th>
             {% for field in fields|filter(f => f.isDisplayedOn('index')) %}
                 {% set direction = sort[field.property]|default(null) %}
-                <th style="{{ field.textAlign ? 'text-align:' ~ field.textAlign }}">
+                {#- cell-id pins the identifier column while the grid scrolls
+                    sideways (see .datagrid td.cell-id). Keyed off the field's
+                    own property so it follows the ID wherever it is ordered. -#}
+                <th class="{{ field.property == 'id' ? 'cell-id' }}" style="{{ field.textAlign ? 'text-align:' ~ field.textAlign }}">
                     {% if field.isSortable is not defined or field.isSortable != false %}
                         <a href="{{ admin_url(controller_fqcn, 'index', null, {'sort': {(field.property): direction == 'ASC' ? 'DESC' : 'ASC'}}) }}">
                             {{ field.label ?? field.property|humanize }}
@@ -220,7 +223,7 @@
                 <td class="batch"><input type="checkbox" name="batchIds[]" value="{{ row.entity.id }}"
                     onclick="this.closest('form').querySelector('.batch-toolbar').hidden = !this.closest('table').querySelector('tbody input:checked');"></td>
                 {% for field in row.fields %}
-                    <td class="{{ field.cssClass }}" style="{{ field.textAlign ? 'text-align:' ~ field.textAlign }}">
+                    <td class="{{ field.cssClass }} {{ field.property == 'id' ? 'cell-id' }}" style="{{ field.textAlign ? 'text-align:' ~ field.textAlign }}">
                         {{ include(['@Admin/' ~ field.templateName ~ '.html.twig', '@Admin/crud/field/text.html.twig'], {field: field, entity: row.entity}) }}
                     </td>
                 {% endfor %}

@@ -1,0 +1,13 @@
+{#- One lazily-loaded slice of an embedded collection.
+
+    Rendered by AbstractCrudController::collectionEntries() and injected into
+    the existing .form-collection-items list by the loader in layout.html.twig.
+    Only the entries themselves - no wrapper, no <form> - so the markup drops
+    straight in beside the ones the initial page already rendered.
+
+    form_row per entry (not form_widget) so each keeps the same accordion
+    shell, label wrapper and per-entry action buttons as a normally rendered
+    one; a lazily fetched entry must be indistinguishable from an eager one. -#}
+{% for entry in entries %}
+    {{- form_row(entry) -}}
+{% endfor %}

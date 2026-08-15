@@ -10,7 +10,12 @@
     back to the plain badge for anything that isn't an object (a scalar
     choice/enum value), which is what keeps this macro safe to use for
     every iterable case rather than only associations. -#}
-{%- macro entity(item, choices, enumClass, entityDisplay, crudFqcn) -%}
+{#- `mode` mirrors AssociationField's showFirst()/show() contract:
+    0 NO_SHOW, 1 SHOW_NAME_ONLY, 2 SHOW_ICON_ONLY, 3 SHOW_ALL, null = name only
+    (the historical default). Those options were recorded by the field and read
+    by nothing, so a column asking for icon-only chips still printed full names -
+    Tags did, at 286px against production's 84px of icon chips. -#}
+{%- macro entity(item, choices, enumClass, entityDisplay, crudFqcn, mode) -%}
     {%- if not entityDisplay and not crudFqcn and not admin_entity_crud(item) -%}
         {#- Neither option configured: the historical path, untouched. A
             plain choice/enum SelectField must keep its icon+colour badge. -#}
@@ -19,14 +24,23 @@
         {%- set label = admin_entity_label(item, entityDisplay ?: 'username') -%}
         {%- set crudFqcn = crudFqcn ?? admin_entity_crud(item) -%}
         {%- set avatar = 'avatar' == entityDisplay ? admin_entity_avatar(item) : null -%}
+        {%- set icon = mode in [2, 3] ? admin_entity_icon(item) : null -%}
+        {#- Icon-only is a request, not a guarantee: an entity with no icon of its
+            own (Tag has none) would render a completely empty chip. Fall back to
+            the name so the chip always says something. -#}
+        {%- set withName = mode is null or mode in [1, 3] or (mode == 2 and not icon) -%}
+        {%- set body -%}
+            {%- if avatar -%}<img class="badge-avatar" src="{{ avatar }}" alt="{{ label }}">
+            {%- else -%}
+                {%- if icon %}<i class="{{ icon }}"></i>{% endif -%}
+                {%- if withName %}{{ label }}{% endif -%}
+            {%- endif -%}
+        {%- endset -%}
+        {%- set chipClass = 'badge badge-accent badge-entity' ~ (icon and not withName ? ' badge-icon' : '') -%}
         {%- if crudFqcn and item is not null and item.id is defined -%}
-            <a class="badge badge-accent badge-entity" href="{{ admin_url(crudFqcn, 'detail', admin_entity_id(item)) }}" title="{{ label }}">
-                {%- if avatar %}<img class="badge-avatar" src="{{ avatar }}" alt="{{ label }}">{% else %}{{ label }}{% endif -%}
-            </a>
+            <a class="{{ chipClass }}" href="{{ admin_url(crudFqcn, 'detail', admin_entity_id(item)) }}" title="{{ label }}">{{ body }}</a>
         {%- else -%}
-            <span class="badge badge-accent badge-entity" title="{{ label }}">
-                {%- if avatar %}<img class="badge-avatar" src="{{ avatar }}" alt="{{ label }}">{% else %}{{ label }}{% endif -%}
-            </span>
+            <span class="{{ chipClass }}" title="{{ label }}">{{ body }}</span>
         {%- endif -%}
     {%- endif -%}
 {%- endmacro -%}
@@ -55,6 +69,8 @@
 {%- if raw is null or raw == '' or (raw is iterable and raw|length == 0) -%}
     <span class="badge-muted">—</span>
 {%- elseif raw is iterable -%}
+    {%- set showFirstMode = field.customOption('showFirst') -%}
+    {%- set showRestMode = field.customOption('show') ?? showFirstMode -%}
     <span class="badge-list">
         {%- for item in raw -%}
             {#- a to-many association's raw value is a collection of real
@@ -71,7 +87,7 @@
                usernames ("NN") with no way to click through. Neither is
                set by default, so a plain choice/enum SelectField renders
                exactly as before. #}
-            {{ _self.entity(item, choices, enumClass, entityDisplay, crudFqcn ?? admin_entity_crud(item)) }}
+            {{ _self.entity(item, choices, enumClass, entityDisplay, crudFqcn ?? admin_entity_crud(item), loop.first ? showFirstMode : showRestMode) }}
         {%- endfor -%}
     </span>
 {%- elseif raw is not iterable and raw.id is defined -%}
@@ -81,7 +97,7 @@
         single-valued association was the one shape that never linked while
         every to-many one did. Same macro as the collection above, so the two
         cannot drift. -#}
-    {{ _self.entity(raw, choices, enumClass, entityDisplay, crudFqcn ?? admin_entity_crud(raw)) }}
+    {{ _self.entity(raw, choices, enumClass, entityDisplay, crudFqcn ?? admin_entity_crud(raw), field.customOption('showFirst')) }}
 {%- else -%}
     {{ _self.badge(field.formattedValue, choices, enumClass) }}
 {%- endif -%}

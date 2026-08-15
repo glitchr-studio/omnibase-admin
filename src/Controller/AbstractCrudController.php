@@ -415,6 +415,68 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         ]);
     }
 
+    /**
+     * One slice of an embedded collection, rendered on demand.
+     *
+     * Collections are capped (CollectionType::$max_entries) because every entry
+     * is a full sub-form whose relations get hydrated - measured at ~3 queries
+     * each, so an unbounded collection is an unbounded query count. The cap
+     * bounds the initial page; this renders the rest when the operator actually
+     * asks for it.
+     *
+     * The form is rebuilt with the collection WINDOWED to the requested slice,
+     * so this request pays for that slice only. array_slice preserves keys in
+     * CollectionType, so a lazily fetched entry keeps its real index and still
+     * binds to the right slot when the parent form is submitted.
+     */
+    public function collectionEntries(Request $request, string $entityId, string $field): Response
+    {
+        $crud = $this->getCrudConfig(Crud::PAGE_EDIT, Action::EDIT);
+        $this->denyAccessUnlessGrantedToRun($crud);
+
+        $entity = $this->findEntity($entityId);
+        $offset = max(0, $request->query->getInt('offset'));
+        $limit = min(50, max(1, $request->query->getInt('limit', 10)));
+
+        // Work on DESCRIPTORS, not the field objects: getFields() yields
+        // FieldInterface instances (IdField, SelectField...), and only their
+        // DTO exposes getProperty(). FieldFormBuilder performs the same
+        // conversion, and accepts either shape, so passing descriptors through
+        // produces byte-identical field names to the full form.
+        $fields = [];
+        foreach ($this->getFields(Crud::PAGE_EDIT) as $candidate) {
+            $fields[] = $candidate instanceof FieldInterface ? $candidate->getAsDto() : $candidate;
+        }
+
+        $target = null;
+        foreach ($fields as $candidate) {
+            if ($candidate->getProperty() === $field) {
+                $target = $candidate;
+                break;
+            }
+        }
+
+        if (null === $target) {
+            throw $this->createNotFoundException(sprintf('No field "%s" on this CRUD.', $field));
+        }
+
+        // Window THIS field only; every other field keeps its normal options so
+        // the generated names stay identical to the ones the full form emits.
+        $target->setFormTypeOption('entry_offset', $offset);
+        $target->setFormTypeOption('max_entries', $limit);
+
+        $form = $this->fieldFormBuilder->createForm($entity, $fields, FieldDescriptor::PAGE_EDIT, $crud->getEditFormOptions());
+
+        $child = $form->get($field);
+        if ($child->has('_collection')) {
+            $child = $child->get('_collection');
+        }
+
+        return $this->render('@Admin/crud/_collection_entries.html.twig', [
+            'entries' => $child->createView(),
+        ]);
+    }
+
     public function delete(Request $request, string $entityId): Response
     {
         $crud = $this->getCrudConfig(Crud::PAGE_INDEX, Action::DELETE);
@@ -842,9 +904,17 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         // an action with no stored position sorts after the known ones,
         // so a newly added action appears at the end instead of vanishing.
         $order = [];
+        // ...and action name => custom icon class, from the same children.
+        // An action the superadmin never re-iconed simply has no entry and
+        // the template falls back to the icon the CRUD declared in code.
+        $icons = [];
         foreach (\is_array($item['children'] ?? null) ? $item['children'] : [] as $position => $child) {
             if (\is_string($child['key'] ?? null) && '' !== $child['key']) {
                 $order[$child['key']] = $position;
+
+                if (\is_string($child['icon'] ?? null) && '' !== $child['icon']) {
+                    $icons[$child['key']] = $child['icon'];
+                }
             }
         }
 
@@ -852,6 +922,7 @@ abstract class AbstractCrudController extends AbstractController implements Crud
             'crud_page_key' => $slug,
             'crud_page' => $item,
             'crud_action_order' => $order,
+            'crud_action_icons' => $icons,
         ];
     }
 

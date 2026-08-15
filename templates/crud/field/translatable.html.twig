@@ -13,10 +13,13 @@
     {%- set translated = attribute(raw, app.localizer.locale) ?? raw|first -%}
 {%- endif -%}
 {%- set shown = translated is not null ? attribute(translated, showField) : null -%}
+{#- No leading glyph: the admin being replaced renders this cell as plain
+    text (`<span>Petit cours de prononciat…</span>`). A fa-language marker in
+    front of every row said the same thing 20 times and read as noise against
+    the actual titles - the column header already says "Translations". -#}
 <span class="field-translatable">
-    <i class="fa-solid fa-language badge-muted" title="{{ 'field.translatable'|trans({}, 'admin') }}"></i>
     {%- if shown is not null and shown != '' -%}
-        {%- set max = field.customOption('maxLength') ?? 50 -%}
+        {%- set max = field.customOption('maxLength') ?? 32 -%}
         {%- set shown = '' ~ shown -%}
         {{ shown|length > max ? shown|slice(0, max) ~ '…' : shown }}
     {%- elseif raw is iterable -%}
@@ -28,7 +31,7 @@
         {%- endif -%}
     {%- else -%}
         {%- set value = field.formattedValue -%}
-        {%- set max = field.customOption('maxLength') ?? 50 -%}
+        {%- set max = field.customOption('maxLength') ?? 32 -%}
         {%- if value is null or value == '' -%}
             <span class="badge-muted">—</span>
         {%- else -%}
