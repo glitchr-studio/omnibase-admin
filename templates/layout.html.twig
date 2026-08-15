@@ -4709,6 +4709,20 @@
                 .then(function (html) {
                     list.insertAdjacentHTML('beforeend', html);
 
+                    // Extend the rendered-set declaration with the indices this
+                    // slice brought in - the server restores anything OUTSIDE
+                    // the set on submit, so an unreported fetched entry would be
+                    // "restored" over the operator's own edits/deletion of it.
+                    var reg = btn.parentNode.querySelector('[data-collection-rendered]');
+                    if (reg) {
+                        var have = reg.value ? reg.value.split(',') : [];
+                        var m2, rx = /\[_collection\]\[(\d+)\]/g;
+                        while ((m2 = rx.exec(html))) {
+                            if (have.indexOf(m2[1]) < 0) have.push(m2[1]);
+                        }
+                        reg.value = have.join(',');
+                    }
+
                     loaded = Math.min(total, loaded + limit);
                     btn.dataset.loaded = String(loaded);
 

@@ -848,10 +848,23 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                 return (form.length ? form[0] : undefined);
             case "INPUT":
             case "BUTTON":
+                // The HTML `form` attribute wins, and is checked FIRST: a submit
+                // control is allowed to live outside the form it submits, and the
+                // admin's action bar does exactly that (it is hoisted into the
+                // topbar). Walking up the ancestors finds nothing there, so the
+                // Save button reported "No form found upstream" and never
+                // submitted - the attribute names the form explicitly.
+                var owned = el.getAttribute && el.getAttribute("form");
+                if (owned) {
+                    var byId = document.getElementById(owned);
+                    if (byId && byId.tagName === "FORM") return byId;
+                }
+
                 var form = $(el).closest("form");
                 if (form.length) return form[0];
 
-                var formName = $(el).attr("name").split("[")[0];
+                var formName = ($(el).attr("name") || "").split("[")[0];
+                if (!formName) return undefined;
                 form = $("form[name="+formName+"]");
                 return (form.length ? form[0] : undefined);
         }
@@ -2489,6 +2502,24 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
 
                     for(var i = 0; i < this.files.length; i++)
                         data.append(this.name, this.files[i]);
+
+                } else if(this.type == "select-multiple") {
+
+                    // `this.value` on a multi-select is the FIRST selected
+                    // option only - and "" when nothing is selected. That
+                    // submitted followers as [""], which the server then tried
+                    // to hydrate into a User ("Expected value of type User,
+                    // got string"), and silently dropped every selection past
+                    // the first on populated multi-selects. Serialize like a
+                    // native submit: one entry per selected option, none when
+                    // empty.
+                    for(var i = 0; i < this.selectedOptions.length; i++)
+                        data.append(this.name, this.selectedOptions[i].value);
+
+                } else if((this.type == "checkbox" || this.type == "radio") && !this.checked) {
+
+                    // Native submits omit unchecked boxes; appending their
+                    // value regardless made every switch read as ON.
 
                 } else data.append(this.name, this.value);
             });
