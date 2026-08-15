@@ -849,10 +849,13 @@
             color: color-mix(in srgb, var(--btn-tone) 85%, var(--admin-text));
             transform: translateY(1px); box-shadow: none; }
 
-        {# Tier 1 - the cap, filled in the button's own tone. Scoped to the one
-           committing action: the first control in a page's action bar, and a
-           modal's confirm. Everything else stays neutral above. #}
-        .global-actions .btn[data-primary-action],
+        {# Tier 1 - the key caps. Three kinds of button earn one: the marked
+           primary action, any real submit (both "Enregistrer" variants - two
+           ways to commit are two keys), and the record's "Voir" link, which
+           carries the accent tone since it has no variant class. Icon-only
+           buttons (the trash is a submit too) stay flat - a cap needs a face
+           wide enough to read as one. #}
+        .global-actions .btn:is([data-primary-action], button[type="submit"]:not(.btn-icon), .action-detail),
         .admin-confirm-actions .btn-danger, .admin-confirm-actions .btn-primary,
         .modal-footer .btn-primary, .modal-footer .btn-success, .modal-footer .btn-danger {
             {# Measured off gandi's Log in at REST, which is the shape being asked
@@ -873,7 +876,7 @@
             padding-bottom: calc(.45rem + 4px); transform: none;
             box-shadow: inset 0 -4px 0 0 var(--btn-edge),
                         0 4px 3px 0 color-mix(in srgb, var(--btn-tone) 14%, transparent); }
-        .global-actions .btn[data-primary-action]:hover,
+        .global-actions .btn:is([data-primary-action], button[type="submit"]:not(.btn-icon), .action-detail):hover,
         .admin-confirm-actions .btn-danger:hover, .admin-confirm-actions .btn-primary:hover,
         .modal-footer .btn-primary:hover, .modal-footer .btn-success:hover, .modal-footer .btn-danger:hover {
             background: color-mix(in srgb, var(--btn-tone) 14%, var(--admin-surface));
@@ -885,7 +888,7 @@
            than dropping the inset outright) reads as depressed instead of gone
            flat, and darkening matters because :active is also :hover - the hover
            brightness alone made a pressed key come out lighter than a resting one. #}
-        .global-actions .btn[data-primary-action]:active,
+        .global-actions .btn:is([data-primary-action], button[type="submit"]:not(.btn-icon), .action-detail):active,
         .admin-confirm-actions .btn-danger:active, .admin-confirm-actions .btn-primary:active,
         .modal-footer .btn-primary:active, .modal-footer .btn-success:active, .modal-footer .btn-danger:active {
             padding-bottom: calc(.45rem + 1px); transform: translateY(3px);
@@ -1251,6 +1254,17 @@
            mentions anything specific to this page). #}
         form.admin-form .system-form-body .form-password > .form-group { padding: 0; }
         form.admin-form .label-wrapper { display: flex; align-items: center; gap: .4rem; margin-bottom: .3rem; }
+        {# Two rows of textarea reads as a slot for a filename, not a paragraph -
+           Excerpt is prose. Height, not rows: the attribute comes from the form
+           theme and varies per field. #}
+        form.admin-form textarea { min-height: 6.5rem; resize: vertical; }
+        {# base-async draws the collection frame in hardcoded `lightgrey` (and
+           its entry separators in `lightgrey !important`). Invisible on a light
+           page, glowing on a dark one. Retinted with the theme tokens - the
+           separator override must carry !important to outrank theirs. #}
+        form.admin-form .form-collection { border-color: var(--admin-border); border-radius: 6px; }
+        form.admin-form .form-collection .form-collection-items .form-collection-item:not(.form-collection-item-last) {
+            border-bottom-color: var(--admin-border) !important; }
         {# Collapsible collection entries. The markup is Bootstrap's accordion
            (data-bs-toggle="collapse" + .accordion-collapse.collapse), but this
            admin ships no Bootstrap, so neither the CSS that hides a collapsed
