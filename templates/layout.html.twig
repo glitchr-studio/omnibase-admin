@@ -757,13 +757,17 @@
            action bar left less room than that. Flex can only distribute space
            that exists, so the focused search now takes UP TO 26rem and stops
            where its neighbours begin - nothing overflows to hide. #}
-        .admin-topbar .topbar-search { flex: 0 1 420px; min-width: 9rem; transition: flex-basis .18s ease; }
+        .admin-topbar .topbar-search { flex: 0 1 420px; min-width: 6rem; transition: flex-basis .18s ease; }
         .admin-topbar:has(.global-actions) .topbar-search { flex-basis: 13rem; }
         .admin-topbar .topbar-search:focus-within { flex-basis: 26rem; }
         .admin-topbar .topbar-search input { width: 100%; }
         .admin-topbar .global-actions {
             margin-left: auto; display: flex; align-items: center; flex-wrap: nowrap;
-            gap: .4rem; flex: 0 1 auto; min-width: 0;
+            {# NEVER shrinks: its buttons cannot compress, so letting the box
+               shrink below its content made the buttons spill across the
+               separator into the icon cluster. The search is the elastic
+               element - it shrinks first (min-width below). #}
+            gap: .4rem; flex: 0 0 auto;
             {# " | " between the groups: search | crud actions | user+settings.
                Drawn as hairlines on the bar itself rather than markup, so they
                exist exactly when the action bar does. #}
@@ -1272,7 +1276,17 @@
            its entry separators in `lightgrey !important`). Invisible on a light
            page, glowing on a dark one. Retinted with the theme tokens - the
            separator override must carry !important to outrank theirs. #}
-        form.admin-form .form-collection { border-color: var(--admin-border); border-radius: 6px; }
+        {# overflow: clip is what makes the rounding REAL - the first and last
+           entry are square boxes, and without clipping their corners poke
+           through the frame's radius. Entries then drop their own borders in
+           favour of hairline separators, so the group reads as one rounded
+           panel of rows rather than a stack of boxes. #}
+        form.admin-form .form-collection { border-color: var(--admin-border); border-radius: 8px; overflow: clip; }
+        form.admin-form .form-collection .accordion-item {
+            border: 0; border-radius: 0; margin-bottom: 0; }
+        form.admin-form .form-collection .form-collection-item + .form-collection-item .accordion-item,
+        form.admin-form .form-collection .accordion-item + .accordion-item {
+            border-top: 1px solid var(--admin-border); }
         form.admin-form .form-collection .form-collection-items .form-collection-item:not(.form-collection-item-last) {
             border-bottom-color: var(--admin-border) !important; }
         {# Collapsible collection entries. The markup is Bootstrap's accordion
@@ -1291,7 +1305,11 @@
             display: flex; align-items: center; gap: .5rem; width: 100%; text-align: left;
             padding: .5rem .7rem; border: 0; background: none; color: inherit; font: inherit;
             cursor: pointer; }
-        form.admin-form .accordion-button:hover { background: var(--admin-bg); }
+        {# Row-level hover: the whole entry tints, not just the header strip, and
+           nothing about it may move - background only, no border/padding/size
+           change anywhere in the hover path. #}
+        form.admin-form .accordion-button:hover { background: color-mix(in srgb, var(--admin-accent) 6%, var(--admin-bg)); }
+        form.admin-form .accordion-item:has(> .accordion-header > .accordion-button:hover) { background: var(--admin-bg); }
         {# The chevron IS the affordance - without Bootstrap's own ::after there
            was nothing to say a row could be opened. Rotates when expanded. #}
         form.admin-form .accordion-button::after {
@@ -1327,7 +1345,7 @@
         form.admin-form .form-collection-item a:has(> i:only-child),
         form.admin-form .form-collection-items a:has(> i:only-child) {
             display: inline-flex; align-items: center; justify-content: center;
-            width: 1.7rem; height: 1.6rem; border: 0; border-radius: 3px;
+            width: 1.9rem; height: 1.8rem; border: 0; border-radius: 5px;
             background: transparent; color: var(--admin-muted); text-decoration: none;
             transition: background .12s ease, color .12s ease; }
         form.admin-form .form-collection-item a:has(> i:only-child):hover,
@@ -1338,7 +1356,7 @@
         form.admin-form .form-collection-items a:has(> i:only-child):active {
             background: color-mix(in srgb, var(--admin-accent) 17%, transparent); }
         form.admin-form .form-collection-item a > i, form.admin-form .form-collection-items a > i {
-            font-size: .78rem; }
+            font-size: .9rem; }
         {# The translatable group carries padding-left:15px to indent its fields
            under the locale tab strip. renderSingleLocale() hides that strip, so
            the indent had nothing to sit under and every sub-field from Title
@@ -4667,6 +4685,12 @@
                 var bar = document.querySelector('.admin-header .global-actions');
                 var topbar = document.querySelector('.admin-topbar');
                 if (!bar || !topbar) return;
+
+                // Narrow viewports keep the bar in the header, where it may
+                // wrap onto its own full-width line (see the max-width:720px
+                // rules) - the topbar cannot fit search + actions + icons on
+                // a phone, and unlike the header it is not allowed to wrap.
+                if (window.innerWidth < 900) return;
 
                 var icons = topbar.querySelector('.admin-topbar-icons');
                 if (icons) topbar.insertBefore(bar, icons);
