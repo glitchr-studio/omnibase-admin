@@ -829,9 +829,10 @@
         .btn { display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
                {# line-height set explicitly: an <a> inherits the body's 1.5 while
                   a <button> computes `normal` (~1.2), so two caps sitting side by
-                  side rendered 36px and 42px tall. One declared value, one height,
-                  whatever element a button happens to be. #}
-               line-height: 1.5;
+                  side rendered 36px and 42px tall. Declared at 1.2 - the compact
+                  height the original button had - so every control matches it
+                  whatever element it happens to be. #}
+               line-height: 1.2;
                padding: .45rem .9rem; border-radius: 3px; border: 1px solid var(--admin-border);
                background: transparent; color: inherit; text-decoration: none; font-size: .9rem;
                cursor: pointer; transition: background .12s ease, border-color .12s ease, color .12s ease, box-shadow .12s ease; }
