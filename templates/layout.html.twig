@@ -87,6 +87,11 @@
                 --admin-bg: #16181d; --admin-surface: #1e2127; --admin-border: #2c3038;
                 --admin-text: #e6e8eb; --admin-muted: #8b94a1; --admin-accent: #6ea8fe;
                 --admin-danger: #f87171; --admin-success: #4ade80; --admin-warning: #fbbf24;
+                {# base-bundle's form-type-editor.css reads this to repaint
+                   EditorJS headings, hardcoded black otherwise (invisible
+                   against this dark background - reported live on an
+                   article's content field). #}
+                --editor-heading-color: var(--admin-text);
             }
         }
         :root[data-theme="dark"] {
@@ -94,6 +99,7 @@
             --admin-bg: #16181d; --admin-surface: #1e2127; --admin-border: #2c3038;
             --admin-text: #e6e8eb; --admin-muted: #8b94a1; --admin-accent: #6ea8fe;
             --admin-danger: #f87171; --admin-success: #4ade80; --admin-warning: #fbbf24;
+            --editor-heading-color: var(--admin-text);
         }
         {# Sticky at top:0 with no shadow, only a 1px border, gave the bar no
            visual weight of its own - at rest (no scroll needed, the negative
