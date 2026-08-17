@@ -2492,11 +2492,40 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
             if(formAmbiguity) formInput = $(form).find(":input, [name^='"+form.name+"\[']");
             else formInput = $("form[name='"+form.name+"'] :input, [name^='"+form.name+"\[']");
 
+            // Both clauses above require actual DOM nesting inside <form> -
+            // but the admin's own save/save-and-continue/delete buttons are
+            // deliberately hoisted OUT of the form into the topbar, linked
+            // back only via the HTML5 `form="admin-form"` attribute (see
+            // _form.html.twig's own comment on this). Neither selector
+            // clause can see them there, so `submit_action` was NEVER
+            // appended for ANY of them regardless of which one was clicked -
+            // the server's redirectAfterSubmit() always fell back to its
+            // default (plain save, back to the index), even when "Enregistrer
+            // et continuer" was the one pressed (reported live). Elements
+            // explicitly bound via the `form` attribute are real form
+            // participants per the HTML5 spec even when they live elsewhere
+            // in the document, so this adds them back in regardless of
+            // position - .add() dedupes, so anything already matched above
+            // (a field genuinely inside the form that ALSO carries a
+            // redundant form="..." attribute) isn't counted twice.
+            if (form.id) formInput = formInput.add($("[form='"+form.id+"']"));
+
             formInput.each(function() {
 
                 if(this.tagName == "BUTTON") {
 
-                    if(this == e.target) data.append(this.name, this.value);
+                    // Was `this == e.target`: a button's own icon/label markup
+                    // (e.g. <button><i class="..."></i> Enregistrer et
+                    // continuer</button>) puts a nested <i> in the way, and a
+                    // click landing on THAT sets e.target to the icon, not the
+                    // button - the exact-equality check then silently dropped
+                    // submit_action, so the server fell back to its default
+                    // (plain "save", back to the index) even though the right
+                    // button was clicked (reported live: "save and continue"
+                    // landing on the index). contains() still resolves to
+                    // exactly one button, since buttons are siblings here, not
+                    // nested in each other.
+                    if(this.contains(e.target)) data.append(this.name, this.value);
 
                 } else if(this.type == "file") {
 
