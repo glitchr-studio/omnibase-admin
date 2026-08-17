@@ -93,6 +93,7 @@ action:
     detail: Voir
     delete: Supprimer
     delete_confirm: Voulez-vous vraiment supprimer cet élément ?
+    confirm_again: Cliquez à nouveau pour confirmer
     save: Enregistrer
     create: Créer
     save_and_continue: Enregistrer et continuer

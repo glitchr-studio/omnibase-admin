@@ -42,9 +42,12 @@
        sortable set - they are page controls, not entity actions, and the
        stored order only ever names real action keys. #}
     <div class="global-actions"{% if _editable %} data-action-row data-page-key="{{ crud_page_key }}"{% endif %}>
-        <form class="search-form" method="get" action="{{ admin_url(controller_fqcn, 'index') }}">
-            <input type="search" name="query" value="{{ query ?? '' }}" placeholder="{{ 'datagrid.search_placeholder'|trans({}, 'admin') }}">
-        </form>
+        {# No search field here anymore: this duplicated the topbar's own
+           persistent .topbar-search (layout.html.twig) verbatim - same
+           action URL, same "query" param, both rendered on screen at once
+           (reported live). That one already covers every CRUD page, not
+           just index, so this one was the redundant leftover, not the other
+           way round. #}
         {# Opens the filter panel below. Sits before the create action so the
            row reads search / filter / create, matching production. The count
            badge is what makes a collapsed panel honest: with the old always-

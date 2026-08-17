@@ -13,15 +13,32 @@
     {%- set translated = attribute(raw, app.localizer.locale) ?? raw|first -%}
 {%- endif -%}
 {%- set shown = translated is not null ? attribute(translated, showField) : null -%}
+{%- set max = field.customOption('maxLength') ?? 32 -%}
+{#- Full, untruncated text, computed BEFORE the tag opens (not inside its
+    body - the opening tag is already emitted by the time an {% if %}/{% set %}
+    further down would run, so a title set later never makes it onto the
+    tag). Only the two branches that actually truncate text populate this;
+    the collection-count badge already shows its full value as-is. -#}
+{%- set full = null -%}
+{%- if shown is not null and shown != '' -%}
+    {%- set full = '' ~ shown -%}
+{%- elseif raw is not iterable -%}
+    {%- set formatted = field.formattedValue -%}
+    {%- if formatted is not null and formatted != '' -%}
+        {%- set full = '' ~ formatted -%}
+    {%- endif -%}
+{%- endif -%}
 {#- No leading glyph: the admin being replaced renders this cell as plain
     text (`<span>Petit cours de prononciat…</span>`). A fa-language marker in
     front of every row said the same thing 20 times and read as noise against
     the actual titles - the column header already says "Translations". -#}
-<span class="field-translatable">
-    {%- if shown is not null and shown != '' -%}
-        {%- set max = field.customOption('maxLength') ?? 32 -%}
-        {%- set shown = '' ~ shown -%}
-        {{ shown|length > max ? shown|slice(0, max) ~ '…' : shown }}
+{#- title holds the FULL, untruncated text: the cell itself is clipped to
+    maxLength (32 chars) so a long title reads as "…", with no way to see
+    the rest short of opening the record - the native tooltip is the cheap
+    fix (reported live). -#}
+<span class="field-translatable"{% if full %} title="{{ full }}"{% endif %}>
+    {%- if full is not null -%}
+        {{ full|length > max ? full|slice(0, max) ~ '…' : full }}
     {%- elseif raw is iterable -%}
         {%- set count = raw|length -%}
         {%- if count == 0 -%}
@@ -30,13 +47,6 @@
             <span class="badge">{{ count }} {{ count != 1 ? 'field.items'|trans({}, 'admin') : 'field.item'|trans({}, 'admin') }}</span>
         {%- endif -%}
     {%- else -%}
-        {%- set value = field.formattedValue -%}
-        {%- set max = field.customOption('maxLength') ?? 32 -%}
-        {%- if value is null or value == '' -%}
-            <span class="badge-muted">—</span>
-        {%- else -%}
-            {%- set value = '' ~ value -%}
-            {{ value|length > max ? value|slice(0, max) ~ '…' : value }}
-        {%- endif -%}
+        <span class="badge-muted">—</span>
     {%- endif -%}
 </span>

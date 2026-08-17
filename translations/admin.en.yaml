@@ -93,6 +93,7 @@ action:
     detail: Show
     delete: Delete
     delete_confirm: Are you sure you want to delete this item?
+    confirm_again: Click again to confirm
     save: Save changes
     create: Create
     save_and_continue: Save and keep editing

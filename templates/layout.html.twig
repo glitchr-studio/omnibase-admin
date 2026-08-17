@@ -777,6 +777,19 @@
         {# Nothing in the topbar may push the icon cluster off the end. #}
         .admin-topbar .global-actions .btn { white-space: nowrap; }
         .admin-topbar-icons { flex: 0 0 auto; }
+        {# .admin-topbar-icons's own margin-left:auto (its base rule, further
+           up) is what pushes it to the far right on pages with NO
+           .global-actions in the topbar - but here .global-actions ALREADY
+           has its own margin-left:auto to pull itself away from the search
+           field. Two flex siblings each with margin-left:auto split the
+           available space between BOTH auto-margins instead of pooling it
+           into one gap - Filtres/Créer floating in the middle with a second
+           empty gap before the icon cluster, rather than the two groups
+           sitting together flush right (reported live). Cancelling it here
+           leaves global-actions as the only element absorbing the leftover
+           space, so everything after the search rides together as one
+           right-anchored group. #}
+        .admin-topbar:has(.global-actions) .admin-topbar-icons { margin-left: 0; }
         .admin-header .global-actions { margin-left: auto; display: flex; flex-wrap: wrap; justify-content: flex-end;
                                         gap: .4rem; flex: 0 0 auto; }
         .admin-header-titles { flex: 1 1 auto; min-width: 0; }
@@ -1177,6 +1190,16 @@
             background: var(--admin-bg); border-color: var(--admin-border); color: var(--admin-text);
         }
         :root[data-theme="dark"] .select2-results__option { color: var(--admin-text); }
+        {# Already-selected entries (shown disabled, greyed out in the
+           dropdown list under their own chip up top) - select2-bootstrap4's
+           theme paints these with a hardcoded near-white background
+           (#e9ecef) that was never re-themed, so in dark mode it read as
+           barely-legible light text on a near-white box (reported live on
+           the Tags field, e.g. an already-picked "Voyages" ghosting out
+           against a white row). #}
+        :root[data-theme="dark"] .select2-results__option[aria-selected="true"]:not(.select2-results__option--highlighted) {
+            background: var(--admin-bg); color: var(--admin-muted);
+        }
         :root[data-theme="dark"] .select2-results__option--highlighted { background: var(--admin-accent) !important; color: #fff !important; }
         :root[data-theme="dark"] .select2-results__group { color: var(--admin-muted); }
         @media (prefers-color-scheme: dark) {
@@ -1197,6 +1220,9 @@
                 background: var(--admin-bg); border-color: var(--admin-border); color: var(--admin-text);
             }
             :root:not([data-theme="light"]) .select2-results__option { color: var(--admin-text); }
+            :root:not([data-theme="light"]) .select2-results__option[aria-selected="true"]:not(.select2-results__option--highlighted) {
+                background: var(--admin-bg); color: var(--admin-muted);
+            }
             :root:not([data-theme="light"]) .select2-results__option--highlighted { background: var(--admin-accent) !important; color: #fff !important; }
             :root:not([data-theme="light"]) .select2-results__group { color: var(--admin-muted); }
         }
@@ -1604,12 +1630,106 @@
            "inherit Bootstrap's badge look" - Bootstrap isn't loaded here
            by design, so keyword/tag chips rendered as bare text (reported
            live). Full theme-selector specificity needed to outrank it. #}
+        {# padding is !important: base-async.css ships its own
+           `.select2-selection--multiple .select2-selection__choice { padding:
+           .075em !important }` (a public-site-oriented reset), which
+           silently collapsed this to ~1px on every side despite this rule's
+           own higher selector specificity - !important only defers to
+           specificity AMONG important declarations, so a plain declaration
+           here never had a chance. That near-zero padding is what put the
+           remove button flush against the chip's own rounded corner
+           (reported live: "too close to left") even after its own margin
+           was already zeroed out - the fix belongs here, not on the button. #}
         form.admin-form .select2-container--bootstrap4 .select2-selection--multiple .select2-selection__choice {
             background: var(--admin-bg); border: 1px solid var(--admin-border); border-radius: 5px;
-            padding: .05rem .45rem; margin-right: .3rem; color: inherit;
+            padding: .05rem .45rem !important; margin-right: .3rem; color: inherit;
         }
-        form.admin-form .select2-container--bootstrap4 .select2-selection--multiple .select2-selection__choice__remove { color: var(--admin-muted); }
-        form.admin-form .select2-container--bootstrap4 .select2-selection--multiple .select2-selection__choice__remove:hover { color: var(--admin-danger); }
+        {# The glyph alone had no hit-area or button affordance - a bare `×`
+           character sized off the chip's own font, sitting flush against
+           the icon/label with 3px of padding, so it read as stray
+           punctuation rather than a control (reported live). Sized and
+           shaped like the admin's other small delete controls (.item-remove
+           above: flex-centered square, rounded, solid danger fill on
+           hover instead of a color-only change) so it reads as the same
+           "remove" affordance everywhere it appears, just smaller to fit
+           the chip's own height. #}
+        {# align-self:center - the chip is a flex row with align-items left at
+           its browser default ("normal" -> stretch), and stretch has no
+           effect on a child with an explicit height, which this button has;
+           per spec it then falls back to flex-start, pinning the button to
+           the TOP of the chip instead of centering it. Combined with the
+           negative left margin below (meant to snug it against the chip's
+           own padding, but landing it flush against - and visually
+           overlapping - the chip's own rounded corner instead), this is
+           the "red outline not well-placed" reported live. #}
+        form.admin-form .select2-container--bootstrap4 .select2-selection--multiple .select2-selection__choice__remove {
+            display: flex; align-items: center; justify-content: center;
+            align-self: center;
+            width: 1.15rem; height: 1.15rem; margin: 0 .35rem 0 0;
+            padding: 0; border-radius: 4px; font-size: .8rem; line-height: 1;
+            color: var(--admin-muted); background: none; flex-shrink: 0;
+        }
+        form.admin-form .select2-container--bootstrap4 .select2-selection--multiple .select2-selection__choice__remove:hover {
+            background: var(--admin-danger); color: #fff;
+        }
+        {# Persistent (not hover-only) state for the click-to-arm/confirm
+           guard below - hover alone can't signal "armed", since the mouse
+           is still hovering the button in the exact same position right
+           after the first click as before it. Pulsing ring makes the
+           second, confirming click state visually distinct from plain hover. #}
+        form.admin-form .select2-selection__choice__remove.is-confirm-armed,
+        form.admin-form .select2-selection__clear.is-confirm-armed {
+            background: var(--admin-danger) !important; color: #fff !important;
+            animation: select2-confirm-pulse 1s ease-in-out infinite;
+        }
+        @keyframes select2-confirm-pulse {
+            0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--admin-danger) 55%, transparent); }
+            50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--admin-danger) 0%, transparent); }
+        }
+        {# select2-bootstrap4's own default: a hardcoded light-grey circle
+           (#c8c8c8) that never adapted to this admin's palette, reading as
+           an unstyled foreign element next to the chips' own themed remove
+           buttons (reported live: "circled in light grey and wrong").
+           Same square/rounded language as .select2-selection__choice__remove
+           above, so "clear everything" reads as the same family of control
+           as "remove one", just distinguished by position. #}
+        {# top/right/line-height are !important for the same reason as the
+           chip padding above: base-async.css's own
+           `.select2-selection--multiple .select2-selection__clear { top: 0
+           !important; right: .75em !important; line-height: 0 !important }`
+           otherwise wins despite this rule's higher specificity.
+
+           Fixed top offset, not the earlier top:50%/negative-margin
+           centering trick - centering is relative to the WHOLE selection
+           box, which grows taller every time the chips wrap to another row
+           (3+ tags), so the button drifted down into the gap between rows
+           instead of sitting at a stable top-right corner (reported live,
+           twice: "still vertically aligned" after the first attempt only
+           swapped which point it centered against). Anchoring to a fixed
+           .5rem from the top keeps it in the same place regardless of how
+           many rows the chips wrap to.
+
+           margin: 0 - the select2-bootstrap4 theme's own default carries a
+           `margin-top: .75em` (~11px) on this element that this rule never
+           contested (only top/right/line-height were, since those were the
+           properties fighting base-async's !important overrides); with no
+           competing declaration for margin-top at all, that ~11px silently
+           stacked ON TOP of the intended top:.5rem offset, landing the
+           button ~19px down instead - visually "too high a margin, not
+           well top-right aligned" even though top itself was correctly 8px
+           (still reported live after the top-anchoring fix, confirming
+           margin was the actual remaining culprit, found via computed
+           style, not the CSS source, since it never appeared in a
+           top/right-scoped rule search). #}
+        form.admin-form .select2-container--bootstrap4 .select2-selection--multiple .select2-selection__clear {
+            display: flex; align-items: center; justify-content: center;
+            width: 1.3rem; height: 1.3rem; top: .5rem !important; right: .5rem !important; margin: 0 !important;
+            border-radius: 4px; font-size: .85rem; line-height: 1 !important;
+            color: var(--admin-muted); background: var(--admin-bg); border: 1px solid var(--admin-border);
+        }
+        form.admin-form .select2-container--bootstrap4 .select2-selection--multiple .select2-selection__clear:hover {
+            background: var(--admin-danger); color: #fff; border-color: var(--admin-danger);
+        }
         form.admin-form .form-password-strength { display: flex; gap: .2rem; margin-top: .4rem; }
         form.admin-form .form-password-strength .strength { flex: 1; height: 3px; border-radius: 2px; background: var(--admin-border); }
         {# .form-password used to get its own bordered/padded box here too
@@ -1769,32 +1889,58 @@
            maintenance banner in particular, which is present on every
            render while the mode is on, permanently displaced the content
            under it (reported live: "should be absolute with an overlay,
-           but it is relative"). Fixed and centred near the top instead, so
-           a message appearing or clearing never reflows the page.
+           but it is relative"). Absolute against .admin-main instead, so a
+           message appearing or clearing never reflows the page (and, per
+           that column's own position:relative comment above, scrolls away
+           with the content it belongs to rather than chasing the reader
+           down the page like a viewport-fixed toast would).
+
+           Anchored to the top-right corner as a narrow stack, not a wide
+           bar spanning the column - a single-line confirmation like "Les
+           modifications ont été enregistrées." read as an oddly-placed
+           banner floating dead-center over the page (reported live), where
+           a toast in the corner is the shape readers expect a transient
+           confirmation to take.
 
            pointer-events:none on the stack, auto on each flash: the empty
-           column spans the width of the content and would otherwise
-           swallow clicks aimed at whatever is behind it. #}
-        .flashes { position: absolute; top: .5rem; left: 2rem; right: 2rem;
-                   z-index: 30; width: auto; max-width: 560px; margin: 0 auto;
-                   display: flex; flex-direction: column; gap: .4rem; pointer-events: none; }
-        .flash { padding: .6rem .9rem; border-radius: 6px; border: 1px solid var(--admin-border);
-                 background: var(--admin-surface); pointer-events: auto;
-                 box-shadow: 0 10px 30px rgba(0, 0, 0, .18); }
-        .flash-success { border-color: #86efac; background: #f0fdf4; color: #166534; }
-        .flash-warning { border-color: #fde68a; background: #fffbeb; color: #92400e; }
-        .flash-danger, .flash-error { border-color: #fecaca; background: #fef2f2; color: #991b1b; }
+           column would otherwise swallow clicks aimed at whatever is
+           behind it. #}
+        {# top offset clears .admin-topbar, not just a small gap from
+           .admin-main's own padding-box: the topbar sits INSIDE .admin-main
+           as its first child, pulled out to the full edge via a negative
+           margin equal to .admin-main's own padding (see .admin-topbar's
+           rule above) - so .admin-main's padding-box top is exactly where
+           the topbar itself starts, and a plain `top: .5rem` landed the
+           toast stack right on top of it (reported live: the toast
+           overlapped the search bar/action buttons). #}
+        .flashes { position: absolute; top: calc(3.3rem + .75rem); right: 0; z-index: 30;
+                   width: 100%; max-width: 22rem;
+                   display: flex; flex-direction: column; gap: .5rem; pointer-events: none; }
+        .flash { padding: .7rem .9rem; border-radius: 8px; border: 1px solid var(--admin-border);
+                 border-left-width: 3px; background: var(--admin-surface); pointer-events: auto;
+                 box-shadow: 0 10px 30px rgba(0, 0, 0, .18);
+                 animation: flash-in .22s ease; }
+        @keyframes flash-in { from { opacity: 0; transform: translate(.75rem, -.25rem); } }
+        .flash-success { border-color: #86efac; border-left-color: #16a34a; background: #f0fdf4; color: #166534; }
+        .flash-warning { border-color: #fde68a; border-left-color: #d97706; background: #fffbeb; color: #92400e; }
+        .flash-danger, .flash-error { border-color: #fecaca; border-left-color: #dc2626; background: #fef2f2; color: #991b1b; }
         {# A flash had no way out: no close control and no timeout, so one
            "the website is now displayed in English" sat over the page until
            the next full navigation. Every flash now carries a dismiss, and
            the non-error ones retire themselves. #}
-        .flash { display: flex; align-items: flex-start; gap: .75rem; }
-        .flash-body { flex: 1; min-width: 0; }
+        .flash { display: flex; align-items: flex-start; gap: .6rem; }
+        {# margin-top centers the icon glyph against the FIRST line of
+           .flash-body's text specifically (not the whole, possibly-wrapped
+           message) - text sits in a 22.5px line-height at 15px font-size,
+           the icon box is ~15.2px tall, so half the ~7.3px leading (.15rem
+           undershot it, reported live as visibly high) is what centers it. #}
+        .flash-icon { flex-shrink: 0; margin-top: .23rem; font-size: .95rem; opacity: .85; }
+        .flash-body { flex: 1; min-width: 0; padding-top: .05rem; }
         .flash-close { flex-shrink: 0; border: 0; background: none; color: inherit; cursor: pointer;
                        font: inherit; font-size: 1.15rem; line-height: 1; padding: 0 .1rem;
                        opacity: .55; transition: opacity .12s ease; }
         .flash-close:hover { opacity: 1; }
-        .flash.is-dismissing { opacity: 0; transform: translateY(-.35rem);
+        .flash.is-dismissing { opacity: 0; transform: translate(.75rem, 0);
                                transition: opacity .25s ease, transform .25s ease; }
         .search-form { display: inline-flex; gap: .4rem; }
         .search-form input { padding: .45rem .65rem; border: 1px solid var(--admin-border); border-radius: 6px; font: inherit; min-width: 220px;
@@ -3091,7 +3237,13 @@
                        flush left. #}
                     <form class="topbar-search" method="get" action="{{ admin_url(admin_context.crudControllerFqcn, 'index') }}">
                         <i class="fa-solid fa-magnifying-glass"></i>
-                        <input type="search" name="query" placeholder="{{ 'datagrid.search_placeholder'|trans({}, 'admin') }}">
+                        {# app.request, not a controller-passed "query" var: this
+                           form is defined once here and shared by every CRUD
+                           page (index/new/edit/detail), not just the index
+                           action that actually has a $query to pass in - reading
+                           the live request keeps an active search term visible
+                           regardless of which page rendered the topbar. #}
+                        <input type="search" name="query" value="{{ app.request.query.get('query') }}" placeholder="{{ 'datagrid.search_placeholder'|trans({}, 'admin') }}">
                     </form>
                 {% else %}
                     <span></span>
@@ -3175,6 +3327,12 @@
         {% block flashes %}
             {% set flashes = app.flashes %}
             {% if flashes is not empty %}
+            {% set _flashIcons = {
+                success: 'fa-solid fa-circle-check',
+                warning: 'fa-solid fa-triangle-exclamation',
+                danger: 'fa-solid fa-circle-xmark',
+                error: 'fa-solid fa-circle-xmark',
+            } %}
             <div class="flashes">
                 {% for type, messages in flashes %}
                     {% for message in messages %}
@@ -3188,6 +3346,7 @@
                            into one of these must be escaped where it is put
                            in, not here. #}
                         <div class="flash flash-{{ type }}" role="status">
+                            <i class="flash-icon {{ _flashIcons[type] ?? 'fa-solid fa-circle-info' }}"></i>
                             <span class="flash-body">{{ message|trans|raw }}</span>
                             <button type="button" class="flash-close" data-flash-close
                                     aria-label="{{ 'action.cancel'|trans({}, 'admin') }}">&times;</button>
@@ -4650,6 +4809,57 @@
                 }
             }).observe(document.body, { childList: true, subtree: true });
         })();
+
+        // Click-to-confirm guard on select2's own "remove one" / "remove
+        // all" controls: both fired with no confirmation at all, so one
+        // misclick on a Tags/Authors/... chip (or the "clear all" circle)
+        // silently dropped a selection with no way to tell it happened
+        // besides noticing the chip is gone (reported live). Two DIFFERENT
+        // event types need guarding, not one - select2's own source binds
+        // "remove one" on 'click' (multiple.js) but "clear all" on
+        // 'mousedown' (allowClear.js, so it fires before the field would
+        // otherwise focus/open); a guard on 'click' alone would silently
+        // never arm the clear-all circle at all. Both listen in the CAPTURE
+        // phase directly on document, so they run BEFORE select2's own
+        // bubble-phase delegated handler ever sees the event. First
+        // press: block it (stopImmediatePropagation, so select2 never gets
+        // it) and arm the button (.is-confirm-armed, see layout CSS).
+        // Second press within ARM_MS on the SAME already-armed button: let
+        // it through untouched - select2 removes it normally. Pressing
+        // anywhere else, or letting the window lapse, disarms without
+        // removing anything.
+        if (!window.__adminSelect2ConfirmBound) {
+        window.__adminSelect2ConfirmBound = true;
+        var ARM_MS = 2500;
+        function disarmSelect2Remove(btn) {
+            delete btn.dataset.confirmArmed;
+            btn.classList.remove('is-confirm-armed');
+            if (btn._confirmTimer) { clearTimeout(btn._confirmTimer); btn._confirmTimer = null; }
+            if (btn._confirmTitle !== undefined) { btn.title = btn._confirmTitle; btn._confirmTitle = undefined; }
+        }
+        function guardSelect2Remove(selector) {
+            return function (e) {
+                var btn = e.target.closest(selector);
+                if (!btn) return;
+
+                if (btn.dataset.confirmArmed) {
+                    disarmSelect2Remove(btn);
+                    return; // let it proceed - select2's own handler removes it
+                }
+
+                e.preventDefault();
+                e.stopImmediatePropagation();
+
+                btn.dataset.confirmArmed = '1';
+                btn.classList.add('is-confirm-armed');
+                btn._confirmTitle = btn.title;
+                btn.title = '{{ 'action.confirm_again'|trans({}, 'admin')|e('js') }}';
+                btn._confirmTimer = setTimeout(function () { disarmSelect2Remove(btn); }, ARM_MS);
+            };
+        }
+        document.addEventListener('click', guardSelect2Remove('.select2-selection__choice__remove'), true);
+        document.addEventListener('mousedown', guardSelect2Remove('.select2-selection__clear'), true);
+        }
 
         // Accordion toggle for collection entries. data-bs-toggle="collapse" is
         // Bootstrap's contract and nothing here implements it, so the headers
