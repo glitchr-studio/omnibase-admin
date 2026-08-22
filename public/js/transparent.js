@@ -2453,8 +2453,24 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
             // button's default is a form submission, which findLink() does
             // recognise and route through the swap pipeline, so exempting
             // them would double-fire real navigations.
+            // `button` IS in the list above, despite the note further up
+            // about double-firing. That concern only applies when findLink()
+            // RECOGNISES the button - and in that case this branch is never
+            // reached, because link would not be null. Reaching here means the
+            // opposite: transparentJS has decided it will not handle this
+            // click, so preventDefault() suppresses the browser's own default
+            // without substituting anything for it. For a submit button that
+            // default IS the form submission, so suppressing it left the
+            // button completely dead - no request, and (where a form relies on
+            // one) not even the submit event a confirmation handler needs.
+            //
+            // Confirmed live in the admin datagrid: findLink() gates on
+            // el.getAttribute("type") == "submit", but a <button> inside a
+            // form submits by default and those buttons are rendered without
+            // the attribute, so findLink() returned null and the row delete
+            // button did nothing at all when clicked.
             const t = e.target;
-            if (t && t.closest && t.closest('summary, details, input, select, textarea, option, label, [contenteditable]')) return;
+            if (t && t.closest && t.closest('summary, details, input, select, textarea, option, label, [contenteditable], button')) return;
 
             e.preventDefault();
             return;
