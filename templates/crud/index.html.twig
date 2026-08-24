@@ -226,7 +226,14 @@
                 <td class="batch"><input type="checkbox" name="batchIds[]" value="{{ row.entity.id }}"
                     onclick="this.closest('form').querySelector('.batch-toolbar').hidden = !this.closest('table').querySelector('tbody input:checked');"></td>
                 {% for field in row.fields %}
-                    <td class="{{ field.cssClass }} {{ field.property == 'id' ? 'cell-id' }}" style="{{ field.textAlign ? 'text-align:' ~ field.textAlign }}">
+                    {#- data-label carries the column heading down onto the cell
+                        so the grid can restyle itself as a stack of cards on a
+                        phone, where there is no room for a header row and the
+                        value alone says nothing (see the max-width:720px block
+                        in @Admin/layout.html.twig). -#}
+                    <td class="{{ field.cssClass }} {{ field.property == 'id' ? 'cell-id' }}"
+                        data-label="{{ field.label ?? field.property|humanize }}"
+                        style="{{ field.textAlign ? 'text-align:' ~ field.textAlign }}">
                         {{ include(['@Admin/' ~ field.templateName ~ '.html.twig', '@Admin/crud/field/text.html.twig'], {field: field, entity: row.entity}) }}
                     </td>
                 {% endfor %}

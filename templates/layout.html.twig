@@ -597,11 +597,19 @@
            sidebar-collapsed, above) doesn't fix this on its own either -
            it's an opt-in preference toggle, not an automatic breakpoint,
            and its hover-driven submenu flyouts don't work on touch anyway.
-           Off-canvas instead, same breakpoint as the widget grid: hidden
-           by a translateX until explicitly opened via the hamburger
-           button now in .admin-topbar, then slides in as a full-height
-           overlay above the content rather than sharing width with it. #}
-        @media (max-width: 720px) {
+           Off-canvas instead: hidden by a translateX until explicitly
+           opened via the hamburger button now in .admin-topbar, then
+           slides in as a full-height overlay above the content rather
+           than sharing width with it.
+
+           The breakpoint is 1024px, not the 720px the rest of this
+           stylesheet uses, because this rule is about horizontal ROOM
+           rather than about being a phone. Every iPad in portrait is
+           820-1024px wide: wide enough to escape a phone breakpoint,
+           nowhere near wide enough to spend 373px of it on a permanent
+           sidebar. On an 820px iPad that left ~450px for a 13-column
+           datagrid - two columns of it visible. #}
+        @media (max-width: 1024px) {
             .admin-mobile-nav-toggle { display: flex; }
             .admin-aside { position: fixed; top: 0; left: 0; transform: translateX(-100%); transition: transform .2s ease; box-shadow: 0 0 24px rgba(0,0,0,.25); }
             html.is-mobile-nav-open .admin-aside { transform: translateX(0); }
@@ -806,7 +814,13 @@
            buttons and read as overlapping them (seen on a 390px capture).
            Let the header itself wrap and give the actions their own full-width
            row underneath the title. #}
-        @media (max-width: 720px) {
+        {# 1024px rather than 720px, matching the off-canvas sidebar above and
+           for the same reason: this is about horizontal room, not about being
+           a phone. An edit page's action row (back / save / save-and-continue
+           / view / prev / next) is ~750px on its own, so beside a title on an
+           820px iPad it ran 44px off the side of the screen and took the whole
+           page sideways with it. #}
+        @media (max-width: 1024px) {
             .admin-header { flex-wrap: wrap; align-items: flex-start; }
             .admin-header-titles { flex: 1 1 auto; }
             .admin-header .global-actions {
@@ -1115,7 +1129,27 @@
         form.admin-form .form-errors { color: var(--admin-danger); font-size: .85rem; margin-top: .25rem;
             background: none; border: 0; padding: 0; }
         form.admin-form .form-errors:empty { display: none; }
-        @media (max-width: 720px) { form.admin-form .form-row { grid-column: span 12 !important; } }
+        @media (max-width: 720px) {
+            form.admin-form .form-row { grid-column: span 12 !important; }
+            {# Side padding is a luxury of a wide screen. Between .admin-main's
+               2rem and .form-grid's 1.25rem, a 390px phone spent 104px - over
+               a quarter of the viewport - on empty margin, which the content
+               column pays for: the article editor was left a 261px measure,
+               hyphenating mid-word every second line. Trimmed here rather
+               than in either rule's base value so nothing about the desktop
+               layout moves. #}
+            .admin-main { padding-left: .85rem; padding-right: .85rem; }
+            form.admin-form .form-grid { padding-left: .75rem; padding-right: .75rem; }
+            {# .admin-topbar and .admin-header bleed to the edge of the column
+               with a -2rem margin that cancels .admin-main's padding exactly.
+               Trim the padding without trimming these and the cancellation
+               overshoots by the difference on each side - the topbar grew 37px
+               wider than the viewport and the whole page scrolled sideways.
+               They have to move together. #}
+            .admin-topbar { margin-left: -.85rem; margin-right: -.85rem; }
+            .admin-header { margin-left: -.85rem; margin-right: -.85rem;
+                            padding-left: .85rem; padding-right: .85rem; }
+        }
         {# BooleanField's confirm-modal markup (form_div_layout.html.twig) is
            Bootstrap ".modal fade" markup: it only ever hides/shows via
            Bootstrap's own CSS+JS, neither of which this package loads (no
@@ -2507,7 +2541,13 @@
         .badge-avatar { width: 1.6rem; height: 1.6rem; border-radius: 999px; object-fit: cover; display: block;
             border: 1px solid var(--admin-border); background: var(--admin-bg); }
 
-        .field-switch { display: inline-flex; align-items: center; cursor: pointer; }
+        /* position:relative is load-bearing, not decoration. The input below
+           is absolutely positioned to hide it from sight while keeping it
+           focusable; without a positioned ancestor its containing block
+           became main.admin-main, so on a phone it was laid out at
+           left:745px - escaping the datagrid's own scroll box and
+           stretching the whole page to 750px of sideways scroll. */
+        .field-switch { display: inline-flex; align-items: center; cursor: pointer; position: relative; }
         .field-switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
         .field-switch .track { width: 34px; height: 19px; border-radius: 999px; background: var(--admin-border); position: relative; transition: background .15s ease; flex: 0 0 auto; }
         .field-switch .track::after { content: ''; position: absolute; top: 2px; left: 2px; width: 15px; height: 15px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.3); transition: transform .15s ease; }
@@ -2539,6 +2579,114 @@
             box-shadow: 8px 0 8px -8px rgba(0, 0, 0, .18); }
         .datagrid th.cell-id { background: var(--admin-bg); z-index: 6; }
         .datagrid tr:hover td.cell-id { background: var(--admin-bg); }
+
+        {# ------------------------------------------------------------------
+           The datagrid on a phone.
+
+           A 13-column grid is 1677px wide. Sideways scrolling keeps it honest
+           on a laptop, but on a 390px screen the sticky ID and action columns
+           between them fill the viewport, so the list reads as a column of
+           bare "#1147" with four icons beside it - every field that actually
+           identifies a row sits off-screen in the 1300px nobody thinks to
+           drag. Below 720px the table stops being a table: each row becomes a
+           card, each cell a label/value line, with the heading supplied by the
+           data-label the index template writes onto every td.
+
+           display:block on table parts is what makes this work, and it means
+           colspan, sticky positioning and the min-width:max-content floor all
+           have to be undone explicitly - they are meaningless once the rows
+           are no longer laid out as a table.
+           ------------------------------------------------------------------ #}
+        @media (max-width: 720px) {
+            .table-responsive { overflow-x: visible; }
+
+            table.datagrid { min-width: 0; display: block; }
+            .datagrid thead { display: none; }
+            .datagrid tbody, .datagrid tr, .datagrid td { display: block; }
+
+            .datagrid tr {
+                position: relative;
+                border: 1px solid var(--admin-border);
+                border-radius: 10px;
+                margin: 0 0 .6rem;
+                padding: .2rem .1rem;
+                background: var(--admin-surface);
+            }
+            .datagrid tr:hover td { background: transparent; }
+
+            .datagrid td {
+                border-bottom: 1px solid var(--admin-border);
+                padding: .5rem .8rem;
+                white-space: normal;
+                max-width: none;
+                display: flex;
+                align-items: baseline;
+                justify-content: space-between;
+                gap: 1rem;
+            }
+            .datagrid td:last-child { border-bottom: 0; }
+
+            .datagrid td::before {
+                content: attr(data-label);
+                flex: 0 0 40%;
+                color: var(--admin-muted);
+                font-size: .78rem;
+                text-transform: uppercase;
+                letter-spacing: .03em;
+                {# The td carries an inline text-align from the field's own
+                   textAlign option, which a ::before inherits - so a column
+                   configured to centre its values centred its LABEL too, and
+                   the label column came out ragged down the card. Labels
+                   always start at the same edge. #}
+                text-align: left;
+            }
+
+            {# A cell whose value is empty would otherwise render as a lone
+               floating label. Nothing useful to say, so say nothing. #}
+            .datagrid td:empty { display: none; }
+
+            {# Undo the pinned columns: there are no columns left to pin. #}
+            .datagrid td.cell-id, .datagrid th.cell-id,
+            .datagrid td.actions, .datagrid th.actions {
+                position: static; box-shadow: none; background: transparent; }
+
+            {# The identifier is the card's title, not one of its fields. #}
+            .datagrid td.cell-id {
+                padding-right: 3.2rem;
+                font-size: 1rem;
+                border-bottom: 1px solid var(--admin-border);
+            }
+            .datagrid td.cell-id::before { display: none; }
+            .datagrid td.cell-id .field-id { font-size: 1rem; color: var(--admin-fg); font-weight: 600; }
+
+            {# The batch checkbox rides in the card's top-right corner rather
+               than taking a full line of its own. #}
+            .datagrid td.batch {
+                position: absolute; top: .45rem; right: .6rem;
+                width: auto; padding: 0; border: 0; display: block; }
+            .datagrid td.batch::before { display: none; }
+
+            {# Actions become a footer strip, laid out left to right with room
+               enough to hit with a thumb. #}
+            .datagrid td.actions {
+                display: flex; justify-content: flex-start; flex-wrap: wrap;
+                gap: .25rem; text-align: left;
+                padding-top: .6rem; padding-bottom: .6rem;
+                border-top: 1px solid var(--admin-border);
+            }
+            .datagrid td.actions::before { display: none; }
+            .datagrid .actions a, .datagrid .actions button { margin-left: 0; }
+            .datagrid td.actions .btn-icon { min-width: 2.5rem; min-height: 2.5rem; }
+
+            {# Long values (badge lists, translations) wrap instead of being
+               clipped to an ellipsis - there is vertical room here. #}
+            .datagrid td .field-association a,
+            .datagrid td .field-translatable,
+            .datagrid td > span:only-child:not(.badge):not(.badge-list):not(.badges) {
+                max-width: none; overflow: visible; text-overflow: clip; white-space: normal; }
+            .datagrid .badge-list { max-width: none; }
+        }
+
         .field-id { color: var(--admin-muted); font-size: .85rem; }
         .field-id a { color: inherit; text-decoration: none; }
         .field-id a:hover { color: var(--admin-accent); }
