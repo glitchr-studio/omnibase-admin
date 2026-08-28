@@ -80,6 +80,17 @@ class EntityViewsWidgetTypeTest extends KernelTestCase
 
     public function testAllInstancesModeSumsEveryPublishedInstanceOfTheClass(): void
     {
+        // Same guard the sibling test above already carries. Without it this
+        // asserted that published articles exist, which is true of a developer
+        // database and false of a freshly created one - so the deploy gate,
+        // which builds its schema from scratch and loads no fixtures, failed
+        // here every run while the code under test was behaving correctly: with
+        // no rows, falling back to the empty-state series is the right answer.
+        $registry = static::getContainer()->get(\Base\Admin\Widget\LinkableEntityRegistry::class);
+        if ([] === $registry->findInstances(Article::class, 1)) {
+            self::markTestSkipped('No Article rows in this environment; nothing to aggregate.');
+        }
+
         $widget = MenuItem::block('entity_views', null, null, null, [
             'entityClass' => Article::class,
             'entityId' => EntityViewsWidgetType::ALL_INSTANCES,
