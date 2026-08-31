@@ -2404,7 +2404,28 @@
            composite.html.twig's own inline grid-template-columns track
            width exactly (same "10px" literal there) or the divider element
            and the gap the grid actually reserves for it drift apart. #}
-        .composite-pane-divider { width: 6px; border-radius: 999px; background: var(--admin-border); cursor: col-resize; touch-action: none; transition: background .15s ease; }
+        {# Vertical inset is deliberately NOT symmetric in margin terms,
+           because the card it sits in isn't either: .composite-card above
+           has zero top padding and a 2.75rem bottom gutter (for the resize
+           handle). As a plain stretched grid item the divider inherited
+           exactly that - it ran flush into the card's top edge and then
+           stopped 45px short of the bottom, which read as a broken/lopsided
+           rule rather than a deliberate separator (reported live: 1px inset
+           at the top against 45px at the bottom).
+
+           margin-top matches .composite-pane's own 1.25rem top padding, so
+           the divider starts level with the pane content beside it instead
+           of above it. margin-bottom cancels the card's bottom gutter back
+           out (1.25rem - 2.75rem) so the inset from the CARD's bottom edge
+           comes out the same 1.25rem. Result: 21px top, 21px bottom.
+
+           Safe to reach into that bottom gutter here: the gutter exists to
+           keep .item-resize-handle off the last pane's corner, and the
+           handle is a circle in the bottom-RIGHT corner (~x 1022-1050 on a
+           768px card) while this divider is horizontally centred (~x 651) -
+           they never meet. #}
+        .composite-pane-divider { width: 6px; border-radius: 999px; background: var(--admin-border); cursor: col-resize; touch-action: none; transition: background .15s ease;
+            margin-top: 1.25rem; margin-bottom: calc(1.25rem - 2.75rem); }
         body:not(.is-customizing) .composite-pane-divider { cursor: default; pointer-events: none; opacity: .4; }
         .composite-pane-divider:hover, .composite-pane-divider.is-dragging { background: var(--admin-accent); }
         @container (max-width: 480px) {
