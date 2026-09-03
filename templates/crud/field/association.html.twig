@@ -46,7 +46,7 @@
             {%- set withName = mode is null or mode in [1, 3] or (mode == 2 and not itemIcon) -%}
             {%- set chipBody -%}
                 {%- if itemIcon %}<i class="{{ itemIcon }}"></i>{% endif -%}
-                {%- if withName %}{{ shortLabel }}{% endif -%}
+                {%- if withName %}<span class="badge-label">{{ shortLabel }}</span>{% endif -%}
             {%- endset -%}
             {%- if itemCrud and item.id is defined -%}
                 <a class="badge{{ itemIcon and not withName ? ' badge-icon' }}" href="{{ admin_url(itemCrud, 'detail', admin_entity_id(item)) }}" title="{{ itemLabel }}">{{ chipBody }}</a>

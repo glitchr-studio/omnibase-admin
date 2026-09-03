@@ -33,7 +33,7 @@
             {%- if avatar -%}<img class="badge-avatar" src="{{ avatar }}" alt="{{ label }}">
             {%- else -%}
                 {%- if icon %}<i class="{{ icon }}"></i>{% endif -%}
-                {%- if withName %}{{ label }}{% endif -%}
+                {%- if withName %}<span class="badge-label">{{ label }}</span>{% endif -%}
             {%- endif -%}
         {%- endset -%}
         {%- set chipClass = 'badge badge-accent badge-entity' ~ (icon and not withName ? ' badge-icon' : '') -%}
@@ -56,6 +56,7 @@
     {%- set color = enumClass ? enum(enumClass).getColor(raw) : null -%}
     <span class="badge badge-accent"{% if color %} style="background:{{ color }}22; color:{{ color }}; border-color:{{ color }}55;"{% endif %}>
         {%- if icon -%}<i class="{{ icon }}"></i> {%- endif -%}
+        <span class="badge-label">
         {%- if label is not null -%}
             {{- label|trans -}}
         {%- elseif enumLabel is not null -%}
@@ -63,6 +64,8 @@
         {%- else -%}
             {{- raw|lower|replace({'_': ' '})|capitalize -}}
         {%- endif -%}
+        </span>
+    {#- -#}
     </span>
 {%- endmacro -%}
 {%- set raw = field.value -%}

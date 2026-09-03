@@ -2564,14 +2564,44 @@
         .datagrid td > span:only-child:not(.badge):not(.badge-list):not(.badges) {
             display: inline-block; max-width: 100%; overflow: hidden;
             text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+        {# A chip elides through its LABEL, never itself: text-overflow only
+           renders on a block container, and a badge is inline-flex - putting
+           overflow/text-overflow on the badge merely clipped the text mid-word
+           (the gallery Photos chips read "Miyajima (宮島) - Photo #" with no
+           "…"). The label is its own flex item, allowed to shrink (min-width:
+           0 - a flex item's default is its content width) and ellipsized;
+           the icon never shrinks. #}
+        .badge > i, .badge > .badge-avatar { flex: 0 0 auto; }
+        {# display: block is load-bearing: base-bundle's base-async.css ships
+           `.badge > * { display: flex; justify-content: center }` (another of
+           its rules reaching a page it was never written for, see the
+           bootstrap-leak notes above), which turned the label into a centered
+           flex box - centered text that overflows an overflow:hidden box spills
+           out of BOTH sides, so the label came out cut at the left and with no
+           ellipsis at the right. A block with text-align: start elides at the
+           end like any other truncated cell. #}
+        .badge > .badge-label { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: start; }
+        {# A lone chip (a to-one association: a Comment's parent Article) had
+           no ceiling at all - only chips inside a .badge-list did - so a long
+           parent title rendered a 450px chip in a 240px cell and, table cells
+           being overflow:visible, drew straight over the Owners column.
+           Capped to the cell's content box (15rem minus the .9rem padding
+           each side) rather than 100%: a percentage is treated as auto while
+           the column is being sized, so it would still have asked for the
+           full 450px. #}
+        .datagrid td > .badge { max-width: 13.2rem; }
         .datagrid .badge-list { max-width: 14rem; }
-        .datagrid .badge-list > .badge {
-            max-width: 11rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .datagrid .badge-list > .badge { max-width: 11rem; }
+        {# Every linked chip, not only the entity-styled ones: the plain
+           association chips (gallery Photos) are <a class="badge"> and this
+           admin loads no Bootstrap reboot, so they rendered in the UA's blue
+           underlined link style inside the pill. #}
+        a.badge { text-decoration: none; }
+        a.badge:not(.badge-accent) { color: inherit; }
+        a.badge:hover { border-color: var(--admin-accent); }
         {# A related entity rendered as a badge (SelectField/AssociationField
-           with entityDisplay and/or crudControllerFqcn set). text-decoration
-           because the linked variant is an <a> and this admin loads no
-           Bootstrap reboot to strip the UA underline. In 'avatar' mode the
-           badge holds only the image, so the pill padding would frame it
+           with entityDisplay and/or crudControllerFqcn set). In 'avatar' mode
+           the badge holds only the image, so the pill padding would frame it
            oddly - drop it and let the circle be the badge. #}
         .badge-entity { text-decoration: none; }
         .badge-entity:hover { border-color: var(--admin-accent); }
