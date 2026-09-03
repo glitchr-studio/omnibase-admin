@@ -68,6 +68,8 @@ customize:
     icon_hint: "Cliquer pour changer l'icône (synchronisée avec le menu latéral). Vider le champ puis Entrée pour rétablir l'icône par défaut."
     icon_search: "Rechercher une icône…"
     icon_clear: "Effacer la recherche"
+    hide_action: Masquer ce bouton sur cette page
+    show_action: Afficher ce bouton sur cette page
 
 composite:
     settings:
@@ -88,6 +90,7 @@ field:
 
 action:
     index: Retour à la liste
+    home: Retour au tableau de bord
     new: Créer
     edit: Modifier
     detail: Voir

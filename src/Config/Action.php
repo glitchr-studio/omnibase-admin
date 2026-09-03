@@ -23,6 +23,12 @@ class Action
     public const SAVE_AND_RETURN = 'saveAndReturn';
 
     // navigation actions
+    /**
+     * "Back to the dashboard" - the non-CRUD counterpart of INDEX: a system
+     * page (settings, API keys) has no entity list to return to, but it does
+     * have the same need for a way back out of the form it is showing.
+     */
+    public const HOME = 'home';
     public const GOTO_PREV = 'prev';
     public const GOTO_SEE = 'see';
     public const GOTO_NEXT = 'next';

@@ -105,7 +105,62 @@ class AdminTwigExtension extends AbstractExtension
             new TwigFunction('admin_entity_id', $this->fieldValueResolver->entityIdentifier(...)),
             new TwigFunction('admin_menu_current', $this->adminMenuCurrent(...)),
             new TwigFunction('admin_entity_icon', $this->adminEntityIcon(...)),
+            new TwigFunction('admin_action_order', $this->adminActionOrder(...)),
         ];
+    }
+
+    /**
+     * The final left-to-right order of a page's action buttons: the order
+     * declared in code, with the superadmin's stored order applied on top.
+     *
+     * A PERMUTATION OF THE SLOTS the stored actions already occupy, not a
+     * "stored first, unstored last" sort. Stored children are how EVERY
+     * per-action customization is persisted (icon, visibility, order alike -
+     * see LayoutController::quickSave()), so a page where the superadmin has
+     * only ever re-iconed ONE button has exactly one child stored, and a
+     * naive sort read that as "this button is first, everything else is
+     * unranked" - re-iconing or hiding a single button visibly reshuffled
+     * the whole row (found live: hiding "Enregistrer et continuer" on
+     * Settings moved it to the front). Restricting the permutation to the
+     * slots those actions already hold means a partial record can only
+     * reorder the buttons it actually mentions, and an action added in code
+     * later keeps its declared position instead of being pushed to the end.
+     *
+     * @param iterable<Action|string> $actions   the page's actions, in code order
+     * @param array<string, int>      $stored    action name => stored position
+     *
+     * @return array<string, int> action name => final position
+     */
+    public function adminActionOrder(iterable $actions, array $stored = []): array
+    {
+        $names = [];
+        foreach ($actions as $action) {
+            $names[] = \is_string($action) ? $action : $action->getName();
+        }
+
+        $order = [];
+        $slots = [];
+        $ranked = [];
+
+        foreach ($names as $slot => $name) {
+            $order[$name] = $slot;
+
+            if (\array_key_exists($name, $stored) && \is_int($stored[$name])) {
+                $slots[] = $slot;
+                $ranked[$name] = $stored[$name];
+            }
+        }
+
+        // asort keeps the association while sorting by the stored position,
+        // so the ranked names come out in the order the superadmin dragged
+        // them into - which is then poured back into their own slots.
+        asort($ranked);
+
+        foreach (array_keys($ranked) as $i => $name) {
+            $order[$name] = $slots[$i];
+        }
+
+        return $order;
     }
 
     /**

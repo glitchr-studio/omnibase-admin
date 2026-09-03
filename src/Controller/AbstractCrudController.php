@@ -41,6 +41,7 @@ abstract class AbstractCrudController extends AbstractController implements Crud
     protected \Base\Admin\Menu\MenuBuilder $menuBuilder;
     protected \Base\Admin\Layout\LayoutStore $layoutStore;
     protected \Base\Admin\Router\AdminRouteRegistry $routeRegistry;
+    protected \Base\Admin\Layout\PageCustomization $pageCustomization;
 
     #[Required]
     public function setAdminServices(
@@ -52,6 +53,7 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         \Base\Admin\Menu\MenuBuilder $menuBuilder,
         \Base\Admin\Layout\LayoutStore $layoutStore,
         \Base\Admin\Router\AdminRouteRegistry $routeRegistry,
+        \Base\Admin\Layout\PageCustomization $pageCustomization,
     ): void {
         $this->entityManager = $entityManager;
         $this->fieldFormBuilder = $fieldFormBuilder;
@@ -61,6 +63,7 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         $this->menuBuilder = $menuBuilder;
         $this->layoutStore = $layoutStore;
         $this->routeRegistry = $routeRegistry;
+        $this->pageCustomization = $pageCustomization;
     }
 
     /**
@@ -882,47 +885,18 @@ abstract class AbstractCrudController extends AbstractController implements Crud
      */
     protected function crudPageCustomization(): array
     {
-        $slug = $this->routeRegistry->getSlug(static::class);
-        $item = null;
-
-        // ->toArray() is the whole config (['items' => [...]]), not the item
-        // list - quickSave writes into $array['items'] and this has to read
-        // the same level back.
-        $stored = $this->layoutStore->get(\Base\Admin\Layout\LayoutScope::CRUD)->toArray();
-
-        foreach (\is_array($stored['items'] ?? null) ? $stored['items'] : [] as $candidate) {
-            if (($candidate['key'] ?? null) === $slug) {
-                $item = $candidate;
-                break;
-            }
-        }
-
-        // action name => position, for the top-right button row. Stored as
-        // the entry's children (see LayoutController::quickSave) so the
-        // order is just the child order. A map rather than a list because
-        // the templates sort with it and an O(1) lookup keeps that simple;
-        // an action with no stored position sorts after the known ones,
-        // so a newly added action appears at the end instead of vanishing.
-        $order = [];
-        // ...and action name => custom icon class, from the same children.
-        // An action the superadmin never re-iconed simply has no entry and
-        // the template falls back to the icon the CRUD declared in code.
-        $icons = [];
-        foreach (\is_array($item['children'] ?? null) ? $item['children'] : [] as $position => $child) {
-            if (\is_string($child['key'] ?? null) && '' !== $child['key']) {
-                $order[$child['key']] = $position;
-
-                if (\is_string($child['icon'] ?? null) && '' !== $child['icon']) {
-                    $icons[$child['key']] = $child['icon'];
-                }
-            }
-        }
+        // The lookup itself is shared with the system pages (settings, API
+        // keys), which hang the very same customization off a "system/<page>"
+        // key instead of a CRUD slug - see PageCustomization. Only the naming
+        // is local: the CRUD templates have always read crud_* variables.
+        $customization = $this->pageCustomization->resolve($this->routeRegistry->getSlug(static::class));
 
         return [
-            'crud_page_key' => $slug,
-            'crud_page' => $item,
-            'crud_action_order' => $order,
-            'crud_action_icons' => $icons,
+            'crud_page_key' => $customization['page_key'],
+            'crud_page' => $customization['page'],
+            'crud_action_order' => $customization['action_order'],
+            'crud_action_icons' => $customization['action_icons'],
+            'crud_action_hidden' => $customization['action_hidden'],
         ];
     }
 

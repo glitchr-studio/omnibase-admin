@@ -73,16 +73,24 @@
                 {% if active_filter_count %}<span class="filter-count">{{ active_filter_count }}</span>{% endif %}
             </button>
         {% endif %}
-        {# Apply the superadmin's stored button order. An action with no
-           stored position gets 999 so it lands after the ordered ones -
-           adding a new action to a CRUD must not make it disappear just
-           because an old saved order predates it. #}
-        {% set _order = crud_action_order|default({}) %}
-        {% for action in actions.globalActions('index')|sort((a, b) => (_order[a.name] ?? 999) <=> (_order[b.name] ?? 999)) %}
-            {% if action.crudActionName == 'new' and new_variants is defined and new_variants|length > 1 %}
+        {# Apply the superadmin's stored button order on top of the code
+           order. An action with no stored position keeps the slot it was
+           declared in, so adding a new action to a CRUD - or re-iconing/
+           hiding a single existing one, which stores exactly one child -
+           never reshuffles the row (see AdminTwigExtension::
+           adminActionOrder()). #}
+        {% set _order = admin_action_order(actions.globalActions('index'), crud_action_order|default({})) %}
+        {# Per-page hidden buttons (customize mode's eye toggle) - see
+           crud/detail.html.twig's twin. #}
+        {% set _hidden = crud_action_hidden|default({}) %}
+        {% for action in actions.globalActions('index')|sort((a, b) => _order[a.name] <=> _order[b.name]) %}
+            {% set _isHidden = _hidden[action.name]|default(false) %}
+            {% set _hideAttr = _editable ? ' data-action-hidden="' ~ (_isHidden ? '1' : '0') ~ '"' : '' %}
+            {% if _isHidden and not _editable %}
+            {% elseif action.crudActionName == 'new' and new_variants is defined and new_variants|length > 1 %}
                 {# inheritance-tree entity: creating means choosing WHICH
                    concrete subclass - the historical discriminator dropdown #}
-                <details class="new-dropdown" data-primary-action{% if _editable %} data-action-key="{{ action.name }}" data-action-page="{{ crud_page_key }}" data-page-icon data-page-icon-value="{{ crud_action_icons[action.name] ?? action.icon }}"{% endif %}>
+                <details class="new-dropdown {{ _isHidden ? 'is-hidden' }}" data-primary-action{% if _editable %} data-action-key="{{ action.name }}" data-action-page="{{ crud_page_key }}" data-page-icon data-page-icon-value="{{ crud_action_icons[action.name] ?? action.icon }}"{% endif %}{{ _hideAttr|raw }}>
                     <summary class="btn btn-primary">{% set _icon = crud_action_icons[action.name] ?? action.icon %}{% if _icon %}<i class="{{ _icon }}"></i> {% endif %}{{ action.label|trans }} <i class="fa-solid fa-caret-down"></i></summary>
                     <div class="new-dropdown-menu">
                         {% for variant in new_variants %}
@@ -97,7 +105,7 @@
                    too just duplicated it verbatim on every rendered button
                    (found live: class="btn btn-primary action-new btn btn-
                    primary" on every list page's own create button). #}
-                <a class="{{ action.cssClass }}"{% if action.crudActionName == 'new' %} data-primary-action{% endif %} href="{{ admin_url(controller_fqcn, action.crudActionName ?? 'new') }}"{% if _editable %} data-action-key="{{ action.name }}" data-action-page="{{ crud_page_key }}" data-page-icon data-page-icon-value="{{ crud_action_icons[action.name] ?? action.icon }}"{% endif %}>
+                <a class="{{ action.cssClass }} {{ _isHidden ? 'is-hidden' }}"{% if action.crudActionName == 'new' %} data-primary-action{% endif %} href="{{ admin_url(controller_fqcn, action.crudActionName ?? 'new') }}"{% if _editable %} data-action-key="{{ action.name }}" data-action-page="{{ crud_page_key }}" data-page-icon data-page-icon-value="{{ crud_action_icons[action.name] ?? action.icon }}"{% endif %}{{ _hideAttr|raw }}>
                     {% set _icon = crud_action_icons[action.name] ?? action.icon %}{% if _icon %}<i class="{{ _icon }}"></i> {% endif %}{{ action.label|trans }}
                 </a>
             {% endif %}

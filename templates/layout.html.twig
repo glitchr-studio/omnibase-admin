@@ -745,6 +745,9 @@
                              background: none; color: var(--admin-muted); font: inherit; line-height: 1; cursor: pointer; }
         .icon-search-clear:hover { background: var(--admin-border); color: var(--admin-text); }
         .page-icon-popover.has-term .icon-search-clear { display: flex; align-items: center; justify-content: center; }
+        .page-icon-visibility { display: flex; align-items: center; gap: .4rem; padding: .35rem .5rem; border: 0; border-radius: 6px;
+                                background: none; color: var(--admin-muted); font: inherit; font-size: .82rem; cursor: pointer; }
+        .page-icon-visibility:hover { background: var(--admin-bg); color: var(--admin-text); }
         .page-icon-popover .page-icon-preview { width: 2.1rem; height: 2.1rem; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
                                                 border: 1px solid var(--admin-border); border-radius: 6px; }
         {# Fixed 8-per-row cells; the grid scrolls its own overflow (never
@@ -2500,6 +2503,20 @@
            from reflowing mid-drag. #}
         body.is-customizing [data-action-row] [data-action-key].drop-before { box-shadow: -3px 0 0 0 var(--admin-accent); }
         body.is-customizing [data-action-row] [data-action-key].drop-after { box-shadow: 3px 0 0 0 var(--admin-accent); }
+        {# An action hidden on this page. It is dropped server-side for anyone
+           who cannot customize at all, but a superadmin's markup always
+           carries the customize hooks (customize_enabled is a PERMISSION,
+           not the live mode - that is body.is-customizing, client-side
+           only), so the ghost has to be hidden by CSS for the mode itself.
+           Written as "hide unless customizing" rather than a hide/restore
+           pair on purpose: no rule applies while customizing, so each
+           element keeps its own natural display (.btn is inline-flex, the
+           create-dropdown is a <details>) instead of being forced into one.
+           While customizing it stays there, draggable and clickable, so the
+           toggle that brings it back is reachable - same contract a hidden
+           sidebar entry already has. #}
+        body:not(.is-customizing) [data-action-row] .is-hidden { display: none; }
+        body.is-customizing [data-action-row] .is-hidden { opacity: .38; text-decoration: line-through; }
         .filter-count { display: inline-flex; align-items: center; justify-content: center; min-width: 1.15rem; height: 1.15rem; padding: 0 .3rem;
             margin-left: .35rem; border-radius: 999px; background: var(--admin-accent); color: #fff; font-size: .7rem; font-weight: 700; }
         .filter-bar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .75rem; padding: .75rem .9rem; margin-bottom: 1rem;
@@ -4424,6 +4441,13 @@
         document.addEventListener('click', function (e) {
             var button = e.target.closest('button[type="submit"], input[type="submit"]');
             if (!button || button.classList.contains('skip-validation')) return;
+            // While customizing, a click on an action button EDITS it (see
+            // the action-row click handler further down, which
+            // preventDefault()s it) - nothing is submitted, so nothing must
+            // be marked busy. Without this the button kept a stale
+            // .is-submitting that the next unrelated navigation would light
+            // up as if a save were in flight.
+            if (document.body.classList.contains('is-customizing')) return;
 
             var form = button.form || button.closest('form');
             if (!form) return;
@@ -5232,6 +5256,53 @@
             grid.className = 'page-icon-grid';
             popover.appendChild(header);
             popover.appendChild(grid);
+
+            // Show/hide THIS button on THIS page - only for an action box
+            // (a page heading's own icon has nothing to hide). It lives in
+            // the icon popover rather than as a second control in the row
+            // itself: clicking a button while customizing is already the
+            // "edit this button" gesture, and squeezing an eye toggle
+            // beside every action would re-wrap the header row it is
+            // supposed to be tidying. Persisted immediately, like the icon.
+            if (box.dataset.actionKey && box.dataset.actionPage) {
+                var visRow = document.createElement('button');
+                visRow.type = 'button';
+                visRow.className = 'page-icon-visibility';
+                var syncVisRow = function () {
+                    var hidden = '1' === box.dataset.actionHidden;
+                    visRow.innerHTML = '';
+                    var eye = document.createElement('i');
+                    eye.className = hidden ? 'fa-solid fa-eye' : 'fa-solid fa-eye-slash';
+                    visRow.appendChild(eye);
+                    visRow.appendChild(document.createTextNode(' ' + (hidden
+                        ? '{{ 'customize.show_action'|trans({}, 'admin')|e('js') }}'
+                        : '{{ 'customize.hide_action'|trans({}, 'admin')|e('js') }}')));
+                };
+                syncVisRow();
+                visRow.addEventListener('mousedown', function (ev) { ev.preventDefault(); });
+                visRow.addEventListener('click', function () {
+                    var nowHidden = '1' !== box.dataset.actionHidden;
+                    box.dataset.actionHidden = nowHidden ? '1' : '0';
+                    box.classList.toggle('is-hidden', nowHidden);
+                    // The delete action's own box is a <form style="display:
+                    // contents"> wrapping the button (it needs its own POST
+                    // target - see crud/detail.html.twig). Such an element
+                    // generates no box of its own, so the ghost's opacity/
+                    // strike-through would land on nothing: mark the button
+                    // inside it too, which is where the server renders the
+                    // class on the next load anyway.
+                    var inner = box.querySelector('.btn');
+                    if (inner) inner.classList.toggle('is-hidden', nowHidden);
+                    queueQuickSave(CRUD_QUICK_URL, {
+                        key: box.dataset.actionKey,
+                        parentKey: box.dataset.actionPage,
+                        field: 'visible',
+                        value: !nowHidden
+                    });
+                    closeIconPopover();
+                });
+                popover.appendChild(visRow);
+            }
             function syncHasTerm() {
                 popover.classList.toggle('has-term', '' !== input.value.trim());
             }

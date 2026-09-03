@@ -32,20 +32,29 @@
     } only %}
     {# Reorderable in customize mode - see crud/index.html.twig's twin. #}
     <div class="global-actions"{% if _editable %} data-action-row data-page-key="{{ crud_page_key }}"{% endif %}>
-        {# Stored button order; unknown actions sort last (see index). #}
-        {% set _order = crud_action_order|default({}) %}
-        {% for action in actions.getAll('detail')|sort((a, b) => (_order[a.name] ?? 999) <=> (_order[b.name] ?? 999)) %}
-            {% if action.name == 'delete' %}
-                <form method="post" action="{{ admin_url(controller_fqcn, 'delete', entityId) }}" style="display:contents"{% if _editable %} data-action-key="{{ action.name }}" data-action-page="{{ crud_page_key }}" data-page-icon data-page-icon-value="{{ crud_action_icons[action.name] ?? action.icon }}"{% endif %}
+        {# Code order with the stored order applied on top (see index). #}
+        {% set _order = admin_action_order(actions.getAll('detail'), crud_action_order|default({})) %}
+        {# Per-page hidden buttons (customize mode's eye toggle) - dropped
+           from the document for anyone who cannot customize, and shown by
+           CSS only while customizing (as a faded ghost) for anyone who
+           can, so the toggle that restores one stays reachable. Same set
+           the system pages use, see page/_actions.html.twig. #}
+        {% set _hidden = crud_action_hidden|default({}) %}
+        {% for action in actions.getAll('detail')|sort((a, b) => _order[a.name] <=> _order[b.name]) %}
+            {% set _isHidden = _hidden[action.name]|default(false) %}
+            {% set _hideAttr = _editable ? ' data-action-hidden="' ~ (_isHidden ? '1' : '0') ~ '"' : '' %}
+            {% if _isHidden and not _editable %}
+            {% elseif action.name == 'delete' %}
+                <form method="post" action="{{ admin_url(controller_fqcn, 'delete', entityId) }}" style="display:contents"{% if _editable %} data-action-key="{{ action.name }}" data-action-page="{{ crud_page_key }}" data-page-icon data-page-icon-value="{{ crud_action_icons[action.name] ?? action.icon }}"{% endif %}{{ _hideAttr|raw }}
                       data-confirm="{{ 'action.delete_confirm'|trans({}, 'admin') }}">
                     <input type="hidden" name="_token" value="{{ csrf_token('admin-batch-' ~ crud.entityFqcn) }}">
-                    <button class="btn btn-icon text-danger" title="{{ action.label|trans }}"><i class="fa-solid fa-trash"></i></button>
+                    <button class="btn btn-icon text-danger {{ _isHidden ? 'is-hidden' }}" title="{{ action.label|trans }}"><i class="fa-solid fa-trash"></i></button>
                 </form>
             {% elseif action.name != 'separator' %}
                 {% set href = admin_action_url(action, entity, controller_fqcn) %}
                 {% if href %}
                     {% set isIconOnly = action.htmlAttributes['tooltip'] is defined %}
-                    <a class="btn {{ isIconOnly ? 'btn-icon' }} {{ action.name == 'edit' ? 'btn-primary' }}"{% if action.name == 'edit' %} data-primary-action{% endif %} href="{{ href }}"{% if _editable %} data-action-key="{{ action.name }}" data-action-page="{{ crud_page_key }}" data-page-icon data-page-icon-value="{{ crud_action_icons[action.name] ?? action.icon }}"{% endif %}
+                    <a class="btn {{ isIconOnly ? 'btn-icon' }} {{ action.name == 'edit' ? 'btn-primary' }} {{ _isHidden ? 'is-hidden' }}"{% if action.name == 'edit' %} data-primary-action{% endif %} href="{{ href }}"{% if _editable %} data-action-key="{{ action.name }}" data-action-page="{{ crud_page_key }}" data-page-icon data-page-icon-value="{{ crud_action_icons[action.name] ?? action.icon }}"{% endif %}{{ _hideAttr|raw }}
                        {%- if action.htmlAttributes['target'] is defined %} target="{{ action.htmlAttributes['target'] }}"{% endif %}
                        {%- if isIconOnly %} title="{{ action.label|trans }}"{% endif %}>
                         {%- if action.icon -%}<i class="{{ action.icon }}"></i>{%- endif -%}

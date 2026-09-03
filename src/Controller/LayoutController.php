@@ -199,6 +199,16 @@ class LayoutController extends AbstractController
                     return $this->json(['error' => 'invalid_field'], JsonResponse::HTTP_NOT_FOUND);
                 }
             }
+        } elseif ('visible' === $field) {
+            // The one BOOLEAN field: whether an individual action button is
+            // shown on this page at all. Per page by construction (it is
+            // stored as a child of the page's own entry, exactly like the
+            // order and the icon), which is the whole point - "Enregistrer
+            // et continuer" can be off on Settings and still on for every
+            // entity form.
+            if (!\is_string($key) || '' === $key || !\is_bool($value)) {
+                return $this->json(['error' => 'invalid_field'], JsonResponse::HTTP_NOT_FOUND);
+            }
         } elseif (!\is_string($key) || '' === $key || !\in_array($field, ['label', 'text', 'description', 'icon'], true) || !\is_string($value)) {
             return $this->json(['error' => 'invalid_field'], JsonResponse::HTTP_NOT_FOUND);
         }
@@ -248,6 +258,12 @@ class LayoutController extends AbstractController
                         // A page's own customized description (see MenuItem::
                         // $description / the data-page-desc handler).
                         $item['description'] = $value;
+                    } elseif ('visible' === $field) {
+                        // Same flag every sortable entry already has (see
+                        // LayoutConfig::sanitizeItems) - an action button is
+                        // just a child entry, so hiding one needs no new
+                        // schema, only this branch.
+                        $item['visible'] = $value;
                     } elseif ('actions' === $field) {
                         // Stored as CHILDREN, not as a bespoke schema field:
                         // LayoutConfig already sanitizes children as an
@@ -257,7 +273,22 @@ class LayoutController extends AbstractController
                         // for LayoutArranger to learn - the key is the
                         // action name and the array order IS the button
                         // order. Locale-agnostic, like 'icon'.
-                        $item['children'] = array_map(static fn (string $name): array => ['key' => $name], $value);
+                        // MERGE, don't rebuild: a child also carries this
+                        // action's own icon and visibility, and rebuilding
+                        // the list from bare keys silently threw both away -
+                        // re-dragging a button you had re-iconed (or hidden)
+                        // reset it to the code default.
+                        $existing = [];
+                        foreach (\is_array($item['children'] ?? null) ? $item['children'] : [] as $child) {
+                            if (\is_string($child['key'] ?? null)) {
+                                $existing[$child['key']] = $child;
+                            }
+                        }
+
+                        $item['children'] = array_map(
+                            static fn (string $name): array => ($existing[$name] ?? []) + ['key' => $name],
+                            $value
+                        );
                     } elseif ('icon' === $field) {
                         // Page/menu icon - locale-agnostic by design (see
                         // LayoutConfig's icon-alone branch), so it never
@@ -284,9 +315,10 @@ class LayoutController extends AbstractController
         // unscoped lookup for key "new" would happily rewrite the first
         // page's action it happened to reach. Used by per-action icon edits.
         $scopedParentKey = $data['parentKey'] ?? null;
+        $isScoped = \is_string($scopedParentKey) && '' !== $scopedParentKey && 'actions' !== $field;
         $found = false;
 
-        if (\is_string($scopedParentKey) && '' !== $scopedParentKey && 'actions' !== $field) {
+        if ($isScoped) {
             foreach ($array['items'] as &$parent) {
                 if (($parent['key'] ?? null) !== $scopedParentKey) {
                     continue;
@@ -295,7 +327,7 @@ class LayoutController extends AbstractController
                 $children = \is_array($parent['children'] ?? null) ? $parent['children'] : [];
                 $found = $apply($children);
 
-                if (!$found && \in_array($field, ['label', 'icon'], true)) {
+                if (!$found && \in_array($field, ['label', 'icon', 'visible'], true)) {
                     // First customization of an action that has never been
                     // touched: the page entry exists (its order was saved) but
                     // this child does not yet.
@@ -309,7 +341,15 @@ class LayoutController extends AbstractController
             unset($parent);
         }
 
-        if (!$found) {
+        // A scoped edit that found no such parent falls through to the
+        // upsert below (which creates the parent entry), NEVER to the
+        // unscoped sweep: action names repeat across pages ("saveAndReturn"
+        // exists on every entity form and on every system page), so a
+        // tree-wide lookup for one would happily rewrite a DIFFERENT page's
+        // stored action - which is the exact thing $scopedParentKey exists
+        // to prevent, and which now matters because the system pages carry
+        // action rows of their own.
+        if (!$found && !$isScoped) {
             $found = $apply($array['items']);
         }
 
@@ -336,7 +376,7 @@ class LayoutController extends AbstractController
                     static fn (string $name): array => ['key' => $name],
                     $value
                 )];
-            } elseif (null === $paneIndex && \in_array($field, ['label', 'description', 'icon'], true)) {
+            } elseif (null === $paneIndex && \in_array($field, ['label', 'description', 'icon', 'visible'], true)) {
                 $entry = null !== $intlLocale
                     ? ['key' => $key, 'intl' => [$intlLocale => [$field => $value]]]
                     : ['key' => $key, $field => $value];

@@ -18,6 +18,13 @@ class Actions
     public const PAGE_DETAIL = 'detail';
     public const PAGE_EDIT = 'edit';
     public const PAGE_NEW = 'new';
+    /**
+     * The bespoke, non-entity form pages of the backoffice (site settings,
+     * API keys, ...): one page name for all of them, since they share a
+     * single template (@Admin/page/system.html.twig) and a single action
+     * set - unlike CRUD, where new/edit/index/detail each need their own.
+     */
+    public const PAGE_SYSTEM = 'system';
 
     /** @var array<string, array<string, Action>> page => name => Action */
     protected array $actions = [];
@@ -213,6 +220,40 @@ class Actions
             ->add(self::PAGE_NEW, Action::SAVE_AND_ADD_ANOTHER)
             ->add(self::PAGE_NEW, Action::SAVE_AND_CONTINUE)
             ->add(self::PAGE_NEW, Action::INDEX);
+    }
+
+    /**
+     * The conventional action row of a system page - deliberately the same
+     * three controls an entity EDIT page carries (see addDefaults()), in the
+     * same order: the committing save, a save that keeps you where you are,
+     * and the way back out. A form page in the backoffice should offer the
+     * same buttons in the same place whether or not there is an entity
+     * behind it; these were previously a single unlabelled submit at the
+     * bottom of the card instead.
+     *
+     * Built here rather than through createBuiltInAction(): every CRUD
+     * built-in ends in ->linkToCrudAction(), which is meaningless without a
+     * CRUD controller behind the page, and SAVE_AND_RETURN's own label even
+     * flips to "Créer" for any page name that isn't 'edit'.
+     */
+    public function addSystemDefaults(): static
+    {
+        return $this
+            ->add(self::PAGE_SYSTEM, Action::new(Action::SAVE_AND_RETURN, t('action.save', domain: 'admin'), 'fa-solid fa-check')
+                ->setCssClass('action-saveAndReturn')
+                ->addCssClass('btn btn-primary action-save')
+                ->setHtmlAttributes(['name' => 'submit_action', 'value' => Action::SAVE_AND_RETURN])
+                ->renderAsButton())
+
+            ->add(self::PAGE_SYSTEM, Action::new(Action::SAVE_AND_CONTINUE, t('action.save_and_continue', domain: 'admin'), 'fa-regular fa-edit')
+                ->setCssClass('action-saveAndContinue')
+                ->addCssClass('btn btn-secondary action-save')
+                ->setHtmlAttributes(['name' => 'submit_action', 'value' => Action::SAVE_AND_CONTINUE])
+                ->renderAsButton())
+
+            ->add(self::PAGE_SYSTEM, Action::new(Action::HOME, t('action.home', domain: 'admin'), 'fa-solid fa-arrow-left')
+                ->setCssClass('action-home btn btn-secondary')
+                ->linkToRoute('admin'));
     }
 
     protected function createBuiltInAction(string $pageName, string $actionName): Action

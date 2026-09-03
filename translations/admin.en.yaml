@@ -58,6 +58,8 @@ customize:
     icon_hint: "Click to change the icon (kept in sync with the sidebar menu). Clear the field and press Enter to restore the default icon."
     icon_search: "Search icons…"
     icon_clear: "Clear search"
+    hide_action: Hide this button on this page
+    show_action: Show this button on this page
     resize: Drag to resize
     remove: Remove
     split: Split apart
@@ -88,6 +90,7 @@ field:
 
 action:
     index: Back to list
+    home: Back to dashboard
     new: Create
     edit: Edit
     detail: Show

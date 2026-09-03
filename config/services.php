@@ -81,6 +81,12 @@ return function (ContainerConfigurator $configurator) {
 
     $services->set(LayoutArranger::class);
 
+    // Shared by every page that hangs its title/description/action-row
+    // customization off the CRUD scope: the CRUD controllers (keyed by
+    // slug) and the host's system pages (keyed by "system/<page>").
+    $services->set(\Base\Admin\Layout\PageCustomization::class)
+        ->args([service(LayoutStore::class)]);
+
     // ->call('setContainer', ...) below is a manual stand-in for what
     // autoconfigure() would normally wire for any AbstractController
     // subclass (the #[Required] setContainer() setter + the

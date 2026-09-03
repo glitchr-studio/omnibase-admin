@@ -90,6 +90,23 @@
             </span>
         {% endif %}
     </div>
+    {#- The page's own buttons, in the header rather than at the foot of the
+        card: on a CRUD page every save/return control lives here (and gets
+        hoisted into the topbar on a wide screen), so a settings form used to
+        be the one page in the backoffice where "Enregistrer" was somewhere
+        else entirely - reported live. Rendered only when there is a form to
+        submit, matching the empty-state branch of the content block below. -#}
+    {% if page_actions|default([])|length and form.children|length > 1 %}
+        {% include '@Admin/page/_actions.html.twig' with {
+            actions: page_actions,
+            page_key: page_key|default(null),
+            action_order: action_order|default({}),
+            action_icons: action_icons|default({}),
+            action_hidden: action_hidden|default({}),
+            editable: customize_enabled is defined and customize_enabled,
+            form_id: 'admin-form',
+        } only %}
+    {% endif %}
 </div>
 {% endblock %}
 
@@ -101,7 +118,7 @@
    "about:srcdoc" - no host, no path, so the submit could not be routed
    and the click was dropped. An absolute path resolves identically in a
    normal page and in the overlay. #}
-        {{ form_start(form, {action: app.request.pathInfo, attr: {class: 'admin-form'}}) }}
+        {{ form_start(form, {action: app.request.pathInfo, attr: {id: 'admin-form', class: 'admin-form'}}) }}
             {# Unlike crud/_form.html.twig's per-field {% for child in form %}
                loop (one .form-row per entity field, 12-col .form-grid), this
                form only ever has up to 3 top-level children (intl/unv/valid -
@@ -153,9 +170,15 @@
                     {{ form_rest(form) }}
                 {% endif %}
             </div>
-            <div class="form-footer">
-                <button class="btn btn-primary" type="submit">{{ 'action.save'|trans({}, 'admin') }}</button>
-            </div>
+            {# No footer button: the submit controls are the header's own
+               action row (see content_header above), same as every CRUD form
+               page. The fallback below only exists for the case that row is
+               not rendered at all - a host page that passes no actions. #}
+            {% if page_actions|default([])|length == 0 %}
+                <div class="form-footer">
+                    <button class="btn btn-primary" type="submit">{{ 'action.save'|trans({}, 'admin') }}</button>
+                </div>
+            {% endif %}
         {{ form_end(form) }}
     {% else %}
         <div class="empty-state">{{ ('page.' ~ page ~ '.empty')|trans({}, 'admin') }}</div>

@@ -1,0 +1,57 @@
+{# The top-right action row of a NON-CRUD admin page (settings, API keys).
+
+   Same contract as the CRUD templates' own rows - same .global-actions
+   wrapper (so the layout hoists it into the topbar and the key-cap CSS
+   applies), same data-action-row/data-action-key hooks (so customize mode
+   can drag-reorder the buttons and re-icon them, persisted in the CRUD
+   layout scope under this page's key), same one-primary-cap rule.
+
+   The buttons are hoisted OUT of the <form> they submit and associated
+   back to it by id (form="…"), exactly like crud/_form.html.twig does -
+   a header row cannot be a descendant of the card's form.
+
+   Params: actions (name => Action), page_key, editable, form_id. #}
+{% set _editable = editable|default(false) and page_key|default(null) %}
+{#- Code order with the stored order applied on top - see
+    AdminTwigExtension::adminActionOrder() for why this is a permutation of
+    the stored actions' own slots rather than a "stored first" sort. -#}
+{% set _order = admin_action_order(actions, action_order|default({})) %}
+{% set _icons = action_icons|default({}) %}
+{#- Buttons the superadmin has hidden ON THIS PAGE. Dropped from the
+    document for anyone who cannot customize; a superadmin still gets the
+    markup (customize_enabled is a permission, not the live mode) and CSS
+    shows it only while customizing, as a faded ghost - the toggle that
+    brings one back lives on the button itself. -#}
+{% set _hidden = action_hidden|default({}) %}
+<div class="global-actions"{% if _editable %} data-action-row data-page-key="{{ page_key }}"{% endif %}>
+    {% for action in actions|sort((a, b) => _order[a.name] <=> _order[b.name]) %}
+        {% set _isHidden = _hidden[action.name]|default(false) %}
+        {% set _icon = _icons[action.name] ?? action.icon %}
+        {% set _edit = _editable ? ' data-action-key="' ~ action.name ~ '" data-action-page="' ~ page_key ~ '" data-page-icon data-page-icon-value="' ~ _icon ~ '" data-action-hidden="' ~ (_isHidden ? '1' : '0') ~ '"' : '' %}
+        {#- Hidden and not customizing: not rendered at all (Twig has no
+            `continue`, hence the wrapping condition rather than a skip). -#}
+        {% if not _isHidden or _editable %}
+        {% if action.htmlElement == 'button' %}
+            {#- The committing save is the row's single key cap, green, exactly
+                as on an entity form - every other submit stays flat. -#}
+            {% set isMainSave = 'action-saveAndReturn' in action.cssClass %}
+            <button class="btn {{ isMainSave ? 'btn-success' : 'btn-primary' }} {{ _isHidden ? 'is-hidden' }}"{% if isMainSave %} data-primary-action{% endif %} type="submit"
+                    {%- if form_id|default(null) %} form="{{ form_id }}"{% endif %}
+                    name="{{ action.htmlAttributes.name|default('submit_action') }}" value="{{ action.htmlAttributes.value|default(action.name) }}"{{ _edit|raw }}>
+                {% if _icon %}<i class="{{ _icon }}"></i> {% endif %}{{ action.label|trans }}
+            </button>
+        {% elseif action.routeName %}
+            <a class="btn {{ _isHidden ? 'is-hidden' }}" href="{{ path(action.routeName, action.routeParameters is iterable ? action.routeParameters : {}) }}"{{ _edit|raw }}>
+                {% if _icon %}<i class="{{ _icon }}"></i> {% endif %}{{ action.label|trans }}
+            </a>
+        {% elseif action.linkUrl %}
+            {#- A ready-made URL the controller resolved itself (Action::
+                setLinkUrl) - the only other link shape a system page can
+                need, since there is no entity to build a CRUD URL from. -#}
+            <a class="btn {{ _isHidden ? 'is-hidden' }}" href="{{ action.linkUrl }}"{{ _edit|raw }}>
+                {% if _icon %}<i class="{{ _icon }}"></i> {% endif %}{{ action.label|trans }}
+            </a>
+        {% endif %}
+        {% endif %}
+    {% endfor %}
+</div>

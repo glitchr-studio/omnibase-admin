@@ -33,22 +33,27 @@
     target. new/edit were simply never wired for it, so the one place you
     most often want to reorder buttons was the one place you could not. -#}
 {% set _editable = customize_enabled is defined and customize_enabled and crud_page_key is defined %}
-{% set _order = crud_action_order|default({}) %}
+{% set _order = admin_action_order(actions.getAll(crud.currentPage), crud_action_order|default({})) %}
 {% set _icons = crud_action_icons|default({}) %}
+{#- Per-page hidden buttons (customize mode's eye toggle) - see
+    crud/detail.html.twig's twin for the render contract. -#}
+{% set _hiddenActions = crud_action_hidden|default({}) %}
     <div class="global-actions"{% if _editable %} data-action-row data-page-key="{{ crud_page_key }}"{% endif %}>
-        {#- Unstored actions sort to the end (999) so adding an action in code
-            never hides it behind an older saved order. -#}
-        {% for action in actions.getAll(crud.currentPage)|sort((a, b) => (_order[a.name] ?? 999) <=> (_order[b.name] ?? 999)) %}
+        {#- Code order with the superadmin's stored order applied on top -
+            see AdminTwigExtension::adminActionOrder(). -#}
+        {% for action in actions.getAll(crud.currentPage)|sort((a, b) => _order[a.name] <=> _order[b.name]) %}
             {% set _icon = _icons[action.name] ?? action.icon %}
-            {% set _edit = _editable ? ' data-action-key="' ~ action.name ~ '" data-action-page="' ~ crud_page_key ~ '" data-page-icon data-page-icon-value="' ~ _icon ~ '"' : '' %}
-            {% if action.htmlElement == 'button' %}
+            {% set _isHidden = _hiddenActions[action.name]|default(false) %}
+            {% set _edit = _editable ? ' data-action-key="' ~ action.name ~ '" data-action-page="' ~ crud_page_key ~ '" data-page-icon data-page-icon-value="' ~ _icon ~ '" data-action-hidden="' ~ (_isHidden ? '1' : '0') ~ '"' : '' %}
+            {% if _isHidden and not _editable %}
+            {% elseif action.htmlElement == 'button' %}
                 {% set isMainSave = 'action-saveAndReturn' in action.cssClass %}
-                <button class="btn {{ isMainSave ? 'btn-success' : 'btn-primary' }}"{% if isMainSave %} data-primary-action{% endif %} type="submit" form="admin-form"
+                <button class="btn {{ isMainSave ? 'btn-success' : 'btn-primary' }} {{ _isHidden ? 'is-hidden' }}"{% if isMainSave %} data-primary-action{% endif %} type="submit" form="admin-form"
                         name="{{ action.htmlAttributes.name|default('submit_action') }}" value="{{ action.htmlAttributes.value|default(action.name) }}"{{ _edit|raw }}>
                     {% if _icon %}<i class="{{ _icon }}"></i> {% endif %}{{ action.label|trans }}
                 </button>
             {% elseif action.crudActionName == 'index' %}
-                <a class="btn" href="{{ admin_url(controller_fqcn, 'index') }}"{{ _edit|raw }}>
+                <a class="btn {{ _isHidden ? 'is-hidden' }}" href="{{ admin_url(controller_fqcn, 'index') }}"{{ _edit|raw }}>
                     {% if _icon %}<i class="{{ _icon }}"></i> {% endif %}{{ action.label|trans }}
                 </a>
             {% elseif action.name == 'delete' and entity is defined and entity.id %}
@@ -59,13 +64,13 @@
                 <form method="post" action="{{ admin_url(controller_fqcn, 'delete', entity.id) }}" style="display:contents"
                       data-confirm="{{ 'action.delete_confirm'|trans({}, 'admin') }}">
                     <input type="hidden" name="_token" value="{{ csrf_token('admin-batch-' ~ crud.entityFqcn) }}">
-                    <button class="btn btn-icon text-danger" title="{{ action.label|trans }}"{{ _edit|raw }}><i class="{{ _icons[action.name] ?? 'fa-solid fa-trash' }}"></i></button>
+                    <button class="btn btn-icon text-danger {{ _isHidden ? 'is-hidden' }}" title="{{ action.label|trans }}"{{ _edit|raw }}><i class="{{ _icons[action.name] ?? 'fa-solid fa-trash' }}"></i></button>
                 </form>
             {% elseif entity is defined and entity.id %}
                 {% set href = admin_action_url(action, entity, controller_fqcn) %}
                 {% if href %}
                     {% set isIconOnly = action.htmlAttributes['tooltip'] is defined %}
-                    <a class="btn {{ isIconOnly ? 'btn-icon' }} {{ action.cssClass }}" href="{{ href }}"
+                    <a class="btn {{ isIconOnly ? 'btn-icon' }} {{ action.cssClass }} {{ _isHidden ? 'is-hidden' }}" href="{{ href }}"
                        {%- if action.htmlAttributes['target'] is defined %} target="{{ action.htmlAttributes['target'] }}"{% endif %}
                        {%- if isIconOnly %} title="{{ action.label|trans }}"{% endif %}{{ _edit|raw }}>
                         {%- if _icon -%}<i class="{{ _icon }}"></i>{%- endif -%}
