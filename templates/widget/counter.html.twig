@@ -43,6 +43,22 @@
                 {% endif %}
             </select>
         </label>
+        {# This widget's stand-in for a chart legend: with no canvas there is
+           nothing to click a series off on, so the source filter lives here
+           instead. Same params.series key the two chart widgets persist
+           through their legends, so "which traffic this counts" is one
+           concept across all three rather than a counter-only setting. #}
+        <fieldset class="widget-settings-field">
+            <span>{{ 'counter.settings.sources_label'|trans({}, 'admin') }}</span>
+            <div class="widget-settings-checks">
+                {% for key, label in sourceLabels %}
+                    <label class="widget-settings-check">
+                        <input type="checkbox" data-counter-settings-source value="{{ key }}"{{ key in sources ? ' checked' }}>
+                        <span>{{ label }}</span>
+                    </label>
+                {% endfor %}
+            </div>
+        </fieldset>
         <div class="widget-settings-actions">
             <button type="button" class="analytics-range-btn" data-counter-settings-cancel>{{ 'counter.settings.cancel'|trans({}, 'admin') }}</button>
             <button type="button" class="analytics-range-btn is-active" data-counter-settings-apply>{{ 'counter.settings.apply'|trans({}, 'admin') }}</button>
@@ -57,7 +73,10 @@
                 </span>
             {% endif %}
         </div>
-        <span class="analytics-stat-label">{{ 'analytics.label.page_views'|trans({}, 'admin') }}</span>
+        {# Names the sources rather than saying a bare "Vues": the number is
+           human-only by default, and a tile with no legend beside it has
+           nowhere else to say so. #}
+        <span class="analytics-stat-label">{{ sources|map(key => sourceLabels[key])|join(' + ') }}</span>
     {% else %}
         <p class="analytics-empty-state">{{ 'counter.empty_state'|trans({}, 'admin') }}</p>
     {% endif %}

@@ -41,7 +41,14 @@
    a card inside a card, which this codebase's dashboard loop explicitly
    never allows ("nothing is ever a card nested inside another card").
    .analytics-card's own padding is kept either way. #}
-{% set totalPageViews = series|reduce((carry, day) => carry + day.pageViews, 0) %}
+{# Summed from the VISIBLE source lines, not from Analytics' combined
+   `pageViews` column, so the headline number always equals the lines the
+   legend below is currently showing. It used to read the combined column
+   unconditionally, which counted crawlers into "Vues" even while the
+   chart's own bot line was hidden. The legend handler in layout.html.twig
+   keeps that invariant afterwards (recomputeStatsFromChart sums exactly
+   the datasets that aren't hidden). #}
+{% set totalPageViews = series|reduce((carry, day) => carry + visibleSources|reduce((sum, key) => sum + day[key], 0), 0) %}
 <div class="analytics-card {{ (embedded is not defined or not embedded) ? 'card' }}" data-analytics-card>
     <div class="analytics-card-header">
         <h2 class="analytics-card-title" data-analytics-title>{{ widget.label|trans({}, 'admin') }}</h2>
@@ -49,9 +56,9 @@
             <div class="analytics-stat" data-stat="pageViews">
                 <span class="analytics-stat-value">
                     <span class="analytics-stat-number" data-raw-value="{{ totalPageViews }}">{{ totalPageViews }}</span>
-                    {%- if change.pageViews is not null %}
-                        <span class="analytics-stat-change {{ change.pageViews >= 0 ? 'is-up' : 'is-down' }}">
-                            {{ change.pageViews >= 0 ? '+' : '' }}{{ change.pageViews }}%
+                    {%- if pageViewsChange is not null %}
+                        <span class="analytics-stat-change {{ pageViewsChange >= 0 ? 'is-up' : 'is-down' }}">
+                            {{ pageViewsChange >= 0 ? '+' : '' }}{{ pageViewsChange }}%
                         </span>
                     {% endif %}
                 </span>

@@ -23,7 +23,7 @@ use Symfony\Contracts\Translation\TranslatorInterface;
  */
 final class EntityViewsWidgetType implements PaletteDashboardWidgetTypeInterface
 {
-    private const SOURCE_KEYS = ['pageViewsHuman', 'pageViewsBot', 'pageViewsAi'];
+    private const SOURCE_KEYS = AnalyticsSeriesPalette::SOURCE_KEYS;
 
     /**
      * params.entityId's "every instance of entityClass, summed" sentinel -
@@ -107,6 +107,21 @@ final class EntityViewsWidgetType implements PaletteDashboardWidgetTypeInterface
         // uses, same colors - Visitors/Users are deliberately excluded
         // (see Analytics::dailyBreakdown()'s own docblock: they're not
         // answerable per-path with the current data model).
+        // Which source lines this instance plots, same per-instance param
+        // (and same legend-click persistence) the site-wide traffic card
+        // has - this widget used to hardcode all three unconditionally,
+        // which is why its own header total counted crawlers with no way
+        // to say otherwise. Defaults to human only here: unlike the
+        // site-wide card there are no visitor/user lines to keep, so
+        // DEFAULT_VISIBLE's non-source half has nothing to contribute.
+        $visibleSeries = \array_values(\array_intersect(
+            $params['series'] ?? AnalyticsSeriesPalette::DEFAULT_VISIBLE,
+            self::SOURCE_KEYS,
+        ));
+        if ([] === $visibleSeries) {
+            $visibleSeries = \array_values(\array_intersect(AnalyticsSeriesPalette::DEFAULT_VISIBLE, self::SOURCE_KEYS));
+        }
+
         $palette = \array_intersect_key(
             \array_map(
                 fn (array $entry) => \array_merge($entry, ['label' => $this->translator->trans($entry['label'], [], 'admin')]),
@@ -132,6 +147,14 @@ final class EntityViewsWidgetType implements PaletteDashboardWidgetTypeInterface
             ),
             'series' => $series,
             'palette' => $palette,
+            'visibleSeries' => $visibleSeries,
+            // The header total sums exactly these, so it matches the lines
+            // the legend is showing rather than Analytics' bot-inclusive
+            // combined column (see AnalyticsSeriesPalette::DEFAULT_VISIBLE).
+            'total' => \array_sum(\array_map(
+                fn (array $day) => \array_sum(\array_intersect_key($day, \array_flip($visibleSeries))),
+                $series,
+            )),
             'events' => (null !== $path) ? $this->timelineEvents->getFormattedEvents($series, $labels, $dateFormat) : [],
         ];
     }

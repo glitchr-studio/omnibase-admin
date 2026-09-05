@@ -28,6 +28,7 @@ counter:
         entity_label: Élément
         entity_placeholder: "— Sélectionner un élément —"
         all_instances: "— Tous —"
+        sources_label: Trafic compté
         cancel: Annuler
         apply: Appliquer
 

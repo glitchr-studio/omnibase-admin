@@ -4,6 +4,7 @@ namespace Base\Admin\Widget;
 
 use Base\Admin\Config\Menu\MenuItem;
 use Base\Service\Analytics;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * The "Counter" palette entry: a single number + period-over-period trend
@@ -23,6 +24,7 @@ final class CounterWidgetType implements PaletteDashboardWidgetTypeInterface
     public function __construct(
         private readonly Analytics $analytics,
         private readonly LinkableEntityRegistry $entities,
+        private readonly TranslatorInterface $translator,
     ) {
     }
 
@@ -69,11 +71,38 @@ final class CounterWidgetType implements PaletteDashboardWidgetTypeInterface
             $path = $entity?->__toLink();
         }
 
+        // Which traffic sources this counter counts. Human only unless the
+        // admin says otherwise (see AnalyticsSeriesPalette::DEFAULT_VISIBLE
+        // for why that is the default rather than the combined column this
+        // used to sum): a KPI tile stating a number nearly double the real
+        // audience, with no legend next to it to hint that crawlers were in
+        // there, is the worst place on the dashboard for that total.
+        //
+        // This widget has no chart, so the settings panel's checkboxes are
+        // its equivalent of the legend - same params.series key the two
+        // chart widgets persist, so the concept reads identically wherever
+        // it appears.
+        $sources = \array_values(\array_intersect(
+            $params['series'] ?? AnalyticsSeriesPalette::DEFAULT_VISIBLE,
+            AnalyticsSeriesPalette::SOURCE_KEYS,
+        ));
+        if ([] === $sources) {
+            $sources = \array_values(\array_intersect(
+                AnalyticsSeriesPalette::DEFAULT_VISIBLE,
+                AnalyticsSeriesPalette::SOURCE_KEYS,
+            ));
+        }
+
+        $sumSources = fn (array $days): int => \array_sum(\array_map(
+            fn (array $day) => \array_sum(\array_intersect_key($day, \array_flip($sources))),
+            $days,
+        ));
+
         $total = null;
         $change = null;
         if (null !== $path) {
             $series = $this->analytics->dailyBreakdown($days, $path);
-            $total = \array_sum(\array_column($series, 'pageViews'));
+            $total = $sumSources($series);
             // Same $days*2-then-split trick Analytics::periodOverPeriodChange()
             // itself uses site-wide, done here directly since that method
             // has no $path parameter of its own (page-view totals are
@@ -81,8 +110,8 @@ final class CounterWidgetType implements PaletteDashboardWidgetTypeInterface
             // was only ever built for the site-wide case - see its own
             // docblock).
             $fullSeries = $this->analytics->dailyBreakdown($days * 2, $path);
-            $previous = \array_sum(\array_column(\array_slice($fullSeries, 0, $days), 'pageViews'));
-            $current = \array_sum(\array_column(\array_slice($fullSeries, $days, $days), 'pageViews'));
+            $previous = $sumSources(\array_slice($fullSeries, 0, $days));
+            $current = $sumSources(\array_slice($fullSeries, $days, $days));
             $change = $previous > 0 ? \round((($current - $previous) / $previous) * 100, 1) : null;
         }
 
@@ -97,6 +126,11 @@ final class CounterWidgetType implements PaletteDashboardWidgetTypeInterface
             ),
             'total' => $total,
             'change' => $change,
+            'sources' => $sources,
+            'sourceLabels' => \array_map(
+                fn (string $key) => $this->translator->trans(AnalyticsSeriesPalette::SERIES[$key]['label'], [], 'admin'),
+                \array_combine(AnalyticsSeriesPalette::SOURCE_KEYS, AnalyticsSeriesPalette::SOURCE_KEYS),
+            ),
         ];
     }
 }

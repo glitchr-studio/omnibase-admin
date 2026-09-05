@@ -17,15 +17,33 @@
    wired up for it, matches analytics_card.html.twig's own note on the
    same gap) - kept here only so this template doesn't silently break the
    day it is. #}
-<div class="analytics-card {{ (embedded is not defined or not embedded) ? 'card' }}" data-entity-views-card>
+{# data-analytics-card as well as this widget's own attribute: that is the
+   hook layout.html.twig's legend handler scopes to, so a legend click here
+   now recomputes the header total (and persists the choice into
+   params.series while customizing) exactly as it does on the site-wide
+   card, instead of silently toggling a line while the number above it
+   stayed on a bot-inclusive figure. #}
+<div class="analytics-card {{ (embedded is not defined or not embedded) ? 'card' }}" data-entity-views-card data-analytics-card>
     <div class="analytics-card-header">
         <h2 class="analytics-card-title" data-analytics-title>
             {{ entity ? (widget.label ?: entity) : widget.label|trans({}, 'admin') }}
         </h2>
         {% if entity or allInstances %}
+            {# Same [data-stat]/.analytics-stat-number structure as
+               analytics_card.html.twig - not cosmetic: recomputeStatsFromChart()
+               looks the number up by exactly those two selectors and
+               animates from data-raw-value, so a plain <span> here would
+               leave the total frozen on every legend click.
+
+               No % badge: this widget has no period-over-period figure to
+               put in one (Analytics' comparison has no $path parameter -
+               see CounterWidgetType, which does the two-window split by
+               hand for precisely that reason). #}
             <div class="analytics-stat-row">
-                <div class="analytics-stat">
-                    <span class="analytics-stat-value">{{ series|reduce((carry, day) => carry + day.pageViews, 0) }}</span>
+                <div class="analytics-stat" data-stat="pageViews">
+                    <span class="analytics-stat-value">
+                        <span class="analytics-stat-number" data-raw-value="{{ total }}">{{ total }}</span>
+                    </span>
                     <span class="analytics-stat-label">{{ 'analytics.label.page_views'|trans({}, 'admin') }}</span>
                 </div>
             </div>
@@ -68,15 +86,24 @@
     </div>
     {% if entity or allInstances %}
         <div class="analytics-chart-wrap">
-            {# see analytics_card.html.twig for why this carries an id #}
+            {# see analytics_card.html.twig for why this carries an id.
+
+               All three source lines are always sent, hidden ones included,
+               flagged with Chart.js's own `hidden` - an omitted dataset has
+               no legend entry, so dropping the ones that aren't currently
+               visible would make them unreachable (same reasoning as
+               analytics_card). Noted out here rather than beside `datasets`
+               below because that sits inside a {{ }} expression, where a
+               Twig comment is a syntax error. #}
             <canvas id="admin-chart-{{ widget.key|default('entity-views')|replace({'.': '-'}) }}" data-admin-chart="{{ {
                 labels: series|map(day => day.date|date('d/m')),
-                datasets: ['pageViewsHuman', 'pageViewsBot', 'pageViewsAi']|map(key => {
+                datasets: palette|keys|map(key => {
                     key: key,
                     label: palette[key].label,
                     data: series|map(day => day[key]),
                     color: palette[key].color,
                     colorDark: palette[key].colorDark,
+                    hidden: key not in visibleSeries,
                 }),
                 events: events|default([]),
             }|json_encode }}"></canvas>

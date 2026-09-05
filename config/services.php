@@ -182,6 +182,7 @@ return function (ContainerConfigurator $configurator) {
         ->args([
             service(\Base\Service\Analytics::class),
             service(\Base\Admin\Widget\LinkableEntityRegistry::class),
+            service('translator'),
         ])
         ->tag('base.admin.dashboard_widget_type')
         ->tag('base.admin.dashboard_widget_type.palette');

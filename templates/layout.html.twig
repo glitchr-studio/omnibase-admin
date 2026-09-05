@@ -238,6 +238,36 @@
         [data-page-desc][contenteditable="true"]:focus {
             outline: 2px solid var(--admin-accent); outline-offset: 2px; border-radius: 4px;
         }
+        {# The dash before the page description, and the empty description
+           itself, are an affordance for customize mode - not content. The
+           template renders them for anyone who CAN customize (see
+           crud/_page_heading.html.twig's `_desc or editable` guard), which
+           left every superadmin looking at a bare "Article ID #1143 -" with
+           nothing after it on every page that has no description yet, and no
+           hint that the space was editable at all.
+
+           Hidden by default, shown when there is a description to separate,
+           and shown while customizing - where the placeholder finally
+           renders, so the empty slot says what it is instead of being an
+           orphan character. data-placeholder was already on the element and
+           had never been drawn by anything. #}
+        {# Stated as "hide it when what follows is empty" rather than
+           enumerating every case that should show it: the description is
+           always the subtitle's last span, whether or not it carries the
+           editable attributes, so one rule covers both. #}
+        .admin-header-subtitle:has(> span:last-child:empty) .admin-header-sep { display: none; }
+        {# Repeats the :has() rather than being a plain
+           `body.is-customizing .admin-header-sep`: :has() takes the
+           specificity of its own argument, so the hide rule above weighs
+           (0,4,1) and a selector that merely adds body.is-customizing to
+           the class would lose to it and never show the separator at all. #}
+        body.is-customizing .admin-header-subtitle:has(> span:last-child:empty) .admin-header-sep { display: inline; }
+
+        body.is-customizing [data-page-desc]:empty::before {
+            content: attr(data-placeholder);
+            opacity: .45;
+            font-style: italic;
+        }
         .admin-menu { list-style: none; margin: .75rem 0 0; padding: 0; }
         {# Used to push a standalone "Tableau de bord" quick-link away from
            the sections below it (prod-style rhythm: quick link at the very
@@ -2312,6 +2342,16 @@
         body.is-customizing .widget-settings-panel:not([hidden]) { border: 1px solid var(--admin-border); border-radius: var(--admin-radius); padding: 1rem; margin-bottom: 1rem; display: flex; flex-direction: column; gap: .9rem; background: var(--admin-surface); }
         .widget-settings-field { display: flex; flex-direction: column; gap: .4rem; font-size: .78rem; color: var(--admin-muted); text-transform: uppercase; letter-spacing: .03em; }
         .widget-settings-field input[type="text"], .widget-settings-field select { font: inherit; text-transform: none; letter-spacing: normal; color: var(--admin-text); background: var(--admin-bg); border: 1px solid var(--admin-border); border-radius: 6px; padding: .4rem .6rem; }
+        {# The counter widget's source filter. A fieldset rather than a
+           label so the group caption isn't tied to one checkbox; it needs
+           the border/margin/padding reset because a fieldset carries UA
+           defaults for all three and the admin loads no Bootstrap to
+           normalize them away (see the theming notes elsewhere in this
+           file - element defaults leak here). #}
+        fieldset.widget-settings-field { border: 0; margin: 0; padding: 0; min-width: 0; }
+        .widget-settings-checks { display: flex; flex-wrap: wrap; gap: .35rem .8rem; }
+        .widget-settings-check { display: inline-flex; align-items: center; gap: .35rem; font: inherit; text-transform: none; letter-spacing: normal; color: var(--admin-text); cursor: pointer; }
+        .widget-settings-check input { margin: 0; accent-color: var(--admin-accent); }
         .widget-settings-actions { display: flex; justify-content: flex-end; gap: .5rem; }
         {# The traffic widget's title, in place: contenteditable is toggled
            by JS (see refreshTitleEditability()), not rendered conditionally
@@ -5477,14 +5517,15 @@
         // admin-charts.js's legendOnClick - Chart.js already toggles a
         // series for free on legend click, this just also dispatches a DOM
         // event so the currently-visible set can be persisted here).
-        // data-analytics-card scopes this to the site-wide traffic widget
-        // specifically - article_views' own chart dispatches the exact
-        // same generic event (admin-charts.js has no idea which widget
-        // type is listening), but that widget hardcodes its 3 series
-        // unconditionally and has no params.series concept to write one
-        // into, so a legend click there stays a harmless temporary view
-        // preference instead of attempting to persist something that
-        // doesn't exist.
+        // data-analytics-card scopes this to the widgets that have a stat
+        // row to recompute and a params.series to persist into. That is
+        // both chart widgets now: entity_views.html.twig carries the
+        // attribute too, since EntityViewsWidgetType gained the same
+        // per-instance source selection. It previously hardcoded all three
+        // series, so a legend click there was a temporary view preference
+        // with nothing to write it to - and, worse, left its header total
+        // on a bot-inclusive figure that contradicted the line the admin
+        // had just hidden.
         document.addEventListener('admin-chart:legend-toggle', function (e) {
             var card = e.target.closest('[data-analytics-card]');
             var chart = e.target._adminChart;
@@ -5738,7 +5779,14 @@
             applyBlock.dataset.blockName = applyDef.blockName || 'entity_views';
             applyBlock.dataset.widgetLabel = applyBlock.dataset.widgetLabel || applyDef.label || '';
             applyBlock.dataset.widgetIcon = applyDef.icon || '';
-            applyBlock.dataset.widgetParams = JSON.stringify(Object.assign({}, applyDef.params, { entityClass: entityClass, entityId: entityId }));
+            // applyDef is the widget's ORIGINAL definition, so assigning
+            // straight from it would drop any series the admin had just
+            // picked off the legend - harmless while this widget hardcoded
+            // its three series, a silent reset now that it persists them.
+            // The live params are the base; the two selects below are the
+            // only keys this panel actually owns.
+            var evLive = JSON.parse(applyBlock.dataset.widgetParams || '{}');
+            applyBlock.dataset.widgetParams = JSON.stringify(Object.assign({}, applyDef.params, evLive, { entityClass: entityClass, entityId: entityId }));
 
             applyCard.querySelector('[data-entity-views-settings-panel]').hidden = true;
             var applyToggle = applyBlock.querySelector('[data-entity-views-settings-toggle]');
@@ -5781,6 +5829,20 @@
                     toggleCard.querySelector('[data-counter-settings-class]').value = toggleClass;
                     toggleCard.querySelector('[data-counter-settings-class]').dispatchEvent(new Event('change', { bubbles: true }));
                     toggleCard.querySelector('[data-counter-settings-entity]').value = toggleEntityId;
+
+                    // Re-checks the boxes from the live params rather than
+                    // mergeDef, which is the widget's original definition
+                    // and has no record of a source picked in an earlier
+                    // open. Falls back to the checked state the server
+                    // rendered when nothing is stored, so re-opening the
+                    // panel never silently proposes a different filter than
+                    // the number above it is using.
+                    var liveParams = JSON.parse((toggleBlock && toggleBlock.dataset.widgetParams) || '{}');
+                    if (Array.isArray(liveParams.series)) {
+                        toggleCard.querySelectorAll('[data-counter-settings-source]').forEach(function (box) {
+                            box.checked = liveParams.series.indexOf(box.value) !== -1;
+                        });
+                    }
                 }
                 togglePanel.hidden = !opening;
                 toggle.classList.toggle('is-active', opening);
@@ -5812,7 +5874,21 @@
             applyBlock.dataset.blockName = applyDef.blockName || 'counter';
             applyBlock.dataset.widgetLabel = applyBlock.dataset.widgetLabel || applyDef.label || '';
             applyBlock.dataset.widgetIcon = applyDef.icon || '';
-            applyBlock.dataset.widgetParams = JSON.stringify(Object.assign({}, applyDef.params, { entityClass: entityClass, entityId: entityId }));
+            // Checked sources, in the panel's own (palette) order. An
+            // all-unchecked box is not persisted as an empty list - the
+            // server would only fall straight back to the default, so
+            // omitting the key says the same thing without storing a state
+            // that reads as deliberate. Same "at least one series" stance
+            // the chart legend handler takes.
+            var sources = [];
+            applyCard.querySelectorAll('[data-counter-settings-source]').forEach(function (box) {
+                if (box.checked) sources.push(box.value);
+            });
+
+            var counterParams = Object.assign({}, applyDef.params, { entityClass: entityClass, entityId: entityId });
+            if (sources.length) counterParams.series = sources;
+            else delete counterParams.series;
+            applyBlock.dataset.widgetParams = JSON.stringify(counterParams);
 
             applyCard.querySelector('[data-counter-settings-panel]').hidden = true;
             var applyToggle = applyBlock.querySelector('[data-counter-settings-toggle]');
