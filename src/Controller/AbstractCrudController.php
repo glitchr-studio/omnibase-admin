@@ -3,6 +3,7 @@
 namespace Base\Admin\Controller;
 
 use Base\Admin\Config\Action;
+use Base\Database\Attribute\Alias;
 use function Symfony\Component\Translation\t;
 use Base\Admin\Config\Actions;
 use Base\Admin\Config\Crud;
@@ -568,28 +569,195 @@ abstract class AbstractCrudController extends AbstractController implements Crud
     // overridable persistence + query hooks
     // -----------------------------------------------------------------
 
+    /**
+     * Constructor parameter names that mean "who this record belongs to".
+     *
+     * Matching on the NAME rather than the User type is deliberate and
+     * load-bearing. Plenty of constructors here take a User that is not an
+     * owner at all - Sanction's is `(?User $user, ?Penalty $penalty, ?User
+     * $moderator, ...)`, where the first User is the person being
+     * sanctioned - so filling every User parameter with whoever is logged
+     * in would quietly sanction the moderator instead of the offender.
+     */
+    private const OWNER_PARAMETERS = ['owner', 'author'];
+
     public function createEntity(string $entityFqcn): object
     {
         $reflection = new \ReflectionClass($entityFqcn);
         $constructor = $reflection->getConstructor();
 
-        if (null === $constructor || 0 === $constructor->getNumberOfRequiredParameters()) {
+        if (null === $constructor) {
             return new $entityFqcn();
         }
 
-        // required constructor args (author entities, pathed settings, ...):
-        // pass null/'' defaults so the blank instance is form-fillable;
-        // override createEntity() when the entity needs a smarter default
+        // A new record defaults to being owned by whoever is creating it -
+        // which is what makes a new article arrive with its author already
+        // filled in, rather than requiring the one person who cannot be
+        // wrong about it to pick themselves from a list every time. It stays
+        // an ordinary pre-filled form value: the field is still editable, so
+        // publishing on someone else's behalf costs one change instead of
+        // being the default state.
+        //
+        // Passed through the CONSTRUCTOR rather than set afterwards because
+        // each entity decides for itself what owning it means. Article and
+        // Destination expose the field as `authors`, a property that Alias
+        // only binds to `owners` on prePersist/postLoad - so on a brand-new
+        // in-memory instance the two collections are still separate, and
+        // calling addOwner() afterwards would fill the one the form is not
+        // reading. Their constructors seed both; only they know that.
+        $owner = $this->getUser();
+        $parameters = $constructor->getParameters();
+        $ownerIndex = null !== $owner ? $this->resolveOwnerParameter($entityFqcn, $parameters) : null;
+
+        // The owner is not always the first parameter - Photo's signature is
+        // `(?string $image, ?User $owner, ...)` - so optional parameters
+        // before it are filled with their own declared defaults instead of
+        // stopping the walk, then any purely-default tail is trimmed back
+        // off so entities without an owner are constructed exactly as before.
         $arguments = [];
-        foreach ($constructor->getParameters() as $parameter) {
-            if ($parameter->isOptional()) {
+        $lastMeaningful = -1;
+
+        foreach ($parameters as $index => $parameter) {
+            if ($index === $ownerIndex) {
+                $arguments[$index] = $owner;
+                $lastMeaningful = $index;
+
+                continue;
+            }
+
+            // A variadic tail accepts no positional default, so anything
+            // past here would be inventing arguments the signature never
+            // asked for. (Gallery's `(...$args)` forwards straight to
+            // Thread's constructor, which is why it can still be the owner
+            // slot above.)
+            if ($parameter->isVariadic()) {
                 break;
             }
+
+            if ($parameter->isOptional()) {
+                if (!$parameter->isDefaultValueAvailable()) {
+                    break;
+                }
+
+                $arguments[$index] = $parameter->getDefaultValue();
+
+                continue;
+            }
+
             $type = $parameter->getType();
-            $arguments[] = ($type instanceof \ReflectionNamedType && 'string' === $type->getName() && !$type->allowsNull()) ? '' : null;
+
+            // required constructor args (pathed settings, ...): pass null/''
+            // defaults so the blank instance is form-fillable; override
+            // createEntity() when the entity needs a smarter default
+            $arguments[$index] = ($type instanceof \ReflectionNamedType && 'string' === $type->getName() && !$type->allowsNull()) ? '' : null;
+            $lastMeaningful = $index;
         }
 
-        return $reflection->newInstanceArgs($arguments);
+        $arguments = \array_slice($arguments, 0, $lastMeaningful + 1);
+        $entity = [] === $arguments ? new $entityFqcn() : $reflection->newInstanceArgs($arguments);
+
+        if (null !== $ownerIndex) {
+            $this->bindOwnerAliases($reflection, $entity);
+        }
+
+        return $entity;
+    }
+
+    /**
+     * The property Thread keeps its owners in, and the one an #[Alias] has to
+     * name to be an alias OF ownership rather than of something else.
+     */
+    private const OWNERS_PROPERTY = 'owners';
+
+    /**
+     * Point aliased owner properties at the owners collection.
+     *
+     * Five entities expose their owners under a second name via #[Alias] -
+     * Article, Destination, Comment, Gallery and Calendar all call it
+     * `authors` - and that is the name their CRUD form actually binds to. But
+     * Alias only ties the two properties together on postLoad/prePersist, so
+     * on an instance that has just been constructed and not yet saved they
+     * are still two separate values: the constructor filled `owners`, and the
+     * form reads an `authors` that is still null. The author field came up
+     * blank on four of the five for exactly that reason.
+     *
+     * Article is the one that worked, because its constructor happens to seed
+     * `authors` by hand as well. Doing this here instead means the other four
+     * do not each need to remember to - and the entity that already does is
+     * unharmed, since Alias::bind() unions the two collections by key rather
+     * than appending, so the owner does not end up listed twice.
+     *
+     * Restricted to aliases OF `owners`: the same attribute is also used for
+     * unrelated things (Gallery's `photos` aliases `children`), and binding
+     * those early is a broader change than defaulting an author calls for.
+     */
+    private function bindOwnerAliases(\ReflectionClass $reflection, object $entity): void
+    {
+        foreach ($reflection->getProperties() as $property) {
+            foreach ($property->getAttributes(Alias::class) as $attribute) {
+                $alias = $attribute->newInstance();
+
+                if (self::OWNERS_PROPERTY !== $alias->column) {
+                    continue;
+                }
+
+                $alias->bind($entity, $alias->column, $property->getName());
+            }
+        }
+    }
+
+    /**
+     * Which constructor argument, if any, should receive the current user.
+     *
+     * Two rules, in this order:
+     *
+     * 1. A parameter explicitly named owner/author, whatever its position.
+     *    This has to win outright, because Photo is a Thread whose first
+     *    parameter is its image and whose owner is second - positional
+     *    guessing there would set the filename to a User.
+     *
+     * 2. Failing that, the FIRST parameter of a Thread subclass. Every
+     *    thread in this codebase takes its owner first and forwards it to
+     *    Thread::__construct(), but they do not agree on how to spell it:
+     *    Destination declares an untyped `$user`, and Gallery declares
+     *    `(...$args)` and forwards the lot. Neither is name- or
+     *    type-matchable, and both mean the same thing. Restricting the
+     *    positional rule to Thread subclasses is what keeps it safe -
+     *    Sanction and Notification also lead with a User that is emphatically
+     *    not their owner, and neither is a Thread.
+     *
+     * @param list<\ReflectionParameter> $parameters
+     */
+    private function resolveOwnerParameter(string $entityFqcn, array $parameters): ?int
+    {
+        foreach ($parameters as $index => $parameter) {
+            if (\in_array(\strtolower($parameter->getName()), self::OWNER_PARAMETERS, true)) {
+                return $this->acceptsOwner($parameter) ? $index : null;
+            }
+        }
+
+        if ([] === $parameters || !\is_subclass_of($entityFqcn, \Base\Entity\Thread::class)) {
+            return null;
+        }
+
+        return $this->acceptsOwner($parameters[0]) ? 0 : null;
+    }
+
+    /**
+     * Whether the logged-in user can actually be passed here - an untyped or
+     * variadic parameter takes anything, a typed one has to agree.
+     */
+    private function acceptsOwner(\ReflectionParameter $parameter): bool
+    {
+        $type = $parameter->getType();
+
+        if (null === $type || $parameter->isVariadic()) {
+            return true;
+        }
+
+        return $type instanceof \ReflectionNamedType
+            && !$type->isBuiltin()
+            && $this->getUser() instanceof ($type->getName());
     }
 
     public function persistEntity(EntityManagerInterface $entityManager, object $entity): void
