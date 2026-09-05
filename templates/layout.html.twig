@@ -1223,7 +1223,14 @@
            once ->setColumns() puts them in something less than the full
            12-span. Forcing 100% keeps them honest to the grid track. #}
         form.admin-form .select2-container { width: 100% !important; }
-        .select2-avatar { width: 1.3rem; height: 1.3rem; border-radius: 50%; object-fit: cover; vertical-align: middle; flex-shrink: 0; }
+        {# The black ring is what makes the avatar read as a distinct round
+           token rather than bleeding into the chip: profile pictures are
+           user-supplied, so a light or transparent one (Marki's duck) has no
+           edge of its own against the chip background. Safe as a border
+           because `* { box-sizing: border-box }` above keeps it inside the
+           1.3rem box - no reflow of the chip. #}
+        .select2-avatar { width: 1.3rem; height: 1.3rem; border-radius: 50%; object-fit: cover; vertical-align: middle; flex-shrink: 0;
+            border: 1px solid #000; }
         .field-avatar-thumb { width: 2rem; height: 2rem; border-radius: 50%; object-fit: cover; }
         {# select2's vendored "bootstrap4" theme is a fixed light palette -
            it never adapts to the admin's own light/dark toggle, so every
