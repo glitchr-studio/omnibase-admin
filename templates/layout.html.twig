@@ -238,36 +238,24 @@
         [data-page-desc][contenteditable="true"]:focus {
             outline: 2px solid var(--admin-accent); outline-offset: 2px; border-radius: 4px;
         }
-        {# The dash before the page description, and the empty description
-           itself, are an affordance for customize mode - not content. The
-           template renders them for anyone who CAN customize (see
-           crud/_page_heading.html.twig's `_desc or editable` guard), which
-           left every superadmin looking at a bare "Article ID #1143 -" with
-           nothing after it on every page that has no description yet, and no
-           hint that the space was editable at all.
+        {# The dash before the page description is punctuation between two
+           things, so it has no reason to exist when the second one is
+           absent. crud/_page_heading.html.twig renders it for anyone who
+           CAN customize (its `_desc or editable` guard), which left every
+           superadmin looking at a bare "User ID #40 -" trailing into an
+           empty span on every page with no description yet.
 
-           Hidden by default, shown when there is a description to separate,
-           and shown while customizing - where the placeholder finally
-           renders, so the empty slot says what it is instead of being an
-           orphan character. data-placeholder was already on the element and
-           had never been drawn by anything. #}
-        {# Stated as "hide it when what follows is empty" rather than
+           Hidden unconditionally when the description is empty - including
+           during customize mode. There is deliberately no placeholder text
+           to introduce: the element's data-placeholder is inert markup that
+           nothing has ever drawn, and an empty description is not something
+           the heading needs to advertise.
+
+           Stated as "hide it when what follows is empty" rather than
            enumerating every case that should show it: the description is
            always the subtitle's last span, whether or not it carries the
            editable attributes, so one rule covers both. #}
         .admin-header-subtitle:has(> span:last-child:empty) .admin-header-sep { display: none; }
-        {# Repeats the :has() rather than being a plain
-           `body.is-customizing .admin-header-sep`: :has() takes the
-           specificity of its own argument, so the hide rule above weighs
-           (0,4,1) and a selector that merely adds body.is-customizing to
-           the class would lose to it and never show the separator at all. #}
-        body.is-customizing .admin-header-subtitle:has(> span:last-child:empty) .admin-header-sep { display: inline; }
-
-        body.is-customizing [data-page-desc]:empty::before {
-            content: attr(data-placeholder);
-            opacity: .45;
-            font-style: italic;
-        }
         .admin-menu { list-style: none; margin: .75rem 0 0; padding: 0; }
         {# Used to push a standalone "Tableau de bord" quick-link away from
            the sections below it (prod-style rhythm: quick link at the very
