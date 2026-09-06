@@ -26,6 +26,13 @@
         autoscrollSpeed: 12,   // px per animation frame at full deflection
         draggingClass: 'is-dragging',
         placeholderClass: 'is-sortable-placeholder',
+        // Orientation of the drop marker, set per move. A grid wraps items
+        // onto rows, so "insert here" is a vertical line BETWEEN two cards on
+        // one row but a horizontal line between rows - the same marker read
+        // one way in both places was telling you the welcome banner would slot
+        // in beside a card when it was actually about to take a row of its own.
+        placeholderVerticalClass: 'is-placeholder-vertical',
+        placeholderHorizontalClass: 'is-placeholder-horizontal',
         onChange: null,        // function(order, container) - fires once, on drop, if the order changed
         mergeable: false,      // opt-in: dropping in the INNER zone of another item fires onMerge instead of reordering
         mergeInset: 28,        // px inset from an item's edges that counts as its "merge zone" rather than its "reorder edge"
@@ -123,7 +130,13 @@
 
         this.placeholder = document.createElement(item.tagName);
         this.placeholder.className = this.options.placeholderClass;
-        this.placeholder.style.height = item.offsetHeight + 'px';
+        // Published as a custom property, not as height: the marker is a line
+        // whose thickness is the stylesheet's business, but it still needs the
+        // dragged item's measurements to know how LONG to be along the axis it
+        // ends up on. Setting height here instead would be an inline style the
+        // orientation rules could only beat with !important.
+        this.placeholder.style.setProperty('--sortable-item-height', item.offsetHeight + 'px');
+        this.placeholder.style.setProperty('--sortable-item-width', item.offsetWidth + 'px');
         item.parentElement.insertBefore(this.placeholder, item.nextSibling);
 
         var rect = item.getBoundingClientRect();
@@ -156,6 +169,82 @@
     // wins" alone doesn't say which SIDE to drop on (a grid has more than
     // one neighbor at similar distance), so whichever axis has the larger
     // offset from that sibling's center decides before-vs-after.
+
+    /**
+     * Do these two boxes sit on the same visual row?
+     *
+     * Overlap of more than half the shorter box, not "same top": widgets on a
+     * row are stretched to the tallest of them but a shorter neighbour that
+     * has not stretched still shares the row, and an exact-top test would
+     * call that a different one.
+     */
+    StickySortable.prototype.sharesRow = function (a, b) {
+        if (!a || !b) {
+            return false;
+        }
+        var ra = a.getBoundingClientRect();
+        var rb = b.getBoundingClientRect();
+        if (!ra.height || !rb.height) {
+            return false;
+        }
+
+        return Math.min(ra.bottom, rb.bottom) - Math.max(ra.top, rb.top) > Math.min(ra.height, rb.height) / 2;
+    };
+
+    /**
+     * Which way the drop marker should read, from where it has just landed.
+     *
+     * Decided from the NEIGHBOURS rather than the placeholder itself: the
+     * placeholder is styled as a thin line, so it has no footprint of its own
+     * left to compare against anything.
+     *
+     *   between two cards sharing a row  -> vertical, it goes between them
+     *   nothing before it                -> horizontal, it starts a new row
+     *   neighbours on different rows     -> horizontal, it goes between rows
+     *   last position, room left on the row -> vertical
+     *
+     * A plain vertical list (the sidebar menu uses this same sortable) never
+     * has two neighbours sharing a row, so it always reads horizontal, which
+     * is the right answer there without a special case.
+     */
+    StickySortable.prototype.orientPlaceholder = function () {
+        if (!this.placeholder) {
+            return;
+        }
+
+        var isItem = function (el) {
+            return el && el !== this.dragging && el.matches(this.options.items);
+        }.bind(this);
+
+        var prev = this.placeholder.previousElementSibling;
+        while (prev && !isItem(prev)) {
+            prev = prev.previousElementSibling;
+        }
+        var next = this.placeholder.nextElementSibling;
+        while (next && !isItem(next)) {
+            next = next.nextElementSibling;
+        }
+
+        var vertical;
+        if (!prev) {
+            vertical = false;
+        } else if (next) {
+            vertical = this.sharesRow(prev, next);
+        } else {
+            // Nothing after it, so there is no pair to read a row from. The
+            // question becomes whether the dragged item still fits beside the
+            // last one, which is what decides if it joins that row or starts
+            // the next.
+            var prevRect = prev.getBoundingClientRect();
+            var containerRect = this.container.getBoundingClientRect();
+            var draggedWidth = this.dragging ? this.dragging.getBoundingClientRect().width : 0;
+            vertical = (prevRect.right + draggedWidth) <= containerRect.right;
+        }
+
+        this.placeholder.classList.toggle(this.options.placeholderVerticalClass, vertical);
+        this.placeholder.classList.toggle(this.options.placeholderHorizontalClass, !vertical);
+    };
+
     StickySortable.prototype.findDropTarget = function (siblings, x, y) {
         if ('y' === this.options.axis) {
             for (var i = 0; i < siblings.length; i++) {
@@ -267,6 +356,8 @@
         } else if (siblings.length) {
             this.container.insertBefore(this.placeholder, null);
         }
+
+        this.orientPlaceholder();
 
         if (this.options.autoscroll) {
             this.updateAutoscroll(e.clientY);

@@ -537,7 +537,34 @@
         .item-handle { cursor: grab; touch-action: none; }
         body.is-customizing [data-sortable-item] { cursor: default; }
         .is-dragging { opacity: .85; box-shadow: 0 8px 20px rgba(0,0,0,.18); border-radius: 6px; background: var(--admin-surface); }
-        .is-sortable-placeholder { border: 2px dashed var(--admin-border); border-radius: 6px; margin: .15rem 0; }
+        {# The drop marker. A dashed box with no width of its own used to render
+           as a ~4px dashed sliver whatever the drop meant - it has none of the
+           .widget-block flex rules, so in the grid it collapsed to its border.
+           Read one way in every position, it claimed the welcome banner was
+           slotting in BESIDE a card when it was about to take a whole row.
+
+           An insertion caret now, oriented by StickySortable::orientPlaceholder():
+           a vertical bar between two cards sharing a row, a horizontal one
+           spanning the grid when the drop starts a new row - which is the case
+           that was misreading. Length comes from the dragged item via the
+           custom properties that method's own comment describes; thickness is
+           fixed here. flex-basis:100% is what makes the horizontal one force
+           its own line in the wrapping flex grid rather than sit in the row. #}
+        .is-sortable-placeholder { border: 0; border-radius: 999px; background: var(--admin-accent); align-self: center; }
+        .is-sortable-placeholder.is-placeholder-vertical {
+            width: 3px; flex: 0 0 3px;
+            height: var(--sortable-item-height, 4rem); align-self: stretch; margin: 0 .35rem;
+        }
+        .is-sortable-placeholder.is-placeholder-horizontal {
+            height: 3px; flex: 0 0 100%; width: 100%; margin: .35rem 0;
+        }
+        {# Neither class yet - the marker is inserted on pointer-down, before
+           the first move has decided which way it reads. Kept invisible rather
+           than shown as its old dashed sliver, so nothing flickers in the frame
+           between grabbing a card and moving it. #}
+        .is-sortable-placeholder:not(.is-placeholder-vertical):not(.is-placeholder-horizontal) {
+            width: 0; height: 0; margin: 0; background: none;
+        }
         .widget-controls { position: absolute; top: .6rem; right: .6rem; }
         .widget-group, .widget-block { position: relative; }
         #admin-customize-done { display: none; }
@@ -2461,6 +2488,13 @@
            normalize them away (see the theming notes elsewhere in this
            file - element defaults leak here). #}
         fieldset.widget-settings-field { border: 0; margin: 0; padding: 0; min-width: 0; }
+        {# The mode toggle hides the other mode's fields with the `hidden`
+           attribute, which the browser honours as display:none only while
+           nothing outranks it - and the display:flex above does. So both
+           modes' controls rendered at once, each swearing it was the active
+           one. Restated here rather than dropped from the rule, because the
+           panel genuinely needs flex; [hidden] simply has to win over it. #}
+        .widget-settings-field[hidden] { display: none; }
         .widget-settings-checks { display: flex; flex-wrap: wrap; gap: .35rem .8rem; }
         .widget-settings-check { display: inline-flex; align-items: center; gap: .35rem; font: inherit; text-transform: none; letter-spacing: normal; color: var(--admin-text); cursor: pointer; }
         .widget-settings-check input { margin: 0; accent-color: var(--admin-accent); }
