@@ -2051,7 +2051,12 @@
            or stopping short of them, reported live as the text visibly
            overlapping the icon row. Resize floats separately at the
            bottom-right corner, so no extra room needed for that. #}
-        body.is-customizing .widget-welcome { padding-right: 7.5rem; }
+        {# 7.5rem is the icons' exact footprint, which left the text ending
+           flush against them - measured live at a 1px gap, i.e. touching.
+           Reserving precisely the space they occupy is what "no overlap"
+           means arithmetically and not what it looks like, so the extra
+           1rem here is the visible gap rather than a fudge factor. #}
+        body.is-customizing .widget-welcome { padding-right: 8.5rem; }
         {# Dashboard-only, rendered into layout.html.twig's own
            topbar_dashboard_extra block (see there) rather than scrolling
            away with the page content - only ever visible while
@@ -2290,6 +2295,32 @@
            controls are actually visible. #}
         body.is-customizing .analytics-card-header { padding-right: 6rem; }
         .analytics-card-header h2 { margin: 0; font-size: 1.1rem; }
+        {# The Counter card's header holds only a title and its gear, and in
+           customize mode a span-1 card gives them ~107px between the card
+           padding and the 6rem reserved for the control icons. "Articles
+           Lus" alone measures 97px, so at flex-wrap:wrap the gear had
+           nowhere to go but a line of its own, landing under the title as a
+           stray icon.
+
+           nowrap + min-width:0 lets the TITLE take the hit instead: it wraps
+           onto a second line inside its own box while the gear stays where
+           it belongs, top-right of the header. Deliberately not
+           text-overflow:ellipsis - the title is admin-authored and worth
+           reading in full, and there is vertical room here where there is
+           no horizontal room.
+
+           Scoped to the counter: the other cards put a whole stat row in
+           this header, where dropping onto another line is the right
+           behaviour rather than a bug - which is also why flex-direction is
+           restated here. The @container (max-width: 320px) rule further
+           down turns this header into a column so a chart card's numbers
+           sit under its title, and a span-1 card is narrow enough to
+           trigger it; for a header holding nothing but a title and a gear
+           that just orphans the gear. Attribute + class outweighs the bare
+           class there, and container queries add no specificity of their
+           own, so this wins without having to be repeated inside it. #}
+        [data-counter-card] .analytics-card-header { flex-direction: row; flex-wrap: nowrap; gap: .5rem; }
+        [data-counter-card] .analytics-card-title { min-width: 0; }
         .analytics-stat-row { display: flex; gap: 1.75rem; flex-wrap: wrap; }
         .analytics-stat { min-width: 6rem; }
         .analytics-stat-value { display: block; font-size: 1.4rem; font-weight: 700; line-height: 1.2; }
@@ -2387,6 +2418,21 @@
         @container (max-width: 320px) {
             .analytics-card { padding: 1.1rem; }
             .analytics-card-header { flex-direction: column; gap: .5rem; }
+            {# Below the icon row, not beside it. The 6rem gutter above
+               reserves room to the RIGHT of the header, which works at the
+               normal 1.5rem card padding but not here: this block drops that
+               padding to 1.1rem, shifting the header 6px further right, and
+               the reservation stops covering the icons. Measured live on a
+               span-1 card, the Counter's gear ended up 6px PAST the drag
+               handle's left edge and vertically overlapping it - sitting
+               underneath the controls.
+
+               Widening the gutter instead would technically clear them, but
+               on a 240px card it spends more than half the width on empty
+               reserved space and squeezes the title into a 59px column.
+               Clearing the icons VERTICALLY costs one row of height and
+               gives the title the full card width back. #}
+            body.is-customizing .analytics-card-header { padding-right: 0; padding-top: 1.5rem; }
             .analytics-stat-row { gap: 1rem; }
             .analytics-range-picker { display: none; }
             .analytics-chart-wrap { display: none; }
@@ -5785,7 +5831,12 @@
             var entitySelect = panel && panel.querySelector('[data-entity-views-settings-entity]');
             if (!entitySelect) return;
 
-            adminFillInstanceSelect(panel, entitySelect, classSelect.value, null);
+            // 'all' rather than null: picking a type and being handed an
+            // empty second select means the widget still renders its "choose
+            // something" empty state, so the obvious two-step (pick a type,
+            // Apply) produces nothing and looks broken. "Tous" is both the
+            // useful default and the one answer that needs no list at all.
+            adminFillInstanceSelect(panel, entitySelect, classSelect.value, 'all');
         });
 
         document.addEventListener('click', function (e) {
@@ -5883,7 +5934,12 @@
             var entitySelect = panel && panel.querySelector('[data-counter-settings-entity]');
             if (!entitySelect) return;
 
-            adminFillInstanceSelect(panel, entitySelect, classSelect.value, null);
+            // 'all' rather than null: picking a type and being handed an
+            // empty second select means the widget still renders its "choose
+            // something" empty state, so the obvious two-step (pick a type,
+            // Apply) produces nothing and looks broken. "Tous" is both the
+            // useful default and the one answer that needs no list at all.
+            adminFillInstanceSelect(panel, entitySelect, classSelect.value, 'all');
         });
 
         document.addEventListener('click', function (e) {
