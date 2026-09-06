@@ -688,7 +688,12 @@
         {# No shadow of its own - .admin-topbar directly above already casts
            one, and the two sitting flush against each other doubled up
            into a visibly darker band right at the seam between them. #}
-        .admin-header { display: flex; align-items: center; gap: 1rem; margin: 0 -2rem 1.25rem; padding: 1rem 2rem;
+        {# flex-start, not center: the titles block grows downward as the
+           description and the flag strip appear under the heading, and
+           centring the row then dragged the title down with them - the
+           heading drifted lower the more it had to say. Top-aligned, the
+           title stays put and everything else accumulates beneath it. #}
+        .admin-header { display: flex; align-items: flex-start; gap: 1rem; margin: 0 -2rem 1.25rem; padding: 1rem 2rem;
                         position: sticky; top: 3.3rem; z-index: 14; background: var(--admin-bg); }
         .admin-header h1 { margin: 0; font-size: 1.35rem; }
         {# Detail-page shape: the record's own name is the heading and the
@@ -708,22 +713,35 @@
            the box just slots in as the first item. #}
         .admin-header-icon { display: flex; align-items: center; justify-content: center; width: 3.4rem; height: 3.4rem; flex-shrink: 0;
                              border: 1px solid var(--admin-border); border-radius: 12px; background: var(--admin-surface); font-size: 1.4rem; }
-        .admin-header-titles { min-width: 0; }
+        {# A wrapping flex row, so the description and the flags SHARE the
+           line under the heading instead of taking one each. The heading
+           claims a full row of its own (flex-basis 100%), which is what
+           pushes the two onto the next line together - description first by
+           source order, flags after it.
+
+           This is what removes the empty band on a page with no description:
+           in customize mode the description renders anyway, so that it can be
+           clicked, and as its own row it reserved 20px of blank line above
+           the flags whether or not it held anything. Sharing a row, an empty
+           one costs nothing. #}
+        .admin-header-titles { display: flex; flex-wrap: wrap; align-items: baseline;
+                               column-gap: .75rem; row-gap: .15rem; min-width: 0; }
+        .admin-header-titles > h1, .admin-header-titles > .admin-header-record { flex: 0 0 100%; }
         {# Which-language-am-I-editing chip for the in-place page title
            (see system.html.twig) - customize mode only, sits right by the
            editable heading's dashed outline. cursor:help + title attr
            carry the "switch language to translate" hint. #}
         .page-locale-badges { display: none; }
-        {# Its own row under the subtitle, not a tail on the end of it: as an
-           inline-flex the flag strip crowded the text it followed. `flex` +
-           margin-top gives it a line of its own and lets the flags wrap when
-           a site has more locales than fit. #}
+        {# Shares the line under the heading with the description rather than
+           taking one of its own - the column-gap on .admin-header-titles is
+           what keeps them apart now, so the old margin-top would only add
+           back the vertical space this is meant to save. Still wraps, for a
+           site with more locales than fit. #}
         body.is-customizing .page-locale-badges {
-            display: flex; flex-wrap: wrap; gap: .25rem; margin: .35rem 0 0; }
-        {# The icon aligns with the TITLE, not with the centre of the whole
-           titles block. Once the flag row appears the block grows downward, so
-           centring pushed the icon below the title it belongs to and the header
-           read as misaligned. #}
+            display: flex; flex-wrap: wrap; gap: .25rem; margin: 0; }
+        {# Kept explicit even though .admin-header is flex-start now: this
+           states the icon's own intent - line up with the TITLE - rather than
+           inheriting it from a row alignment someone may later change back. #}
         .admin-header-icon { align-self: flex-start; margin-top: .1rem; }
         .page-locale-badge { display: inline-flex; align-items: center; padding: .2rem .3rem;
                              border: 1px solid var(--admin-border); border-radius: 5px; background: var(--admin-surface); }
@@ -1250,14 +1268,30 @@
            once ->setColumns() puts them in something less than the full
            12-span. Forcing 100% keeps them honest to the grid track. #}
         form.admin-form .select2-container { width: 100% !important; }
-        {# The black ring is what makes the avatar read as a distinct round
-           token rather than bleeding into the chip: profile pictures are
+        {# The ring is what makes the avatar read as a distinct round token
+           rather than bleeding into the chip: profile pictures are
            user-supplied, so a light or transparent one (Marki's duck) has no
            edge of its own against the chip background. Safe as a border
            because `* { box-sizing: border-box }` above keeps it inside the
-           1.3rem box - no reflow of the chip. #}
+           1.3rem box - no reflow of the chip.
+
+           --admin-muted, not the hardcoded #000 it used to be: black was a
+           hole punched in a dark dropdown, and it was the one colour here
+           that never followed the theme. --admin-border is the obvious
+           candidate and the wrong one - at #e3e6ea / #2c3038 it is too faint
+           to do the job the ring exists for. --admin-muted (#6b7683 / #8b94a1)
+           reads on both grounds.
+
+           The highlighted row paints ITSELF with --admin-accent and white
+           text, so a muted ring vanishes on it and an accent one is invisible
+           outright; there the ring follows the text instead. #}
         .select2-avatar { width: 1.3rem; height: 1.3rem; border-radius: 50%; object-fit: cover; vertical-align: middle; flex-shrink: 0;
-            border: 1px solid #000; }
+            border: 1px solid var(--admin-muted, #6b7683); background: var(--admin-surface, #fff);
+            transition: border-color .12s ease; }
+        .select2-results__option--highlighted .select2-avatar { border-color: #fff; }
+        .select2-results__option:hover .select2-avatar { border-color: var(--admin-accent); }
+        .select2-results__option--highlighted:hover .select2-avatar { border-color: #fff; }
+        .select2-selection__choice:hover .select2-avatar { border-color: var(--admin-accent); }
         .field-avatar-thumb { width: 2rem; height: 2rem; border-radius: 50%; object-fit: cover; }
         {# select2's vendored "bootstrap4" theme is a fixed light palette -
            it never adapts to the admin's own light/dark toggle, so every

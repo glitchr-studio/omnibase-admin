@@ -94,6 +94,26 @@ class SelectField implements FieldInterface
      * @param string $endpoint
      * @return $this
      */
+    /**
+     * Show entries as profile pictures rather than as their __iconize() icon,
+     * wherever one is available.
+     *
+     * Off by default (see SelectType's `avatar` option): that icon carries
+     * meaning - for a User it is their role - and a photo silently replaces it
+     * only for the people who happen to have uploaded one. Worth turning on
+     * where telling individuals apart is the point, such as an article's
+     * authors.
+     *
+     * @param bool $avatar
+     * @return $this
+     */
+    public function useAvatar(bool $avatar = true)
+    {
+        $this->setFormTypeOption('avatar', $avatar);
+
+        return $this;
+    }
+
     public function autocomplete(string $endpoint)
     {
         $this->setFormTypeOption('autocomplete_endpoint', $endpoint);

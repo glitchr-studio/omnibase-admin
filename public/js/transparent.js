@@ -2589,7 +2589,18 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
             var formAmbiguity = $("form[name='"+form.name+"']").length > 1;
             
             var formInput = undefined; // In case of form ambiguity (two form with same name, restrict the data to the target form, if not extends it to each element with standard name)
-            if(formAmbiguity) formInput = $(form).find(":input, [name^='"+form.name+"\[']");
+            // An UNNAMED form matches neither clause below: form.name is "",
+            // so `form[name='']` selects nothing and `[name^='[']` selects
+            // nothing either - formInput came out empty and the request was
+            // sent with NO FIELDS AT ALL. Every plain <form method="post">
+            // added to the admin without a name attribute therefore lost its
+            // CSRF token, was refused, and bounced through the login page
+            // back to its own action URL as a GET - which reads as "the
+            // button does nothing" plus a 404 (found live on the trash page's
+            // restore/destroy buttons). Same failure mode as the hoisted
+            // submit buttons below, different trigger.
+            if(!form.name) formInput = $(form).find(":input");
+            else if(formAmbiguity) formInput = $(form).find(":input, [name^='"+form.name+"\[']");
             else formInput = $("form[name='"+form.name+"'] :input, [name^='"+form.name+"\[']");
 
             // Both clauses above require actual DOM nesting inside <form> -

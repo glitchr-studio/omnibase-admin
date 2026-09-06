@@ -143,6 +143,18 @@ return function (ContainerConfigurator $configurator) {
         ->public(true)
         ->tag('controller.service_arguments');
 
+    $services->set(\Base\Admin\Controller\TrashController::class)
+        ->args([service(\Base\Service\TrashManager::class), service('doctrine.orm.entity_manager'), service('translator'), service(\Base\Admin\Context\AdminContext::class), service(\Base\Admin\Menu\MenuBuilder::class)])
+        ->call('setContainer', [$controllerServiceLocator])
+        ->public(true)
+        ->tag('controller.service_arguments');
+
+    $services->set(\Base\Admin\Controller\RevisionController::class)
+        ->args([service('doctrine.orm.entity_manager')])
+        ->call('setContainer', [$controllerServiceLocator])
+        ->public(true)
+        ->tag('controller.service_arguments');
+
     $services->set(\Base\Admin\Controller\DashboardWidgetController::class)
         ->args([service(\Base\Admin\Widget\PaletteWidgetTypeRegistry::class), service('translator'), service(LayoutStore::class), service(\Base\Admin\Widget\LinkableEntityRegistry::class)])
         ->call('setContainer', [$controllerServiceLocator])

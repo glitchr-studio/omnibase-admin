@@ -132,6 +132,26 @@ datagrid:
     search_placeholder: Search…
 
 page:
+    trash:
+        title: Trash
+        description: Deleted content stays here for its grace period, then is destroyed for good.
+        empty: Empty expired entries
+        empty_confirm: Permanently destroy every entry past its grace period?
+        empty_state: The trash is empty.
+        restore: Restore
+        restored: Content restored.
+        restore_failed: That content no longer exists; the entry was removed from the trash.
+        destroy: Destroy permanently
+        destroy_confirm: Permanently destroy this content? This cannot be undone.
+        destroyed: Content permanently destroyed.
+        emptied: "%count% item(s) permanently destroyed."
+        expired: Grace period over — will be destroyed on the next purge.
+        by: "by %user%"
+        column:
+            label: Content
+            type: Type
+            deleted_at: Deleted on
+            permanent_after: Destroy after
     new: New %entity%
     edit: "Edit %entity% #%id%"
     edit_named: "Edit “%name%”"

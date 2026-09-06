@@ -132,6 +132,26 @@ datagrid:
     search_placeholder: Rechercher…
 
 page:
+    trash:
+        title: Corbeille
+        description: Les contenus supprimés y restent le temps du délai de grâce, puis sont détruits définitivement.
+        empty: Vider les entrées expirées
+        empty_confirm: Détruire définitivement toutes les entrées dont le délai de grâce est écoulé ?
+        empty_state: La corbeille est vide.
+        restore: Restaurer
+        restored: Contenu restauré.
+        restore_failed: Ce contenu n'existe plus ; l'entrée a été retirée de la corbeille.
+        destroy: Détruire définitivement
+        destroy_confirm: Détruire définitivement ce contenu ? Cette action est irréversible.
+        destroyed: Contenu détruit définitivement.
+        emptied: "%count% contenu(s) détruit(s) définitivement."
+        expired: Délai de grâce écoulé — sera détruit à la prochaine purge.
+        by: "par %user%"
+        column:
+            label: Contenu
+            type: Type
+            deleted_at: Supprimé le
+            permanent_after: Destruction après le
     new: Nouveau %entity%
     edit: "Modifier %entity% #%id%"
     edit_named: "Modifier « %name% »"

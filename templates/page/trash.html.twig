@@ -1,0 +1,113 @@
+{% extends '@Admin/layout.html.twig' %}
+
+{% block page_title %}{{ 'page.trash.title'|trans({}, 'admin') }}{% endblock %}
+
+{% block content_header %}
+<div class="admin-header">
+    <span class="admin-header-icon"><i class="fa-solid fa-trash-can"></i></span>
+    <div class="admin-header-titles">
+        <h1>{{ 'page.trash.title'|trans({}, 'admin') }}</h1>
+        <div class="admin-header-subtitle">{{ 'page.trash.description'|trans({}, 'admin') }}</div>
+    </div>
+    {# .global-actions is the row the layout hoists into the topbar, same
+       contract as the CRUD pages and @Admin/page/_actions.html.twig - which is
+       also why the button is associated back to its form by id rather than
+       nested in it: a header row cannot be a descendant of the card's form.
+
+       Emptying destroys only what is ALREADY past its grace period - the same
+       set the cron would take. Not "destroy everything in the trash": the
+       grace period is the promise soft deletion makes, and voiding it for
+       something binned a minute ago would make the trash a slower hard delete. #}
+    {% if rows is not empty %}
+    <div class="global-actions">
+        <button class="btn text-danger" type="submit" form="trash-empty-form">
+            <i class="fa-solid fa-broom"></i> {{ 'page.trash.empty'|trans({}, 'admin') }}
+        </button>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+    .datagrid td.trash-actions { display: flex; gap: 0.25em; align-items: center; justify-content: flex-end; }
+    .datagrid td.trash-actions form { display: contents; }
+    .datagrid .datagrid-hint { display: block; font-size: 11px; opacity: 0.65; }
+</style>
+<form method="post" id="trash-empty-form" action="{{ path('admin_trash_empty') }}"
+      data-confirm="{{ 'page.trash.empty_confirm'|trans({}, 'admin') }}">
+    <input type="hidden" name="_token" value="{{ csrf_token('admin-trash-empty') }}">
+</form>
+<div class="card">
+    {% if rows is empty %}
+        <div class="empty-state">{{ 'page.trash.empty_state'|trans({}, 'admin') }}</div>
+    {% else %}
+    <div class="table-responsive">
+    <table class="datagrid">
+        <thead>
+            <tr>
+                <th class="cell-id">#</th>
+                <th>{{ 'page.trash.column.label'|trans({}, 'admin') }}</th>
+                <th>{{ 'page.trash.column.type'|trans({}, 'admin') }}</th>
+                <th>{{ 'page.trash.column.deleted_at'|trans({}, 'admin') }}</th>
+                <th>{{ 'page.trash.column.permanent_after'|trans({}, 'admin') }}</th>
+                <th class="actions"></th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for row in rows %}
+            <tr>
+                {#- data-label on every cell so the grid can restack as cards
+                    under 720px, same contract as the CRUD datagrid. -#}
+                <td class="cell-id" data-label="#">{{ row.entityId }}</td>
+                <td data-label="{{ 'page.trash.column.label'|trans({}, 'admin') }}">
+                    {{ row.label ?: '—' }}
+                    {%- if row.by %}<span class="datagrid-hint">{{ 'page.trash.by'|trans({'%user%': row.by}, 'admin') }}{% if row.impersonator %} ↷ {{ row.impersonator }}{% endif %}</span>{% endif -%}
+                </td>
+                <td data-label="{{ 'page.trash.column.type'|trans({}, 'admin') }}">
+                    <span class="badge" title="{{ row.class }}">{{ row.shortClass }}</span>
+                </td>
+                <td data-label="{{ 'page.trash.column.deleted_at'|trans({}, 'admin') }}">
+                    {{ row.deletedAt ? row.deletedAt|date('d/m/Y H:i') : '—' }}
+                </td>
+                <td data-label="{{ 'page.trash.column.permanent_after'|trans({}, 'admin') }}"
+                    class="{{ row.expired ? 'text-danger' }}">
+                    {{ row.permanentAfter ? row.permanentAfter|date('d/m/Y H:i') : '—' }}
+                    {%- if row.expired %} <i class="fa-solid fa-triangle-exclamation" title="{{ 'page.trash.expired'|trans({}, 'admin') }}"></i>{% endif -%}
+                </td>
+                {#- Each action is its own POST form (different target, own CSRF
+                    token), and a <form> is block-level - left alone the two
+                    buttons stack. The cell lays them out in a row instead. -#}
+                <td class="actions trash-actions">
+                    <form method="post" action="{{ path('admin_trash_restore', {id: row.id}) }}">
+                        <input type="hidden" name="_token" value="{{ csrf_token('admin-trash-restore-' ~ row.id) }}">
+                        <button class="btn btn-icon" type="submit" title="{{ 'page.trash.restore'|trans({}, 'admin') }}">
+                            <i class="fa-solid fa-rotate-left"></i>
+                        </button>
+                    </form>
+                    <form method="post" action="{{ path('admin_trash_destroy', {id: row.id}) }}"
+                          data-confirm="{{ 'page.trash.destroy_confirm'|trans({}, 'admin') }}">
+                        <input type="hidden" name="_token" value="{{ csrf_token('admin-trash-destroy-' ~ row.id) }}">
+                        <button class="btn btn-icon text-danger" type="submit" title="{{ 'page.trash.destroy'|trans({}, 'admin') }}">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </form>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    <div class="paginator">
+        <span>{{ total }} {{ 'datagrid.results'|trans({}, 'admin') }}</span>
+        {% if pageCount > 1 %}
+        <div class="pages">
+            {% if currentPage > 1 %}<a class="btn" href="{{ path('admin_trash', {page: currentPage - 1}) }}">‹</a>{% endif %}
+            <span class="btn page-current">{{ currentPage }} / {{ pageCount }}</span>
+            {% if currentPage < pageCount %}<a class="btn" href="{{ path('admin_trash', {page: currentPage + 1}) }}">›</a>{% endif %}
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -84,6 +84,8 @@ class AdminRouteLoader extends Loader
         $this->addLayoutRoute($routes, $prefix);
         $this->addAnalyticsRoute($routes, $prefix);
         $this->addDashboardWidgetRoutes($routes, $prefix);
+        $this->addRevisionRoute($routes, $prefix);
+        $this->addTrashRoutes($routes, $prefix);
 
         return $routes;
     }
@@ -135,6 +137,55 @@ class AdminRouteLoader extends Loader
             '',
             [],
             ['POST']
+        ));
+    }
+
+    /**
+     * The trash - see TrashController. The listing is GET; restore, destroy
+     * and empty are POST + CSRF because they write, and two of them destroy.
+     */
+    private function addTrashRoutes(RouteCollection $routes, string $prefix): void
+    {
+        $routes->add('admin_trash', new Route(
+            $prefix . '/trash',
+            ['_controller' => \Base\Admin\Controller\TrashController::class . '::index'],
+            [], [], '', [], ['GET']
+        ));
+
+        $routes->add('admin_trash_restore', new Route(
+            $prefix . '/trash/{id}/restore',
+            ['_controller' => \Base\Admin\Controller\TrashController::class . '::restore'],
+            ['id' => '\d+'], [], '', [], ['POST']
+        ));
+
+        $routes->add('admin_trash_destroy', new Route(
+            $prefix . '/trash/{id}/destroy',
+            ['_controller' => \Base\Admin\Controller\TrashController::class . '::destroy'],
+            ['id' => '\d+'], [], '', [], ['POST']
+        ));
+
+        $routes->add('admin_trash_empty', new Route(
+            $prefix . '/trash/empty',
+            ['_controller' => \Base\Admin\Controller\TrashController::class . '::empty'],
+            [], [], '', [], ['POST']
+        ));
+    }
+
+    /**
+     * The per-field history badge's value fetch - see RevisionController.
+     * GET + no CSRF like the analytics breakdown: it reads back a value the
+     * caller can already read, and writes nothing.
+     */
+    private function addRevisionRoute(RouteCollection $routes, string $prefix): void
+    {
+        $routes->add('admin_revision_value', new Route(
+            $prefix . '/revision/{id}',
+            ['_controller' => \Base\Admin\Controller\RevisionController::class . '::value'],
+            ['id' => '\d+'],
+            [],
+            '',
+            [],
+            ['GET']
         ));
     }
 
