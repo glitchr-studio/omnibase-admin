@@ -2293,7 +2293,13 @@
            right-aligned content lands a real, visible gap short of
            actually touching the control icons. Only needed while the
            controls are actually visible. #}
-        body.is-customizing .analytics-card-header { padding-right: 6rem; }
+        {# 6rem was the controls' exact footprint minus the card's own
+           padding (120px - 24px), i.e. arithmetically flush and measured
+           live at a 1px gap - the gear reading as stuck to the drag handle
+           at every width above the 320px container breakpoint. Same defect,
+           same remedy as .widget-welcome above: the extra 1rem IS the gap,
+           not a safety margin on top of one. #}
+        body.is-customizing .analytics-card-header { padding-right: 7rem; }
         .analytics-card-header h2 { margin: 0; font-size: 1.1rem; }
         {# The Counter card's header holds only a title and its gear, and in
            customize mode a span-1 card gives them ~107px between the card
@@ -2331,6 +2337,21 @@
         {# "Counter" widget's own big number - deliberately much larger
            than .analytics-stat-value (1.4rem): the whole card IS this one
            figure, not one of several stats sharing a row with it. #}
+        {# The card is a flex column so the counter's body can sit in the
+           MIDDLE of whatever height it ends up with. Widgets stretch to the
+           tallest one on their row, so a counter next to a chart inherits
+           its height - and as a plain block that left the number pinned to
+           the top under a growing field of nothing, reported as the block
+           having too much margin once enlarged. The auto margins turn that
+           leftover space into balanced space above and below rather than a
+           dead area underneath. #}
+        [data-counter-card] { display: flex; flex-direction: column; }
+        [data-counter-card] .counter-value-row { margin-top: auto; }
+        [data-counter-card] .analytics-stat-label { margin-bottom: auto; }
+        {# Centred now, so its own 2rem of vertical padding - which existed
+           to stop a short card collapsing around one line of text - is just
+           bulk fighting the centring. #}
+        [data-counter-card] .analytics-empty-state { margin: auto 0; padding: 1rem; }
         .counter-value-row { display: flex; align-items: baseline; gap: .5rem; }
         .counter-value { font-size: 2.75rem; font-weight: 700; line-height: 1.1; }
         .analytics-range-picker { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: 1rem; transition: opacity .15s ease; }
