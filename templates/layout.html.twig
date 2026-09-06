@@ -5726,6 +5726,57 @@
         // options from data-instances-by-class (embedded server-side JSON,
         // see the template's own comment) - client-side, no AJAX round
         // trip, matching this widget's existing "no live chart" simplicity.
+        // Shared by BOTH entity-picking panels (Counter and "Vues"): fills an
+        // instance <select> for one class, fetched on demand from
+        // admin_dashboard_widget_instances. The widgets used to carry every
+        // class's instances inline; see DashboardWidgetController::instances()
+        // for the measurements that killed that.
+        //
+        // $selected is applied HERE rather than by the caller, because the
+        // options only exist once the request lands - a caller setting .value
+        // straight after this returns would be assigning to an empty select.
+        // Each select keeps a token so a slow answer for a class the admin has
+        // already navigated away from cannot repaint the newer list.
+        function adminFillInstanceSelect(panel, entitySelect, className, selected) {
+            var token = (parseInt(entitySelect.dataset.loadToken || '0', 10) + 1);
+            entitySelect.dataset.loadToken = String(token);
+
+            var allOption = function () {
+                return '<option value="all">' + (entitySelect.dataset.allLabel || 'all') + '</option>';
+            };
+            var paint = function (instances) {
+                entitySelect.innerHTML = '<option value=""></option>' + allOption()
+                    + instances.map(function (instance) {
+                        return '<option value="' + instance.id + '">'
+                            + String(instance.label).replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>';
+                    }).join('');
+                entitySelect.disabled = false;
+                if (selected) entitySelect.value = selected;
+            };
+
+            if (!className) {
+                entitySelect.innerHTML = '<option value=""></option>';
+                entitySelect.disabled = true;
+                return Promise.resolve();
+            }
+
+            // Reachable state, not decoration: the fetch is a real round trip,
+            // and without this the select sits there looking empty-and-ready.
+            entitySelect.disabled = true;
+            entitySelect.innerHTML = '<option value=""></option>' + allOption();
+
+            var url = panel.dataset.instancesUrl;
+            if (!url) { paint([]); return Promise.resolve(); }
+
+            return fetch(url + '?class=' + encodeURIComponent(className), { credentials: 'same-origin' })
+                .then(function (r) { return r.ok ? r.json() : { instances: [] }; })
+                .catch(function () { return { instances: [] }; })
+                .then(function (data) {
+                    if (String(token) !== entitySelect.dataset.loadToken) return;
+                    paint((data && data.instances) || []);
+                });
+        }
+
         document.addEventListener('change', function (e) {
             var classSelect = e.target.closest('[data-entity-views-settings-class]');
             if (!classSelect) return;
@@ -5733,13 +5784,7 @@
             var entitySelect = panel && panel.querySelector('[data-entity-views-settings-entity]');
             if (!entitySelect) return;
 
-            var byClass = JSON.parse(panel.dataset.instancesByClass || '{}');
-            var instances = byClass[classSelect.value] || [];
-            entitySelect.disabled = !classSelect.value;
-            entitySelect.innerHTML = '<option value=""></option>' + (classSelect.value ? '<option value="all">' + (entitySelect.dataset.allLabel || 'all') + '</option>' : '')
-                + instances.map(function (instance) {
-                    return '<option value="' + instance.id + '">' + instance.label.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>';
-                }).join('');
+            adminFillInstanceSelect(panel, entitySelect, classSelect.value, null);
         });
 
         document.addEventListener('click', function (e) {
@@ -5764,12 +5809,15 @@
                     var toggleClass = livePick.entityClass || (toggleDef.params && toggleDef.params.entityClass) || '';
                     var toggleEntityId = livePick.entityId || (toggleDef.params && toggleDef.params.entityId) || '';
                     toggleCard.querySelector('[data-entity-views-settings-class]').value = toggleClass;
-                    // Repaint the entity select for whatever class was
-                    // already saved, THEN select its saved value - the
-                    // 'change' handler above only builds the option list,
-                    // it doesn't know what should end up selected.
-                    toggleCard.querySelector('[data-entity-views-settings-class]').dispatchEvent(new Event('change', { bubbles: true }));
-                    toggleCard.querySelector('[data-entity-views-settings-entity]').value = toggleEntityId;
+                    // The option list now arrives over the wire, so the saved
+                    // pick is handed to the loader instead of being assigned
+                    // right after: at this point the select is still empty.
+                    adminFillInstanceSelect(
+                        togglePanel,
+                        toggleCard.querySelector('[data-entity-views-settings-entity]'),
+                        toggleClass,
+                        toggleEntityId
+                    );
                 }
                 togglePanel.hidden = !opening;
                 toggle.classList.toggle('is-active', opening);
@@ -5834,13 +5882,7 @@
             var entitySelect = panel && panel.querySelector('[data-counter-settings-entity]');
             if (!entitySelect) return;
 
-            var byClass = JSON.parse(panel.dataset.instancesByClass || '{}');
-            var instances = byClass[classSelect.value] || [];
-            entitySelect.disabled = !classSelect.value;
-            entitySelect.innerHTML = '<option value=""></option>' + (classSelect.value ? '<option value="all">' + (entitySelect.dataset.allLabel || 'all') + '</option>' : '')
-                + instances.map(function (instance) {
-                    return '<option value="' + instance.id + '">' + instance.label.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</option>';
-                }).join('');
+            adminFillInstanceSelect(panel, entitySelect, classSelect.value, null);
         });
 
         document.addEventListener('click', function (e) {
@@ -5865,8 +5907,15 @@
                     var toggleClass = livePick.entityClass || (toggleDef.params && toggleDef.params.entityClass) || '';
                     var toggleEntityId = livePick.entityId || (toggleDef.params && toggleDef.params.entityId) || '';
                     toggleCard.querySelector('[data-counter-settings-class]').value = toggleClass;
-                    toggleCard.querySelector('[data-counter-settings-class]').dispatchEvent(new Event('change', { bubbles: true }));
-                    toggleCard.querySelector('[data-counter-settings-entity]').value = toggleEntityId;
+                    // The option list now arrives over the wire, so the saved
+                    // pick is handed to the loader instead of being assigned
+                    // right after: at this point the select is still empty.
+                    adminFillInstanceSelect(
+                        togglePanel,
+                        toggleCard.querySelector('[data-counter-settings-entity]'),
+                        toggleClass,
+                        toggleEntityId
+                    );
 
                     // Re-checks the boxes from the live params rather than
                     // mergeDef, which is the widget's original definition

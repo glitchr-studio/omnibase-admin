@@ -183,6 +183,19 @@ class AdminRouteLoader extends Loader
             [],
             ['GET']
         ));
+        // Instance picker options for one class, fetched when the class
+        // select changes - see DashboardWidgetController::instances() for
+        // why the widgets no longer ship them all inline. The FQCN travels
+        // as a query param, not a path segment: it contains backslashes.
+        $routes->add('admin_dashboard_widget_instances', new Route(
+            $prefix . '/dashboard/widget/instances',
+            ['_controller' => \Base\Admin\Controller\DashboardWidgetController::class . '::instances'],
+            [],
+            [],
+            '',
+            [],
+            ['GET']
+        ));
         $routes->add('admin_dashboard_widget_merge', new Route(
             $prefix . '/dashboard/widget/merge',
             ['_controller' => \Base\Admin\Controller\DashboardWidgetController::class . '::merge'],

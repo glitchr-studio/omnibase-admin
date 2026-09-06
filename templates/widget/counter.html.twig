@@ -21,7 +21,7 @@
         <button type="button" class="item-settings" data-counter-settings-toggle title="{{ 'counter.settings.title'|trans({}, 'admin') }}"><i class="fa-solid fa-gear"></i></button>
     </div>
     <div class="widget-settings-panel" data-counter-settings-panel hidden
-         data-instances-by-class="{{ instancesByClass|map(list => list|map(item => {id: item.id, label: item ~ ''}))|json_encode|e('html_attr') }}">
+         data-instances-url="{{ path('admin_dashboard_widget_instances') }}">
         <label class="widget-settings-field">
             <span>{{ 'counter.settings.class_label'|trans({}, 'admin') }}</span>
             <select data-counter-settings-class>
@@ -37,7 +37,7 @@
                 <option value="">{{ 'counter.settings.entity_placeholder'|trans({}, 'admin') }}</option>
                 {% if entityClass %}
                     <option value="all"{{ allInstances ? ' selected' }}>{{ 'counter.settings.all_instances'|trans({}, 'admin') }}</option>
-                    {% for instance in instancesByClass[entityClass] %}
+                    {% for instance in instances %}
                         <option value="{{ instance.id }}"{{ entity and entity.id == instance.id ? ' selected' }}>{{ instance }}</option>
                     {% endfor %}
                 {% endif %}

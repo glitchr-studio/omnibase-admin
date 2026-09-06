@@ -144,7 +144,7 @@ return function (ContainerConfigurator $configurator) {
         ->tag('controller.service_arguments');
 
     $services->set(\Base\Admin\Controller\DashboardWidgetController::class)
-        ->args([service(\Base\Admin\Widget\PaletteWidgetTypeRegistry::class), service('translator'), service(LayoutStore::class)])
+        ->args([service(\Base\Admin\Widget\PaletteWidgetTypeRegistry::class), service('translator'), service(LayoutStore::class), service(\Base\Admin\Widget\LinkableEntityRegistry::class)])
         ->call('setContainer', [$controllerServiceLocator])
         ->public(true)
         ->tag('controller.service_arguments');

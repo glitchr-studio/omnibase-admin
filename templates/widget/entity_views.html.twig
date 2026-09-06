@@ -51,7 +51,7 @@
         <button type="button" class="item-settings" data-entity-views-settings-toggle title="{{ 'entity_views.settings.title'|trans({}, 'admin') }}"><i class="fa-solid fa-gear"></i></button>
     </div>
     <div class="widget-settings-panel" data-entity-views-settings-panel hidden
-         data-instances-by-class="{{ instancesByClass|map(list => list|map(item => {id: item.id, label: item ~ ''}))|json_encode|e('html_attr') }}">
+         data-instances-url="{{ path('admin_dashboard_widget_instances') }}">
         <label class="widget-settings-field">
             <span>{{ 'entity_views.settings.class_label'|trans({}, 'admin') }}</span>
             <select data-entity-views-settings-class>
@@ -73,7 +73,7 @@
                 <option value="">{{ 'entity_views.settings.entity_placeholder'|trans({}, 'admin') }}</option>
                 {% if entityClass %}
                     <option value="all"{{ allInstances ? ' selected' }}>{{ 'entity_views.settings.all_instances'|trans({}, 'admin') }}</option>
-                    {% for instance in instancesByClass[entityClass] %}
+                    {% for instance in instances %}
                         <option value="{{ instance.id }}"{{ entity and entity.id == instance.id ? ' selected' }}>{{ instance }}</option>
                     {% endfor %}
                 {% endif %}

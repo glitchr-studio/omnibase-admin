@@ -6,6 +6,7 @@ use Base\Admin\Config\Menu\MenuItem;
 use Base\Admin\Config\MenuItem as MenuItemFacade;
 use Base\Admin\Layout\LayoutScope;
 use Base\Admin\Layout\LayoutStore;
+use Base\Admin\Widget\LinkableEntityRegistry;
 use Base\Admin\Widget\PaletteWidgetTypeRegistry;
 use Base\Enum\UserRole;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -59,7 +60,39 @@ class DashboardWidgetController extends AbstractController
         protected readonly PaletteWidgetTypeRegistry $paletteRegistry,
         protected readonly TranslatorInterface $translator,
         protected readonly LayoutStore $layoutStore,
+        protected readonly LinkableEntityRegistry $entities,
     ) {
+    }
+
+    /**
+     * The instance picker's options for ONE class, on demand.
+     *
+     * The two entity-picking widgets (Counter, "Vues") used to receive
+     * every instance of EVERY pickable class up front, serialised into a
+     * data-instances-by-class attribute. Measured on beta: 9.2s to render
+     * one empty Counter, a 106KB fragment, 42.5KB of it that single
+     * attribute - roughly a thousand entities hydrated to fill a <select>
+     * that shows one class at a time, and it grows with the site. The
+     * picker now asks for the class it actually needs.
+     *
+     * GET + no CSRF like the other read-only routes here. $class is
+     * untrusted, so it is checked against getPickableClasses() rather
+     * than handed to the ORM - findInstances() guards too, but an
+     * arbitrary FQCN should not reach it in the first place.
+     */
+    public function instances(Request $request): JsonResponse
+    {
+        $this->assertSuperadmin();
+
+        $class = (string) $request->query->get('class', '');
+        if ('' === $class || !isset($this->entities->getPickableClasses()[$class])) {
+            return $this->json(['instances' => []]);
+        }
+
+        return $this->json(['instances' => \array_map(
+            fn ($instance) => ['id' => $instance->getId(), 'label' => (string) $instance],
+            $this->entities->findInstances($class),
+        )]);
     }
 
     public function types(): JsonResponse

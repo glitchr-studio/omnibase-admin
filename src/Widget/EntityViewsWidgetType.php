@@ -135,16 +135,17 @@ final class EntityViewsWidgetType implements PaletteDashboardWidgetTypeInterface
             'entityClass' => $class,
             'entity' => $entity,
             'allInstances' => $allInstances,
-            // Every pickable class's own up-to-200 instances, keyed by
-            // class - the settings panel's second select swaps its own
-            // option list from this client-side (see entity_views.
-            // html.twig's own comment) rather than a per-class AJAX round
-            // trip, same "no search-as-you-type picker" simplicity
-            // article_views' single-class version already settled on.
-            'instancesByClass' => \array_combine(
-                \array_keys($classes),
-                \array_map(fn (string $c) => $this->entities->findInstances($c), \array_keys($classes)),
-            ),
+            // Only the SELECTED class's instances - the picker fetches any
+            // other class's list from admin_dashboard_widget_instances when
+            // the class select changes. This deliberately reverses the
+            // earlier "ship every class inline, avoid a per-class AJAX round
+            // trip" call: measured on beta, shipping them all cost 9.2s to
+            // render one empty widget and a 106KB fragment, 42.5KB of it the
+            // instances attribute alone - about a thousand entities hydrated
+            // so a <select> could show one class at a time, growing with the
+            // site. One round trip on an explicit class change is the
+            // cheaper end of that trade by a wide margin.
+            'instances' => null !== $class ? $this->entities->findInstances($class) : [],
             'series' => $series,
             'palette' => $palette,
             'visibleSeries' => $visibleSeries,
