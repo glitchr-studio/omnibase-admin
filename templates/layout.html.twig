@@ -2162,7 +2162,23 @@
            height for every view - a short widget still renders as short
            normally, only gains a bit of headroom while its own edit
            controls are on screen. #}
-        body.is-customizing .widget-block, body.is-customizing .widget-group { min-height: 4.75rem; }
+        {# Derived from the two overlays it exists to separate, not guessed:
+           4.75rem left exactly 4px between the controls row and the resize
+           handle (measured live: controls 24px at top:.6rem, handle 29px at
+           bottom:.6rem, so 72.2px is the true zero-gap height). 4px reads as
+           "these icons are touching" on a card sitting at the floor, which is
+           what was reported. Spelling the parts out means changing an icon
+           size or an inset can't silently eat the clearance again - and the
+           extra .75rem gap is what makes it look deliberate rather than
+           barely-avoided. #}
+        body.is-customizing .widget-block, body.is-customizing .widget-group {
+            --widget-overlay-inset: .6rem;   /* .item-controls top / .item-resize-handle bottom */
+            --widget-controls-h: 1.5rem;     /* .item-controls row */
+            --widget-resize-h: 1.8rem;       /* .item-resize-handle box */
+            --widget-overlay-gap: .75rem;    /* visible breathing room between the two */
+            min-height: calc(var(--widget-overlay-inset) * 2 + var(--widget-controls-h)
+                             + var(--widget-resize-h) + var(--widget-overlay-gap));
+        }
         {# Widgets span 1-N tracks (N = --widget-columns, superadmin-
            adjustable via both the resize control AND the columns select
            above, persisted like everything else in LayoutConfig). Each
@@ -2335,8 +2351,17 @@
            comment. #}
         .widget-settings-panel { display: none; }
         body.is-customizing .widget-settings-panel:not([hidden]) { border: 1px solid var(--admin-border); border-radius: var(--admin-radius); padding: 1rem; margin-bottom: 1rem; display: flex; flex-direction: column; gap: .9rem; background: var(--admin-surface); }
-        .widget-settings-field { display: flex; flex-direction: column; gap: .4rem; font-size: .78rem; color: var(--admin-muted); text-transform: uppercase; letter-spacing: .03em; }
-        .widget-settings-field input[type="text"], .widget-settings-field select { font: inherit; text-transform: none; letter-spacing: normal; color: var(--admin-text); background: var(--admin-bg); border: 1px solid var(--admin-border); border-radius: 6px; padding: .4rem .6rem; }
+        {# min-width:0 on the field, width:100% on the control. A native <select>
+           is sized by its WIDEST OPTION, and the instance picker's options are
+           entity titles - so an "Article" pick blew the settings panel, and with
+           it the whole card, from 275px to 844px, shoving the dashboard grid
+           around. The flex item needs min-width:0 as well or it simply refuses
+           to shrink below that intrinsic width and the 100% resolves against it.
+           The dropdown POPUP is drawn by the browser outside this box, so long
+           titles stay fully readable when opened - only the closed control is
+           clamped to the card. #}
+        .widget-settings-field { display: flex; flex-direction: column; gap: .4rem; font-size: .78rem; color: var(--admin-muted); text-transform: uppercase; letter-spacing: .03em; min-width: 0; }
+        .widget-settings-field input[type="text"], .widget-settings-field select { font: inherit; text-transform: none; letter-spacing: normal; color: var(--admin-text); background: var(--admin-bg); border: 1px solid var(--admin-border); border-radius: 6px; padding: .4rem .6rem; width: 100%; min-width: 0; }
         {# The counter widget's source filter. A fieldset rather than a
            label so the group caption isn't tied to one checkbox; it needs
            the border/margin/padding reset because a fieldset carries UA
@@ -5727,8 +5752,17 @@
                 var opening = !!togglePanel.hidden;
                 if (opening) {
                     var toggleDef = JSON.parse((toggleBlock && toggleBlock.dataset.mergeDef) || '{}');
-                    var toggleClass = (toggleDef.params && toggleDef.params.entityClass) || '';
-                    var toggleEntityId = (toggleDef.params && toggleDef.params.entityId) || '';
+                    // mergeDef is the widget's ORIGINAL definition, so on its
+                    // own it re-proposes the pristine (usually empty) pick every
+                    // time the panel is re-opened - wiping what the admin chose
+                    // a moment ago, and, if they hit Apply from that blanked
+                    // panel, overwriting the stored params with nulls. Live
+                    // params win, mergeDef is only the fallback. Same reasoning
+                    // the source checkboxes below already spell out; the two
+                    // selects were simply never given the same treatment.
+                    var livePick = JSON.parse((toggleBlock && toggleBlock.dataset.widgetParams) || '{}');
+                    var toggleClass = livePick.entityClass || (toggleDef.params && toggleDef.params.entityClass) || '';
+                    var toggleEntityId = livePick.entityId || (toggleDef.params && toggleDef.params.entityId) || '';
                     toggleCard.querySelector('[data-entity-views-settings-class]').value = toggleClass;
                     // Repaint the entity select for whatever class was
                     // already saved, THEN select its saved value - the
@@ -5819,8 +5853,17 @@
                 var opening = !!togglePanel.hidden;
                 if (opening) {
                     var toggleDef = JSON.parse((toggleBlock && toggleBlock.dataset.mergeDef) || '{}');
-                    var toggleClass = (toggleDef.params && toggleDef.params.entityClass) || '';
-                    var toggleEntityId = (toggleDef.params && toggleDef.params.entityId) || '';
+                    // mergeDef is the widget's ORIGINAL definition, so on its
+                    // own it re-proposes the pristine (usually empty) pick every
+                    // time the panel is re-opened - wiping what the admin chose
+                    // a moment ago, and, if they hit Apply from that blanked
+                    // panel, overwriting the stored params with nulls. Live
+                    // params win, mergeDef is only the fallback. Same reasoning
+                    // the source checkboxes below already spell out; the two
+                    // selects were simply never given the same treatment.
+                    var livePick = JSON.parse((toggleBlock && toggleBlock.dataset.widgetParams) || '{}');
+                    var toggleClass = livePick.entityClass || (toggleDef.params && toggleDef.params.entityClass) || '';
+                    var toggleEntityId = livePick.entityId || (toggleDef.params && toggleDef.params.entityId) || '';
                     toggleCard.querySelector('[data-counter-settings-class]').value = toggleClass;
                     toggleCard.querySelector('[data-counter-settings-class]').dispatchEvent(new Event('change', { bubbles: true }));
                     toggleCard.querySelector('[data-counter-settings-entity]').value = toggleEntityId;
