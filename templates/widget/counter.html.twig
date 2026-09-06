@@ -22,7 +22,57 @@
     </div>
     <div class="widget-settings-panel" data-counter-settings-panel hidden
          data-instances-url="{{ path('admin_dashboard_widget_instances') }}">
-        <label class="widget-settings-field">
+        {# Mode first, because it decides what every control under it means.
+           Radios rather than a select: two options, and the choice changes
+           the rest of the panel, which is worth seeing without opening
+           anything. #}
+        <fieldset class="widget-settings-field">
+            <span>{{ 'counter.settings.mode_label'|trans({}, 'admin') }}</span>
+            <div class="widget-settings-checks">
+                {% for value, label in {'views': 'counter.settings.mode_views', 'records': 'counter.settings.mode_records'} %}
+                    <label class="widget-settings-check">
+                        <input type="radio" name="counter-mode-{{ widget.key|default('new')|replace({'.': '-'}) }}" data-counter-settings-mode value="{{ value }}"{{ mode == value ? ' checked' }}>
+                        <span>{{ label|trans({}, 'admin') }}</span>
+                    </label>
+                {% endfor %}
+            </div>
+        </fieldset>
+        {# The records-mode pickers. Kept in the DOM and hidden rather than
+           rendered conditionally, so switching mode is instant and a
+           selection made in one mode survives a look at the other. #}
+        <label class="widget-settings-field" data-counter-records-only{{ mode == 'records' ? '' : ' hidden' }}>
+            <span>{{ 'counter.settings.count_label'|trans({}, 'admin') }}</span>
+            <select data-counter-settings-count>
+                <option value="">{{ 'counter.settings.class_placeholder'|trans({}, 'admin') }}</option>
+                {% for class, label in classes %}
+                    <option value="{{ class }}"{{ countClass == class ? ' selected' }}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label class="widget-settings-field" data-counter-records-only{{ mode == 'records' ? '' : ' hidden' }}>
+            <span>{{ 'counter.settings.scope_label'|trans({}, 'admin') }}</span>
+            <select data-counter-settings-scope-class>
+                <option value="">{{ 'counter.settings.scope_everywhere'|trans({}, 'admin') }}</option>
+                {% for class, label in classes %}
+                    <option value="{{ class }}"{{ scopeClass == class ? ' selected' }}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <select data-counter-settings-scope-entity data-all-label="{{ 'counter.settings.scope_everywhere'|trans({}, 'admin') }}"{{ scopeClass ? '' : ' disabled' }}>
+                <option value=""></option>
+            </select>
+        </label>
+        <fieldset class="widget-settings-field" data-counter-records-only{{ mode == 'records' ? '' : ' hidden' }}>
+            <span>{{ 'counter.settings.states_label'|trans({}, 'admin') }}</span>
+            <div class="widget-settings-checks">
+                {% for value, label in stateLabels %}
+                    <label class="widget-settings-check">
+                        <input type="checkbox" data-counter-settings-state value="{{ value }}"{{ value in states ? ' checked' }}>
+                        <span>{{ label }}</span>
+                    </label>
+                {% endfor %}
+            </div>
+        </fieldset>
+        <label class="widget-settings-field" data-counter-views-only{{ mode == 'views' ? '' : ' hidden' }}>
             <span>{{ 'counter.settings.class_label'|trans({}, 'admin') }}</span>
             <select data-counter-settings-class>
                 <option value="">{{ 'counter.settings.class_placeholder'|trans({}, 'admin') }}</option>
@@ -31,7 +81,7 @@
                 {% endfor %}
             </select>
         </label>
-        <label class="widget-settings-field">
+        <label class="widget-settings-field" data-counter-views-only{{ mode == 'views' ? '' : ' hidden' }}>
             <span>{{ 'counter.settings.entity_label'|trans({}, 'admin') }}</span>
             <select data-counter-settings-entity data-all-label="{{ 'counter.settings.all_instances'|trans({}, 'admin') }}"{{ entityClass ? '' : ' disabled' }}>
                 <option value="">{{ 'counter.settings.entity_placeholder'|trans({}, 'admin') }}</option>
@@ -48,7 +98,7 @@
            instead. Same params.series key the two chart widgets persist
            through their legends, so "which traffic this counts" is one
            concept across all three rather than a counter-only setting. #}
-        <fieldset class="widget-settings-field">
+        <fieldset class="widget-settings-field" data-counter-views-only{{ mode == 'views' ? '' : ' hidden' }}>
             <span>{{ 'counter.settings.sources_label'|trans({}, 'admin') }}</span>
             <div class="widget-settings-checks">
                 {% for key, label in sourceLabels %}
@@ -65,8 +115,18 @@
         </div>
     </div>
     {% if total is not null %}
+        {# The number is the link, not a separate "voir la liste" control:
+           clicking the thing you are reading is the whole gesture. Rendered
+           as a plain span when there is no matching list to send you to
+           (views mode, or a count the index cannot reproduce as filters -
+           see CounterWidgetType::crudLink), so it never looks clickable
+           without being so. #}
         <div class="counter-value-row">
-            <span class="counter-value">{{ total }}</span>
+            {% if link %}
+                <a class="counter-value counter-value-link" href="{{ link }}" title="{{ 'counter.open_list'|trans({}, 'admin') }}">{{ total }}</a>
+            {% else %}
+                <span class="counter-value">{{ total }}</span>
+            {% endif %}
             {%- if change is not null %}
                 <span class="analytics-stat-change {{ change >= 0 ? 'is-up' : 'is-down' }}">
                     {{ change >= 0 ? '+' : '' }}{{ change }}%
@@ -76,7 +136,16 @@
         {# Names the sources rather than saying a bare "Vues": the number is
            human-only by default, and a tile with no legend beside it has
            nowhere else to say so. #}
-        <span class="analytics-stat-label">{{ sources|map(key => sourceLabels[key])|join(' + ') }}</span>
+        {# Names what was counted: the sources in views mode, the states in
+           records mode. A bare "Vues" under a number that excludes bots, or
+           under a count of drafts, would be the misleading half of the tile. #}
+        <span class="analytics-stat-label">
+            {%- if mode == 'records' -%}
+                {{ states|map(v => stateLabels[v])|join(' + ')|default('counter.state.any'|trans({}, 'admin')) }}
+            {%- else -%}
+                {{ sources|map(key => sourceLabels[key])|join(' + ') }}
+            {%- endif -%}
+        </span>
     {% else %}
         <p class="analytics-empty-state">{{ 'counter.empty_state'|trans({}, 'admin') }}</p>
     {% endif %}

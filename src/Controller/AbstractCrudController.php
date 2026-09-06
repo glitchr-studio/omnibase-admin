@@ -794,6 +794,22 @@ abstract class AbstractCrudController extends AbstractController implements Crud
     {
         $filters = $this->configureFilters(\Base\Admin\Filter\Filters::new());
 
+        // Every Thread carries a state, and nothing declared a filter for it -
+        // so a Counter widget reading "7 brouillons" had nowhere to send you
+        // that actually showed those 7. Offered by default rather than added
+        // to each CRUD by hand, and only when that CRUD has not named `state`
+        // itself, so an explicit declaration still wins.
+        $entityFqcn = static::getEntityFqcn();
+        if (null === $filters->get('state') && \is_subclass_of($entityFqcn, \Base\Entity\Thread::class)) {
+            $filters->add(\Base\Admin\Filter\Filter::new('state', 'État')->asChoice([
+                'Publié' => \Base\Enum\ThreadState::PUBLISH,
+                'Brouillon' => \Base\Enum\ThreadState::DRAFT,
+                'Programmé' => \Base\Enum\ThreadState::FUTURE,
+                'Caché' => \Base\Enum\ThreadState::SECRET,
+                'Archivé' => \Base\Enum\ThreadState::ARCHIVE,
+            ]));
+        }
+
         // guess widget types from Doctrine metadata for plain add('property')
         $metadata = $this->entityManager->getClassMetadata(static::getEntityFqcn());
         foreach ($filters->getAll() as $property => $filter) {

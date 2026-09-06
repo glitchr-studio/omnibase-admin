@@ -2065,6 +2065,39 @@
            VIEWING the dashboard (not editing it) sees neither control. #}
         .admin-topbar-dashboard-extra { display: none; align-items: center; gap: .75rem; }
         body.is-customizing .admin-topbar-dashboard-extra { display: flex; }
+        {# The topbar is one nowrap row at a fixed 3.3rem, which holds fine
+           until customize mode adds its toolbar to it. On a 390px phone the
+           row then wants 526px - hamburger 27 + toolbar 239 + "Terminé" 82 +
+           icons 114, plus four 1rem gaps - and the icons ran 150px off the
+           right edge, unreachable. Measured: 150px of overflow with
+           customize on, exactly 0 with it off, which is why it never showed
+           up outside an editing session.
+
+           Below 720px the toolbar and its Done button move to a second row,
+           so row one keeps the hamburger and the icons at their normal size
+           rather than shrinking anything to fit. height:auto is
+           required for it - the fixed height is what forces a single row -
+           and min-height keeps a non-customizing topbar exactly as it was. #}
+        @media (max-width: 720px) {
+            body.is-customizing .admin-topbar {
+                flex-wrap: wrap; height: auto; min-height: 3.3rem;
+                row-gap: .5rem; padding-bottom: .55rem;
+            }
+            {# flex-basis:100% would claim the whole row and push Done onto a
+               third one - 127px of topbar on a phone. The two together are
+               239 + 82 + gap = 337px against 362px of usable width, so they
+               share row two. grow must stay 0: at `1 1 auto` the toolbar
+               expands to fill the row and displaces Done just as
+               flex-basis:100% did. `0 1 auto` takes its content width and
+               shrinks if pressed, and its own wrap handles the rest. #}
+            body.is-customizing .admin-topbar-dashboard-extra {
+                order: 10; flex: 0 1 auto; min-width: 0; flex-wrap: wrap; gap: .5rem .75rem;
+            }
+            {# Trails the toolbar on the same second row: it is the action
+               that ENDS what that row configures. #}
+            body.is-customizing .admin-topbar #admin-customize-done { order: 11; flex: 0 0 auto; }
+            body.is-customizing .admin-columns-select { flex: 1 1 auto; min-width: 0; }
+        }
         [data-widget-palette-menu] { min-width: 12rem; }
         {# Sized to match .btn exactly (padding/font-size/border-radius) so
            the columns picker and "+ Ajouter un widget" read as one
@@ -2354,6 +2387,13 @@
         [data-counter-card] .analytics-empty-state { margin: auto 0; padding: 1rem; }
         .counter-value-row { display: flex; align-items: baseline; gap: .5rem; }
         .counter-value { font-size: 2.75rem; font-weight: 700; line-height: 1.1; }
+        {# Not styled as a link at rest: at 2.75rem an underline and an accent
+           colour turn the tile's whole point into decoration. It announces
+           itself on hover/focus instead, and the focus ring is what keeps it
+           reachable without a mouse. #}
+        a.counter-value-link { color: inherit; text-decoration: none; cursor: pointer; }
+        a.counter-value-link:hover { color: var(--admin-accent); text-decoration: underline; }
+        a.counter-value-link:focus-visible { outline: 2px solid var(--admin-accent); outline-offset: 3px; border-radius: 4px; }
         .analytics-range-picker { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: 1rem; transition: opacity .15s ease; }
         .analytics-range-picker.is-loading { opacity: .5; }
         .analytics-range-btn { border: 1px solid var(--admin-border); background: transparent; color: var(--admin-muted); font-size: .78rem; font-weight: 600; padding: .3rem .75rem; border-radius: 999px; cursor: pointer; transition: background .15s ease, color .15s ease, border-color .15s ease; }
@@ -5948,6 +5988,34 @@
         // settings-* namespace/data-counter-card scoping (see counter.
         // html.twig's own comment on why this stays a separate copy
         // rather than a shared abstraction).
+        {# Mode radio: shows the half of the panel that belongs to the chosen
+           mode and hides the other. Purely a visibility flip - both halves
+           stay in the DOM (see counter.html.twig) so nothing is lost by
+           looking at the other mode, and Apply reads whichever is current. #}
+        document.addEventListener('change', function (e) {
+            var modeInput = e.target.closest('[data-counter-settings-mode]');
+            if (!modeInput) return;
+            var card = modeInput.closest('[data-counter-card]');
+            if (!card) return;
+            var records = modeInput.value === 'records';
+            card.querySelectorAll('[data-counter-records-only]').forEach(function (el) { el.hidden = !records; });
+            card.querySelectorAll('[data-counter-views-only]').forEach(function (el) { el.hidden = records; });
+        });
+
+        {# "Dans" scope: same on-demand instance fetch the other pickers use,
+           so choosing a container never ships every class's rows up front.
+           Defaults to nothing selected rather than 'all' - an empty scope
+           means "the whole site" here, which is a real answer, unlike the
+           entity picker where it means "not configured yet". #}
+        document.addEventListener('change', function (e) {
+            var scopeClass = e.target.closest('[data-counter-settings-scope-class]');
+            if (!scopeClass) return;
+            var panel = scopeClass.closest('[data-counter-settings-panel]');
+            var scopeEntity = panel && panel.querySelector('[data-counter-settings-scope-entity]');
+            if (!scopeEntity) return;
+            adminFillInstanceSelect(panel, scopeEntity, scopeClass.value, null);
+        });
+
         document.addEventListener('change', function (e) {
             var classSelect = e.target.closest('[data-counter-settings-class]');
             if (!classSelect) return;
@@ -6050,9 +6118,37 @@
                 if (box.checked) sources.push(box.value);
             });
 
-            var counterParams = Object.assign({}, applyDef.params, { entityClass: entityClass, entityId: entityId });
+            var modeInput = applyCard.querySelector('[data-counter-settings-mode]:checked');
+            var counterMode = modeInput ? modeInput.value : 'views';
+
+            var states = [];
+            applyCard.querySelectorAll('[data-counter-settings-state]').forEach(function (box) {
+                if (box.checked) states.push(box.value);
+            });
+            var countSel = applyCard.querySelector('[data-counter-settings-count]');
+            var scopeClassSel = applyCard.querySelector('[data-counter-settings-scope-class]');
+            var scopeEntitySel = applyCard.querySelector('[data-counter-settings-scope-entity]');
+            var scopeIdRaw = scopeEntitySel ? scopeEntitySel.value : '';
+
+            // Live params as the base, not applyDef alone: the panel owns the
+            // keys below and nothing else, so a source picked off the legend
+            // or a mode set earlier survives an Apply from here.
+            var counterLive = JSON.parse(applyBlock.dataset.widgetParams || '{}');
+            var counterParams = Object.assign({}, applyDef.params, counterLive, {
+                entityClass: entityClass,
+                entityId: entityId,
+                mode: counterMode,
+                countClass: (countSel && countSel.value) || null,
+                scopeClass: (scopeClassSel && scopeClassSel.value) || null,
+                scopeId: (scopeIdRaw && scopeIdRaw !== 'all') ? parseInt(scopeIdRaw, 10) : null,
+            });
             if (sources.length) counterParams.series = sources;
             else delete counterParams.series;
+            // An empty list is "every state", which is what omitting the key
+            // already means server-side - storing [] would instead read as a
+            // deliberate "none of them".
+            if (states.length) counterParams.states = states;
+            else delete counterParams.states;
             applyBlock.dataset.widgetParams = JSON.stringify(counterParams);
 
             applyCard.querySelector('[data-counter-settings-panel]').hidden = true;

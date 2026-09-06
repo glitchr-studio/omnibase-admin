@@ -100,4 +100,88 @@ class CounterWidgetTypeTest extends KernelTestCase
         $this->assertTrue($vars['allInstances']);
         $this->assertNotNull($vars['total'], 'real published articles exist in this environment, so this must not fall back to the empty-state total');
     }
+
+    // -----------------------------------------------------------------
+    // records mode: counting rows rather than page views
+    // -----------------------------------------------------------------
+
+    public function testRecordsModeWithNothingToCountYetHasNoTotalAndNoLink(): void
+    {
+        $vars = $this->type->getTemplateVars(MenuItem::block('counter', null, null, null, [
+            'mode' => CounterWidgetType::MODE_RECORDS,
+        ]));
+
+        $this->assertNull($vars['total']);
+        $this->assertNull($vars['link']);
+        $this->assertSame(CounterWidgetType::MODE_RECORDS, $vars['mode']);
+    }
+
+    public function testRecordsModeNeverInventsATrend(): void
+    {
+        // A row count has no stored history to compare against, so the
+        // percentage badge must stay absent rather than be derived from
+        // something that does not mean the same thing.
+        $vars = $this->type->getTemplateVars(MenuItem::block('counter', null, null, null, [
+            'mode' => CounterWidgetType::MODE_RECORDS,
+            'countClass' => Article::class,
+        ]));
+
+        $this->assertNull($vars['change']);
+        $this->assertIsInt($vars['total']);
+    }
+
+    public function testStateNarrowingCannotExceedTheUnfilteredCount(): void
+    {
+        $params = ['mode' => CounterWidgetType::MODE_RECORDS, 'countClass' => Article::class];
+
+        $all = $this->type->getTemplateVars(MenuItem::block('counter', null, null, null, $params))['total'];
+        $published = $this->type->getTemplateVars(MenuItem::block('counter', null, null, null,
+            $params + ['states' => [\Base\Enum\ThreadState::PUBLISH]]))['total'];
+
+        // Deliberately a relation, not a fixed number: this suite runs against
+        // both a developer database and a schema built from scratch by the
+        // deploy gate, where every count here is legitimately 0.
+        $this->assertLessThanOrEqual($all, $published);
+    }
+
+    public function testTheCountedListIsReachableAndCarriesTheSameNarrowing(): void
+    {
+        $vars = $this->type->getTemplateVars(MenuItem::block('counter', null, null, null, [
+            'mode' => CounterWidgetType::MODE_RECORDS,
+            'countClass' => Article::class,
+            'states' => [\Base\Enum\ThreadState::DRAFT],
+        ]));
+
+        // The whole point of the link is that it answers for the number: a
+        // count of drafts must not land on a list of everything.
+        $this->assertNotNull($vars['link']);
+        $this->assertStringContainsString('state', \urldecode($vars['link']));
+        $this->assertStringContainsString(\Base\Enum\ThreadState::DRAFT, \urldecode($vars['link']));
+    }
+
+    public function testSeveralStatesLeaveTheLinkUnfilteredRatherThanWrong(): void
+    {
+        $vars = $this->type->getTemplateVars(MenuItem::block('counter', null, null, null, [
+            'mode' => CounterWidgetType::MODE_RECORDS,
+            'countClass' => Article::class,
+            'states' => [\Base\Enum\ThreadState::PUBLISH, \Base\Enum\ThreadState::DRAFT],
+        ]));
+
+        // The index's state filter is single-choice, so two states cannot be
+        // expressed. Dropping the narrowing silently would send you to a list
+        // that disagrees with the number; the link stays, unfiltered on state.
+        $this->assertNotNull($vars['link']);
+        $this->assertStringNotContainsString('state', \urldecode($vars['link']));
+    }
+
+    public function testAnUnknownCountClassDegradesInsteadOfFailing(): void
+    {
+        $vars = $this->type->getTemplateVars(MenuItem::block('counter', null, null, null, [
+            'mode' => CounterWidgetType::MODE_RECORDS,
+            'countClass' => 'App\\Entity\\ThisWasRenamedOrRemoved',
+        ]));
+
+        $this->assertNull($vars['total']);
+        $this->assertNull($vars['link']);
+    }
 }

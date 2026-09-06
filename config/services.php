@@ -183,6 +183,9 @@ return function (ContainerConfigurator $configurator) {
             service(\Base\Service\Analytics::class),
             service(\Base\Admin\Widget\LinkableEntityRegistry::class),
             service('translator'),
+            service('doctrine.orm.entity_manager'),
+            service(\Base\Admin\Router\AdminRouteRegistry::class),
+            service('router'),
         ])
         ->tag('base.admin.dashboard_widget_type')
         ->tag('base.admin.dashboard_widget_type.palette');

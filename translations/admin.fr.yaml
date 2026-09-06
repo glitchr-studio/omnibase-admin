@@ -29,8 +29,23 @@ counter:
         entity_placeholder: "— Sélectionner un élément —"
         all_instances: "— Tous —"
         sources_label: Trafic compté
+        mode_label: Compteur de
+        mode_views: Vues
+        mode_records: Nombre
+        count_label: Compter
+        scope_label: Dans
+        scope_everywhere: "— Tout le site —"
+        states_label: États
         cancel: Annuler
         apply: Appliquer
+    open_list: Voir la liste correspondante
+    state:
+        publish: Publié
+        draft: Brouillon
+        future: Programmé
+        publish_secret: Caché
+        publish_archive: Archivé
+        any: Tous états
 
 topbar:
     appearance: Apparence
