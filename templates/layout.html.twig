@@ -5723,9 +5723,10 @@
         // doesn't have its own live preview.
         //
         // The class select's own 'change' populates the entity select's
-        // options from data-instances-by-class (embedded server-side JSON,
-        // see the template's own comment) - client-side, no AJAX round
-        // trip, matching this widget's existing "no live chart" simplicity.
+        // options by fetching data-instances-url for that one class - see
+        // adminFillInstanceSelect just below, and the measurements in
+        // DashboardWidgetController::instances() for why they are no longer
+        // all embedded server-side.
         // Shared by BOTH entity-picking panels (Counter and "Vues"): fills an
         // instance <select> for one class, fetched on demand from
         // admin_dashboard_widget_instances. The widgets used to carry every

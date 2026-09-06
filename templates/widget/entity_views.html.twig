@@ -1,5 +1,5 @@
 {# Rendered via Base\Admin\Widget\EntityViewsWidgetType - 'classes'/'entityClass'/
-   'entity'/'allInstances'/'instancesByClass'/'series'/'palette'/'events'
+   'entity'/'allInstances'/'instances'/'series'/'palette'/'events'
    arrive as template vars (getTemplateVars()). Same chart/settings-panel
    shell as analytics_card.html.twig (site-wide traffic), generalized from
    what used to be this package's app-level, Article-only article_views.
@@ -63,9 +63,9 @@
         </label>
         <label class="widget-settings-field">
             <span>{{ 'entity_views.settings.entity_label'|trans({}, 'admin') }}</span>
-            {# Repopulated client-side from data-instances-by-class the
+            {# Repopulated client-side by fetching data-instances-url the
                instant the class select above changes (see layout.html.
-               twig's own handler) - starts with just the CURRENTLY
+               twig's adminFillInstanceSelect) - starts with just the CURRENTLY
                selected class's own options (if any) so a fresh page load
                already shows the right selection with no JS round trip
                needed on open. #}
