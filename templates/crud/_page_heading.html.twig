@@ -89,16 +89,13 @@
 {% endif %}
 
 {# Which language the two edits above are saved under - same row as
-   page/system.html.twig's, below the text it annotates. #}
+   page/system.html.twig's, below the text it annotates. Indicative only:
+   it names the dashboard's current language, it does not switch it. The
+   other flags used to be _switch_locale links, and a stray click flipped
+   the whole back-office into a language whose catalogues are partial. #}
 {% if editable and app.localizer.availableLocales|length > 1 %}
     <span class="page-locale-badges" title="{{ 'customize.locale_hint'|trans({'%locale%': app.localizer.locale|lang_name|capitalize}, 'admin') }}">
-        {% for _locale in app.localizer.availableLocales %}
-            {% if _locale == app.localizer.locale %}
-                <span class="page-locale-badge is-active"><img alt="{{ _locale }}" src="{{ asset('bundles/base/images/flags/' ~ (_locale|country) ~ '.svg') }}"></span>
-            {% else %}
-                <a class="page-locale-badge" href="{{ path('_switch_locale', {_locale: _locale|lang}) }}" title="{{ _locale|lang_name|capitalize }}"><img alt="{{ _locale }}" src="{{ asset('bundles/base/images/flags/' ~ (_locale|country) ~ '.svg') }}"></a>
-            {% endif %}
-        {% endfor %}
+        <span class="page-locale-badge is-active"><img alt="{{ app.localizer.locale }}" src="{{ asset('bundles/base/images/flags/' ~ (app.localizer.locale|country) ~ '.svg') }}"> {{ app.localizer.locale|lang_name|capitalize }}</span>
     </span>
 {% endif %}
 </div>

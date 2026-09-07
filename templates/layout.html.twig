@@ -2860,6 +2860,12 @@
            full 450px. #}
         .datagrid td > .badge { max-width: 13.2rem; }
         .datagrid .badge-list { max-width: 14rem; }
+        {# File/photo cells (AssociationFileField: the gallery's photos) list a
+           couple of chips plus a "+N": kept on ONE line, each chip eliding
+           on its own, instead of wrapping into a column of chips. #}
+        .datagrid td.file-widget { max-width: none; white-space: nowrap; }
+        .datagrid td.file-widget .badge-list { max-width: none; flex-wrap: nowrap; align-items: center; }
+        .datagrid td.file-widget .badge-list > .badge { max-width: 9rem; }
         .datagrid .badge-list > .badge { max-width: 11rem; }
         {# Every linked chip, not only the entity-styled ones: the plain
            association chips (gallery Photos) are <a class="badge"> and this
