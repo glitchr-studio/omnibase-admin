@@ -2,8 +2,8 @@
 
 namespace Tests\Base\Admin\Form;
 
-use Base\Admin\Field\FieldDescriptor;
-use Base\Admin\Field\TextField;
+use Base\Field\FieldDescriptor;
+use Base\Field\TextField;
 use Base\Admin\Form\FieldFormBuilder;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Form\Extension\Core\Type\TextType;

@@ -4,7 +4,7 @@ namespace Tests\Base\Admin\Twig;
 
 use Base\Admin\Config\Action;
 use Base\Admin\Config\Actions;
-use Base\Admin\Field\FieldValueResolver;
+use Base\Field\FieldValueResolver;
 use Base\Admin\Router\AdminUrlGenerator;
 use Base\Admin\Twig\AdminTwigExtension;
 use PHPUnit\Framework\TestCase;
