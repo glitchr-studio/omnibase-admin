@@ -146,6 +146,26 @@
         .admin-dropdown-menu button.is-active, .admin-dropdown-menu a.is-active { color: var(--admin-accent); font-weight: 600; }
         .admin-dropdown-menu i { width: 1rem; text-align: center; }
         .admin-dropdown-loading { display: block; padding: .5rem .8rem; font-size: .85rem; color: var(--admin-muted); }
+        {# Notification bell. The panel is an .admin-dropdown-menu for the look,
+           but opened by the notifications script (is-open on the panel itself,
+           not on a [data-dropdown] parent), hence its own display rule. #}
+        .admin-notifications-trigger { position: relative; }
+        .admin-notifications-badge { position: absolute; top: -2px; right: -2px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; box-sizing: border-box;
+            background: var(--admin-danger, #d33); color: #fff; font-size: .65rem; font-weight: 700; line-height: 16px; text-align: center; border: 2px solid var(--admin-surface); }
+        .admin-notifications-badge[hidden] { display: none; }
+        .admin-notifications-panel { min-width: 320px; max-width: min(380px, calc(100vw - 2rem)); }
+        .admin-notifications-panel.is-open { display: block; }
+        .admin-notifications-head { display: flex; align-items: center; justify-content: space-between; }
+        .admin-notifications-head .admin-notifications-readall { width: auto; padding: 0 .3rem; }
+        .admin-notifications-list { max-height: 60vh; overflow-y: auto; border-bottom: 1px solid var(--admin-border); }
+        .admin-notification { display: block !important; padding: .5rem .8rem; border-bottom: 1px solid var(--admin-border); }
+        .admin-notification.is-unread { background: color-mix(in srgb, var(--admin-danger, #d33) 8%, transparent); }
+        .admin-notification.is-unread .admin-notification-title::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--admin-danger, #d33); margin-right: .4rem; vertical-align: middle; }
+        .admin-notification-title { display: block; font-weight: 600; }
+        .admin-notification-body { display: block; color: var(--admin-muted); font-size: .8rem; }
+        .admin-notification-time { display: block; color: var(--admin-muted); font-size: .72rem; margin-top: .15rem; }
+        .admin-notifications-panel [data-push-toggle].is-on { color: var(--admin-success); }
+        .admin-notifications-panel [data-push-toggle][hidden] { display: none; }
         .admin-locale-flag { width: 1.15rem; height: .85rem; object-fit: cover; border-radius: 2px; flex-shrink: 0; }
         {# The avatar cluster IS the "shown by default" summary (not hidden
            behind opening the dropdown) - the dropdown itself is purely the
@@ -3030,6 +3050,9 @@
            to one specific page would never (re-)run when navigating INTO
            that page via the SPA swap instead of a fresh full load. #}
         {{ encore_entry_script_tags('admin-charts') }}
+        {# Notification center client (base-bundle "notifications-defer"):
+           the topbar bell, read marks, Web Push opt-in. #}
+        {% if app.user %}{{ encore_entry_script_tags('notifications') }}{% endif %}
         {# FontAwesome's class rules (.fa-solid/.fas/.far/...) live in the
            'base' entry's CSS, not 'form' - the font FILES were always
            reachable, but nothing mapped fa-* classes to glyphs, so every
@@ -3744,6 +3767,50 @@
                                         <span class="admin-active-dot {{ activeUser.isOnline ? 'is-online' : '' }}" title="{{ (activeUser.isOnline ? 'topbar.online' : 'topbar.recently_active')|trans({}, 'admin') }}"></span>
                                     </div>
                                 {% endfor %}
+                            </div>
+                        </div>
+                    {% endif %}
+                    {% if app.user %}
+                        {# Notification center (base-bundle): unread badge + latest
+                           entries + push opt-in. Driven by the "notifications" script
+                           (data-notifications-*), NOT by the generic [data-dropdown]
+                           handler - opening the panel also marks entries read. #}
+                        {% set unreadNotifications = notifications_unread() %}
+                        <div class="admin-icon-dropdown admin-notifications"
+                             data-notifications
+                             data-csrf="{{ notifications_token() }}"
+                             data-read-url="{{ path('user_notifications_read') }}"
+                             data-latest-url="{{ path('user_notifications_latest') }}"
+                             data-push-key="{{ push_available() ? push_vapid_key() : '' }}"
+                             data-push-subscribe-url="{{ path('push_subscribe') }}"
+                             data-push-unsubscribe-url="{{ path('push_unsubscribe') }}">
+                            <button type="button" class="admin-icon-btn admin-notifications-trigger {{ unreadNotifications > 0 ? 'has-unread' : '' }}" aria-haspopup="true" data-notifications-toggle=".admin-notifications-panel" title="{{ 'topbar.notifications.title'|trans({}, 'admin') }}">
+                                <i class="fa-solid fa-bell"></i>
+                                <span class="admin-notifications-badge" data-notifications-badge data-count="{{ unreadNotifications }}" {% if unreadNotifications == 0 %}hidden{% endif %}>{{ unreadNotifications > 9 ? '9+' : unreadNotifications }}</span>
+                            </button>
+                            <div class="admin-dropdown-menu admin-notifications-panel" role="menu" data-notifications-panel hidden>
+                                <div class="dropdown-heading admin-notifications-head">
+                                    <span>{{ 'topbar.notifications.title'|trans({}, 'admin') }}</span>
+                                    <button type="button" class="admin-notifications-readall" data-notifications-read-all title="{{ 'topbar.notifications.read_all'|trans({}, 'admin') }}"><i class="fa-solid fa-check-double"></i></button>
+                                </div>
+                                <div class="admin-notifications-list">
+                                {% for notification in notifications_latest(8) %}
+                                    <a class="admin-notification {{ notification.isRead ? '' : 'is-unread' }}" data-notification-item data-id="{{ notification.id }}" href="{{ notification.url ?? path('user_notifications') }}">
+                                        <span class="admin-notification-title">{{ notification.getTitle() ?: notification.getSubject() }}</span>
+                                        {% if notification.getContent() %}<span class="admin-notification-body">{{ notification.getContent()|striptags|slice(0, 90) }}</span>{% endif %}
+                                        {% if notification.sentAt %}<span class="admin-notification-time">{{ notification.sentAt|date('d/m/Y H:i') }}</span>{% endif %}
+                                    </a>
+                                {% else %}
+                                    <span class="admin-dropdown-loading">{{ 'topbar.notifications.empty'|trans({}, 'admin') }}</span>
+                                {% endfor %}
+                                </div>
+                                <a href="{{ path('user_notifications') }}"><i class="fa-solid fa-list"></i> {{ 'topbar.notifications.all'|trans({}, 'admin') }}</a>
+                                <button type="button" data-push-toggle hidden
+                                        data-label-off="{{ 'topbar.notifications.push_enable'|trans({}, 'admin') }}"
+                                        data-label-on="{{ 'topbar.notifications.push_disable'|trans({}, 'admin') }}"
+                                        data-label-denied="{{ 'topbar.notifications.push_denied'|trans({}, 'admin') }}">
+                                    <i class="fa-solid fa-mobile-screen"></i> <span data-push-label>{{ 'topbar.notifications.push_enable'|trans({}, 'admin') }}</span>
+                                </button>
                             </div>
                         </div>
                     {% endif %}

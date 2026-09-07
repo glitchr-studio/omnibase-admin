@@ -48,6 +48,14 @@ counter:
         any: Any state
 
 topbar:
+    notifications:
+        title: Notifications
+        all: All notifications
+        empty: Nothing here yet.
+        read_all: Mark all as read
+        push_enable: Enable notifications on this device
+        push_disable: Disable notifications on this device
+        push_denied: Notifications are blocked by the browser
     appearance: Appearance
     theme_light: Light
     theme_dark: Dark

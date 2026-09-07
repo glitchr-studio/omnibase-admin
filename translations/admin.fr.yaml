@@ -48,6 +48,14 @@ counter:
         any: Tous états
 
 topbar:
+    notifications:
+        title: Notifications
+        all: Toutes les notifications
+        empty: Aucune notification.
+        read_all: Tout marquer comme lu
+        push_enable: Activer les notifications sur cet appareil
+        push_disable: Désactiver les notifications sur cet appareil
+        push_denied: Notifications bloquées par le navigateur
     appearance: Apparence
     theme_light: Clair
     theme_dark: Sombre
