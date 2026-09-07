@@ -3,7 +3,7 @@
 namespace Symfony\Component\DependencyInjection\Loader\Configurator;
 
 use Base\Admin\Context\AdminContext;
-use Base\Admin\Field\FieldValueResolver;
+use Base\Field\FieldValueResolver;
 use Base\Admin\Form\FieldFormBuilder;
 use Base\Admin\Controller\AnalyticsController;
 use Base\Admin\Controller\LayoutController;
@@ -59,6 +59,7 @@ return function (ContainerConfigurator $configurator) {
     $services->set(AdminUrlGenerator::class)
         ->args([service('router'), service(AdminRouteRegistry::class)]);
 
+
     $services->set(SecurityVoter::class)
         ->args([service('security.authorization_checker')])
         ->tag('security.voter');
@@ -66,7 +67,7 @@ return function (ContainerConfigurator $configurator) {
     $services->set(\Base\Admin\Twig\AdminTwigExtension::class)
         // Registry: lets admin_entity_crud() resolve a related entity to the
         // CRUD that manages it, so association chips link themselves.
-        ->args([service(AdminUrlGenerator::class), service(\Base\Admin\Field\FieldValueResolver::class), service(AdminRouteRegistry::class), service(AdminContext::class)])
+        ->args([service(AdminUrlGenerator::class), service(\Base\Field\FieldValueResolver::class), service(AdminRouteRegistry::class), service(AdminContext::class)])
         ->tag('twig.extension');
 
     $services->set(\Base\Admin\EventSubscriber\NestHeaderSubscriber::class)

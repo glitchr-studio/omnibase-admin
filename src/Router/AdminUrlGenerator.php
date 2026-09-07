@@ -2,6 +2,7 @@
 
 namespace Base\Admin\Router;
 
+use Base\Routing\AdminUrlGeneratorInterface;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
 /**
@@ -9,7 +10,7 @@ use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
  * routes (admin_crud_<slug>_<action>); no runtime dispatch, no query-string
  * controller FQCNs.
  */
-class AdminUrlGenerator
+class AdminUrlGenerator implements AdminUrlGeneratorInterface
 {
     protected ?string $controllerFqcn = null;
     protected ?string $action = null;

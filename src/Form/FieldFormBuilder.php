@@ -2,8 +2,8 @@
 
 namespace Base\Admin\Form;
 
-use Base\Admin\Field\FieldDescriptor;
-use Base\Admin\Field\FieldInterface;
+use Base\Field\FieldDescriptor;
+use Base\Field\FieldInterface;
 use Symfony\Component\Form\Extension\Core\Type\FormType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\Form\FormFactoryInterface;

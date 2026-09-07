@@ -8,10 +8,10 @@ use function Symfony\Component\Translation\t;
 use Base\Admin\Config\Actions;
 use Base\Admin\Config\Crud;
 use Base\Admin\Context\AdminContext;
-use Base\Admin\Field\FieldDescriptor;
-use Base\Admin\Field\FieldInterface;
-use Base\Admin\Field\FieldValueResolver;
-use Base\Admin\Field\IdField;
+use Base\Field\FieldDescriptor;
+use Base\Field\FieldInterface;
+use Base\Field\FieldValueResolver;
+use Base\Field\IdField;
 use Base\Admin\Form\FieldFormBuilder;
 use Base\Admin\Orm\Paginator;
 use Base\Admin\Router\AdminUrlGenerator;
@@ -537,7 +537,7 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         $property = (string) ($payload['property'] ?? '');
         $token = (string) ($payload['_token'] ?? '');
 
-        if (!$this->isCsrfTokenValid(\Base\Admin\Field\BooleanField::CSRF_TOKEN_NAME, $token)) {
+        if (!$this->isCsrfTokenValid(\Base\Field\BooleanField::CSRF_TOKEN_NAME, $token)) {
             throw $this->createAccessDeniedException('Invalid CSRF token.');
         }
 
@@ -545,8 +545,8 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         foreach ($this->getFields(Crud::PAGE_INDEX) as $field) {
             $descriptor = $field->getAsDto();
             if ($descriptor->getProperty() === $property
-                && $field instanceof \Base\Admin\Field\BooleanField
-                && $descriptor->getCustomOption(\Base\Admin\Field\BooleanField::OPTION_RENDER_AS_SWITCH)
+                && $field instanceof \Base\Field\BooleanField
+                && $descriptor->getCustomOption(\Base\Field\BooleanField::OPTION_RENDER_AS_SWITCH)
             ) {
                 $togglable = $descriptor;
                 break;

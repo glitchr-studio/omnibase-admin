@@ -39,8 +39,8 @@ class AdminExtension extends AbstractBaseExtension
         $urlIdentifier = $config['url_identifier'] ?? [];
         unset($config['url_identifier']);
 
-        $container->getDefinition(\Base\Admin\Field\FieldValueResolver::class)
-            ->setArgument('$identifierFields', $urlIdentifier['fields'] ?? \Base\Admin\Field\FieldValueResolver::DEFAULT_IDENTIFIER_FIELDS)
+        $container->getDefinition(\Base\Field\FieldValueResolver::class)
+            ->setArgument('$identifierFields', $urlIdentifier['fields'] ?? \Base\Field\FieldValueResolver::DEFAULT_IDENTIFIER_FIELDS)
             ->setArgument('$identifierFieldsByEntity', $urlIdentifier['entities'] ?? [])
             ->setArgument('$lowercaseIdentifiers', $urlIdentifier['lowercase'] ?? false);
 

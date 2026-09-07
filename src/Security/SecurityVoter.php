@@ -4,8 +4,8 @@ namespace Base\Admin\Security;
 
 use Base\Admin\Config\Action;
 use Base\Admin\Config\Menu\MenuItem;
-use Base\Admin\Field\FieldDescriptor;
-use Base\Admin\Field\FieldInterface;
+use Base\Field\FieldDescriptor;
+use Base\Field\FieldInterface;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
 use Symfony\Component\Security\Core\Authorization\Voter\Vote;

@@ -3,7 +3,7 @@
     <label class="field-switch"
            data-toggle-url="{{ admin_url(controller_fqcn, 'toggle', entity.id) }}"
            data-property="{{ field.property }}"
-           data-token="{{ csrf_token(constant('Base\\Admin\\Field\\BooleanField::CSRF_TOKEN_NAME')) }}">
+           data-token="{{ csrf_token(constant('Base\\Field\\BooleanField::CSRF_TOKEN_NAME')) }}">
         <input type="checkbox" {{ checked ? 'checked' }}>
         <span class="track"></span>
     </label>

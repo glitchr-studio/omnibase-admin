@@ -3,7 +3,7 @@
 namespace Base\Admin\Twig;
 
 use Base\Admin\Config\Action;
-use Base\Admin\Field\FieldValueResolver;
+use Base\Field\FieldValueResolver;
 use Base\Admin\Router\AdminUrlGenerator;
 use Twig\Extension\AbstractExtension;
 use Twig\TwigFunction;
