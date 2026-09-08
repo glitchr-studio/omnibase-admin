@@ -44,9 +44,17 @@
    actually carries an icon: a question-mark placeholder on every CRUD
    would be worse than no box at all. Sits OUTSIDE .admin-header-titles,
    as a sibling, because .admin-header is the flex row it lines up in. #}
-{% set _menuIcon = admin_menu_current() ? admin_menu_current().icon : null %}
-{% set _icon = _menuIcon ?: (entityFqcn is defined ? admin_entity_icon(entityFqcn) : null) %}
-{% if _icon %}<span class="admin-header-icon"><i class="{{ _icon }}"></i></span>{% endif %}
+{% set _menuItem = admin_menu_current() %}
+{% set _menuIcon = _menuItem ? _menuItem.icon : null %}
+{% set _storedIcon = stored ? (stored.icon ?? null) : null %}
+{% set _icon = _storedIcon ?: _menuIcon ?: (entityFqcn is defined ? admin_entity_icon(entityFqcn) : null) %}
+{#- While customising, the icon can be changed here with the same picker as
+    the sidebar and the action buttons (data-page-icon). It is saved on the
+    CRUD page's own entry (field 'icon', LayoutScope::CRUD, keyed like the
+    title), NOT on a sidebar item: most CRUDs have none, and the one
+    place is what keeps index, detail and edit showing the same icon. -#}
+{% set _iconEdit = editable ? ' data-page-icon data-page-icon-value="' ~ (_storedIcon ?? '') ~ '" data-menu-key="' ~ pageKey ~ '" data-layout-scope="crud" data-page-icon-default="' ~ (_menuIcon ?: (entityFqcn is defined ? admin_entity_icon(entityFqcn) : '') ?: 'fa-solid fa-circle-question') ~ '" title="' ~ 'customize.page_icon_hint'|trans({}, 'admin') ~ '"' : '' %}
+{% if _icon or _iconEdit %}<span class="admin-header-icon"{{ _iconEdit|raw }}><i class="{{ _icon ?: 'fa-solid fa-circle-question' }}"></i></span>{% endif %}
 
 {# Wrapper is what makes the heading a STACK. .admin-header is a flex row,
    so without it the title, the id line, the description and the locale

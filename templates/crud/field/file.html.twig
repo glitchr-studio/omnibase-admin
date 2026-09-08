@@ -5,6 +5,19 @@
     <span class="badge-muted">—</span>
 {%- elseif format == 'avatar' -%}
     <img class="field-avatar-thumb" src="{{ raw|thumbnail(40, 40) }}" alt="">
+{%- elseif format in ['image', 'cropper'] -%}
+    {#- Show the pictures, not the words "1 file". Cheap cached tiles, and
+        the full photo is fetched only when one is clicked. -#}
+    {%- set images = raw is iterable ? raw : [raw] -%}
+    {%- set shown = 3 -%}
+    <span class="field-image-list">
+        {%- for path in images|slice(0, shown) -%}
+            <button type="button" class="field-image-thumb" data-image-view="{{ path|thumbnail(1600, 1600) }}" data-image-full="{{ image(path) }}" title="{{ 'field.viewImage'|trans({}, 'admin') }}">
+                <img src="{{ path|thumbnail(96, 96) }}" alt="" loading="lazy">
+            </button>
+        {%- endfor -%}
+        {%- if count > shown %}<span class="badge badge-muted">+{{ count - shown }}</span>{% endif -%}
+    </span>
 {%- else -%}
     {%- set icon = format == 'video' ? 'fa-solid fa-circle-play' : (format == 'audio' ? 'fa-solid fa-volume-high' : (format in ['image', 'cropper'] ? 'fa-solid fa-image' : 'fa-solid fa-paperclip')) -%}
     <span class="field-media"><i class="{{ icon }}"></i> {{ count }} {{ count != 1 ? 'field.files'|trans({}, 'admin') : 'field.file'|trans({}, 'admin') }}</span>

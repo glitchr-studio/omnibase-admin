@@ -74,6 +74,7 @@ sidebar:
     exit: Quitter l'administration
 
 customize:
+    page_icon_hint: "Cliquer pour changer l'icône de cette page (commune à la liste, au détail et au formulaire). Vider le champ puis Entrée pour rétablir l'icône par défaut."
     description_hint: Ajouter une description…
     reorder: Glisser pour réorganiser
     toggle_visibility: Afficher/masquer
@@ -110,6 +111,10 @@ field:
     files: fichiers
     item: élément
     items: éléments
+    viewImage: "Voir la photo"
+    copyLink: "Copier le lien de l'image"
+    copied: "Lien copié"
+    openImage: "Ouvrir dans un nouvel onglet"
     unlimited: Illimité
 
 action:

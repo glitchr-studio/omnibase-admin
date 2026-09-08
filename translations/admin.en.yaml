@@ -74,6 +74,7 @@ sidebar:
     exit: Exit admin
 
 customize:
+    page_icon_hint: "Click to change this page's icon (shared by the list, the detail and the form). Clear the field then Enter to restore the default icon."
     description_hint: Add a description…
     reorder: Drag to reorder
     toggle_visibility: Show/hide
@@ -110,6 +111,10 @@ field:
     files: files
     item: item
     items: items
+    viewImage: "View the photo"
+    copyLink: "Copy the image link"
+    copied: "Link copied"
+    openImage: "Open in a new tab"
     unlimited: Unlimited
 
 action:

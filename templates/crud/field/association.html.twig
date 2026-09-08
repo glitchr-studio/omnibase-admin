@@ -41,11 +41,20 @@
             {%- set shortLabel = itemLabel|length > maxLength ? itemLabel|slice(0, maxLength) ~ '…' : itemLabel -%}
             {%- set mode = loop.first ? showFirstMode : showRestMode -%}
             {%- set itemIcon = mode in [2, 3] ? admin_entity_icon(item) : null -%}
+            {#- A record that HAS a picture shows it instead of the generic
+                glyph: a column of twelve identical camera icons says nothing,
+                twelve thumbnails say which photos are in the gallery. Same
+                cached pipeline as the front (|thumbnail), so these are 96px
+                webp tiles, not originals. Only where an icon would have been
+                drawn anyway - a name-only chip stays name-only. -#}
+            {%- set itemImage = itemIcon ? admin_entity_image(item) : null -%}
+            {%- set itemThumb = itemImage ? itemImage|thumbnail(96, 96) : null -%}
             {#- Icon-only only holds when there IS an icon; otherwise keep the
                 label rather than emit an empty chip. -#}
             {%- set withName = mode is null or mode in [1, 3] or (mode == 2 and not itemIcon) -%}
             {%- set chipBody -%}
-                {%- if itemIcon %}<i class="{{ itemIcon }}"></i>{% endif -%}
+                {%- if itemThumb %}<img class="badge-thumb" src="{{ itemThumb }}" alt="" loading="lazy">
+                {%- elseif itemIcon %}<i class="{{ itemIcon }}"></i>{% endif -%}
                 {%- if withName %}<span class="badge-label">{{ shortLabel }}</span>{% endif -%}
             {%- endset -%}
             {%- if itemCrud and item.id is defined -%}
@@ -62,6 +71,25 @@
         {%- endif -%}
     </span>
     {%- endif -%}
+{%- elseif admin_entity_image(raw) -%}
+    {#- A to-one IMAGE (a Photo's `image`, a page's cover): the cell used to be
+        the obfuscated URL as dead text - unreadable, unopenable, and the one
+        thing anybody wants from it (the link) had to be selected by hand.
+        Now: a thumbnail that opens the photo in the viewer (fetched on click,
+        never with the page), the path, and a copy button for the absolute
+        URL. -#}
+    {%- set rawImage = admin_entity_image(raw) -%}
+    {%- set fullUrl = image(rawImage) -%}
+    {%- set rawLabel = '' ~ admin_display(raw) -%}
+    {%- set maxLength = field.customOption('maxLength') ?? 40 -%}
+    {%- set shortRaw = rawLabel|length > maxLength ? rawLabel|slice(0, maxLength) ~ '…' : rawLabel -%}
+    <span class="field-image">
+        <button type="button" class="field-image-thumb" data-image-view="{{ rawImage|thumbnail(1600, 1600) }}" data-image-full="{{ fullUrl }}" title="{{ 'field.viewImage'|trans({}, 'admin') }}">
+            <img src="{{ rawImage|thumbnail(96, 96) }}" alt="" loading="lazy">
+        </button>
+        <button type="button" class="field-image-path" data-image-view="{{ rawImage|thumbnail(1600, 1600) }}" data-image-full="{{ fullUrl }}" title="{{ rawLabel }}">{{ shortRaw }}</button>
+        <button type="button" class="admin-copy-btn" data-copy="{{ fullUrl }}" title="{{ 'field.copyLink'|trans({}, 'admin') }}" aria-label="{{ 'field.copyLink'|trans({}, 'admin') }}"><i class="fa-regular fa-copy"></i></button>
+    </span>
 {%- else -%}
     {#- Same elision as the chips above: a to-ONE association had none, so a
         Comment's parent article title made the "Parent" column 504px on its own

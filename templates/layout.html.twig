@@ -743,7 +743,7 @@
            centring the row then dragged the title down with them - the
            heading drifted lower the more it had to say. Top-aligned, the
            title stays put and everything else accumulates beneath it. #}
-        .admin-header { display: flex; align-items: flex-start; gap: 1rem; margin: 0 -2rem 1.25rem; padding: 1rem 2rem;
+        .admin-header { display: flex; align-items: center; gap: 1rem; margin: 0 -2rem 1.25rem; padding: 1rem 2rem;
                         position: sticky; top: 3.3rem; z-index: 14; background: var(--admin-bg); }
         .admin-header h1 { margin: 0; font-size: 1.35rem; }
         {# Detail-page shape: the record's own name is the heading and the
@@ -792,7 +792,11 @@
         {# Kept explicit even though .admin-header is flex-start now: this
            states the icon's own intent - line up with the TITLE - rather than
            inheriting it from a row alignment someone may later change back. #}
-        .admin-header-icon { align-self: flex-start; margin-top: .1rem; }
+        {# Centred on the title block: with no description the title used to
+           hang at the top of the icon's box, off its middle. #}
+        .admin-header-icon { align-self: center; }
+        body.is-customizing .admin-header-icon[data-page-icon] { cursor: pointer; outline: 1px dashed var(--admin-muted); outline-offset: 2px; }
+        body.is-customizing .admin-header-icon[data-page-icon]:hover { outline-color: var(--admin-accent); color: var(--admin-accent); }
         .page-locale-badge { display: inline-flex; align-items: center; padding: .2rem .3rem;
                              border: 1px solid var(--admin-border); border-radius: 5px; background: var(--admin-surface); }
         {# Inactive locales are links through _switch_locale - dimmed at
@@ -939,7 +943,7 @@
            820px iPad it ran 44px off the side of the screen and took the whole
            page sideways with it. #}
         @media (max-width: 1024px) {
-            .admin-header { flex-wrap: wrap; align-items: flex-start; }
+            .admin-header { flex-wrap: wrap; align-items: center; }
             .admin-header-titles { flex: 1 1 auto; }
             .admin-header .global-actions {
                 order: 3; width: 100%; margin-left: 0; justify-content: flex-start; }
@@ -1190,6 +1194,22 @@
         dialog#admin-confirm::backdrop { background: rgba(15, 23, 42, .45); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
         dialog#admin-confirm p { margin: 0 0 1.25rem; white-space: pre-line; }
         .admin-confirm-actions { display: flex; justify-content: flex-end; gap: .5rem; }
+        {# Image viewer. A native <dialog> like the confirmation above, but the
+           photo itself is only fetched when a thumbnail is clicked: a gallery
+           row shows a dozen 96px tiles, and pulling a dozen originals to draw
+           them is what used to time the page out. #}
+        dialog#admin-image-viewer { border: none; background: transparent; padding: 0; overflow: visible;
+                                    max-width: min(94vw, 1400px); max-height: 94vh; color: #fff; }
+        dialog#admin-image-viewer::backdrop { background: rgba(15, 23, 42, .72); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+        .admin-image-viewer-frame { display: flex; flex-direction: column; align-items: center; gap: .75rem; }
+        .admin-image-viewer-frame img { display: block; max-width: min(94vw, 1400px); max-height: 80vh; width: auto; height: auto;
+                                        border-radius: var(--admin-radius); background: var(--admin-surface); box-shadow: 0 24px 60px rgba(0, 0, 0, .45); }
+        dialog#admin-image-viewer.is-loading .admin-image-viewer-frame img { min-width: 220px; min-height: 160px; }
+        .admin-image-viewer-bar { display: flex; flex-wrap: wrap; justify-content: center; gap: .5rem; }
+        .admin-image-viewer-bar .btn { background: var(--admin-surface); color: var(--admin-text); border: 1px solid var(--admin-border); }
+        .admin-image-viewer-bar .btn:hover { border-color: var(--admin-accent); color: var(--admin-accent); }
+        .admin-image-viewer-spinner { position: absolute; opacity: 0; }
+        dialog#admin-image-viewer.is-loading .admin-image-viewer-spinner { opacity: 1; }
         {# Was `.btn-danger { background: var(--admin-danger) }` - a leftover that
            filled every destructive button everywhere and overrode the neutral
            default below it in the cascade. The tone system handles the colour
@@ -2922,6 +2942,24 @@
         .field-country { display: inline-flex; align-items: center; gap: .4rem; }
         .field-country .flag { font-size: 1.05rem; line-height: 1; }
 
+        {# A to-one image cell: tile, path, copy. Both the tile and the path
+           open the viewer, so the obvious click does the obvious thing. #}
+        .field-image { display: inline-flex; align-items: center; gap: .5rem; max-width: 100%; }
+        .field-image-list { display: inline-flex; align-items: center; gap: .35rem; }
+        .field-image-thumb { flex: 0 0 auto; padding: 0; line-height: 0; cursor: zoom-in; overflow: hidden;
+                             border: 1px solid var(--admin-border); border-radius: 10px; background: var(--admin-bg); }
+        .field-image-thumb img { display: block; width: 40px; height: 40px; object-fit: cover; }
+        .field-image-thumb:hover { border-color: var(--admin-accent); }
+        .field-image-path { min-width: 0; padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: zoom-in;
+                            text-align: start; text-decoration: underline dotted; text-underline-offset: 2px;
+                            overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .field-image-path:hover { color: var(--admin-accent); }
+        .admin-copy-btn { flex: 0 0 auto; padding: .25rem .4rem; border: 1px solid transparent; border-radius: 6px;
+                          background: none; color: var(--admin-muted); cursor: pointer; }
+        .admin-copy-btn:hover { color: var(--admin-text); background: var(--admin-bg); border-color: var(--admin-border); }
+        .admin-copy-btn.is-copied { color: var(--admin-success); }
+        {# Chips of records that have a picture show it in place of the glyph. #}
+        .badge > .badge-thumb { flex: 0 0 auto; width: 1.35rem; height: 1.35rem; border-radius: 6px; object-fit: cover; background: var(--admin-bg); }
         .field-media { display: inline-flex; align-items: center; gap: .5rem; }
         .field-media img, .field-media .avatar { width: 32px; height: 32px; border-radius: 6px; object-fit: cover; border: 1px solid var(--admin-border); background: var(--admin-bg); }
         .field-media .avatar { border-radius: 50%; }
@@ -3928,6 +3966,131 @@
    re-submits it through requestSubmit() with the ORIGINAL submitter
    button preserved (a plain form.submit() would drop a row-delete
    button's formaction and delete via the form's own action instead). #}
+{# Image viewer, shared by every image cell (crud/field/association,
+   crud/field/file). data-image-view carries a bounded 1600px rendition for
+   the screen, data-image-full the real file for "open" and "copy". #}
+<dialog id="admin-image-viewer">
+    <div class="admin-image-viewer-frame">
+        <i class="admin-image-viewer-spinner fa-solid fa-circle-notch fa-spin fa-2x"></i>
+        <img data-image-target alt="">
+        <div class="admin-image-viewer-bar">
+            <a class="btn" target="_blank" rel="noopener" data-image-open><i class="fa-solid fa-up-right-from-square"></i> {{ 'field.openImage'|trans({}, 'admin') }}</a>
+            <button type="button" class="btn" data-copy=""><i class="fa-regular fa-copy"></i> {{ 'field.copyLink'|trans({}, 'admin') }}</button>
+            <button type="button" class="btn" data-image-close><i class="fa-solid fa-xmark"></i> {{ 'action.cancel'|trans({}, 'admin') }}</button>
+        </div>
+    </div>
+</dialog>
+<script>
+    // Copy-to-clipboard for anything carrying data-copy. Always copies an
+    // ABSOLUTE url: a path pasted into a mail or a chat has to work away
+    // from this tab. Delegated, so it survives transparentJS page swaps.
+    (function () {
+        if (window.__adminCopyBound) return;
+        window.__adminCopyBound = true;
+
+        function flash(button) {
+            var icon = button.querySelector('i');
+            var previous = icon ? icon.className : null;
+            if (icon) icon.className = 'fa-solid fa-check';
+            button.classList.add('is-copied');
+            button.setAttribute('title', '{{ 'field.copied'|trans({}, 'admin')|e('js') }}');
+            setTimeout(function () {
+                if (icon && previous) icon.className = previous;
+                button.classList.remove('is-copied');
+                button.setAttribute('title', button.getAttribute('aria-label') || '{{ 'field.copyLink'|trans({}, 'admin')|e('js') }}');
+            }, 1600);
+        }
+
+        // execCommand is the fallback for a page served without HTTPS (and
+        // for browsers refusing the async API outside a secure context),
+        // where navigator.clipboard is simply absent.
+        function legacyCopy(text) {
+            var area = document.createElement('textarea');
+            area.value = text;
+            area.setAttribute('readonly', '');
+            area.style.position = 'fixed';
+            area.style.opacity = '0';
+            document.body.appendChild(area);
+            area.select();
+            try { document.execCommand('copy'); } catch (err) { /* nothing else to try */ }
+            document.body.removeChild(area);
+        }
+
+        document.addEventListener('click', function (e) {
+            var button = e.target.closest ? e.target.closest('[data-copy]') : null;
+            if (!button) return;
+            var value = button.getAttribute('data-copy');
+            if (!value) return;
+            e.preventDefault();
+
+            var absolute = value;
+            try { absolute = new URL(value, window.location.origin).href; } catch (err) { /* keep the raw value */ }
+
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(absolute).then(function () { flash(button); }, function () { legacyCopy(absolute); flash(button); });
+            } else {
+                legacyCopy(absolute);
+                flash(button);
+            }
+        });
+    })();
+
+    // The viewer itself.
+    (function () {
+        if (window.__adminImageViewerBound) return;
+        window.__adminImageViewerBound = true;
+
+        document.addEventListener('click', function (e) {
+            if (!e.target.closest) return;
+            var viewer = document.getElementById('admin-image-viewer');
+            if (!viewer) return;
+            var image = viewer.querySelector('[data-image-target]');
+            var openLink = viewer.querySelector('[data-image-open]');
+            var copyButton = viewer.querySelector('.admin-image-viewer-bar [data-copy]');
+
+            var trigger = e.target.closest('[data-image-view]');
+            if (trigger) {
+                e.preventDefault();
+                var source = trigger.getAttribute('data-image-view');
+                var full = trigger.getAttribute('data-image-full') || source;
+
+                viewer.classList.add('is-loading');
+                // Drop the previous photo first: reusing the element would
+                // otherwise show the last one until the new one decodes.
+                image.removeAttribute('src');
+                image.src = source;
+                if (openLink) openLink.href = full;
+                if (copyButton) copyButton.setAttribute('data-copy', full);
+                if (!viewer.open) viewer.showModal();
+                return;
+            }
+
+            // Close on the bar's button, and on the backdrop - which is the
+            // dialog element itself, everything inside being the frame.
+            if (e.target.closest('[data-image-close]') || e.target === viewer) viewer.close();
+        });
+
+        document.addEventListener('load', function (e) {
+            if (e.target && e.target.matches && e.target.matches('#admin-image-viewer [data-image-target]')) {
+                e.target.closest('dialog').classList.remove('is-loading');
+            }
+        }, true);
+        document.addEventListener('error', function (e) {
+            if (e.target && e.target.matches && e.target.matches('#admin-image-viewer [data-image-target]')) {
+                e.target.closest('dialog').classList.remove('is-loading');
+            }
+        }, true);
+
+        // Closing stops a still-running fetch of a large photo.
+        document.addEventListener('close', function (e) {
+            if (e.target && e.target.id === 'admin-image-viewer') {
+                var img = e.target.querySelector('[data-image-target]');
+                if (img) img.removeAttribute('src');
+                e.target.classList.remove('is-loading');
+            }
+        }, true);
+    })();
+</script>
 <dialog id="admin-confirm">
     <p id="admin-confirm-message"></p>
     <div class="admin-confirm-actions">
@@ -5135,9 +5298,21 @@
             if (desc) desc.textContent = entry.description || '';
         });
 
+        // An emptied contenteditable keeps a <br> or a stray newline, which
+        // defeats the :empty rule that draws the dashed "add a description"
+        // slot. Normalise on load and after every edit.
+        function normalizeEmptyDescriptions() {
+            document.querySelectorAll('[data-page-desc]').forEach(function (el) {
+                if (el.textContent.trim() === '' && el.innerHTML !== '') el.innerHTML = '';
+            });
+        }
+        normalizeEmptyDescriptions();
+        window.addEventListener('load', normalizeEmptyDescriptions);
+
         document.addEventListener('blur', function (e) {
             var field = e.target.closest('[data-page-title][contenteditable="true"], [data-page-desc][contenteditable="true"]');
             if (!field) return;
+            if (field.hasAttribute('data-page-desc') && field.textContent.trim() === '') field.innerHTML = '';
             var key = field.dataset.menuKey;
             if (!key) return;
             var isTitle = field.hasAttribute('data-page-title');
@@ -5349,6 +5524,18 @@
                 box.dataset.pageIconValue = value;
                 var actionIcon = box.querySelector('i');
                 if (actionIcon) actionIcon.className = value || 'fa-solid fa-circle-question';
+                return;
+            }
+
+            // A CRUD page heading's icon lives on the page's own entry in
+            // the CRUD scope, beside its title (crud/_page_heading.html.twig).
+            // Cleared = back to the icon the code declares (menu item, then
+            // the entity's own), which the heading passes along.
+            if (box.dataset.layoutScope === 'crud') {
+                queueQuickSave(CRUD_QUICK_URL, { key: box.dataset.menuKey, field: 'icon', value: value });
+                box.dataset.pageIconValue = value;
+                var pageIcon = box.querySelector('i');
+                if (pageIcon) pageIcon.className = value || box.dataset.pageIconDefault || 'fa-solid fa-circle-question';
                 return;
             }
 

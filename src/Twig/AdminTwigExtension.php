@@ -101,6 +101,9 @@ class AdminTwigExtension extends AbstractExtension
             // FieldValueResolver::entityLabel()/entityAvatar().
             new TwigFunction('admin_entity_label', $this->fieldValueResolver->entityLabel(...)),
             new TwigFunction('admin_entity_avatar', $this->fieldValueResolver->entityAvatar(...)),
+            // The RAW storage path of an entity's image, for templates that
+            // then size it themselves: admin_entity_image(photo)|thumbnail(96, 96).
+            new TwigFunction('admin_entity_image', $this->fieldValueResolver->entityImage(...)),
             new TwigFunction('admin_entity_crud', $this->adminEntityCrud(...)),
             new TwigFunction('admin_entity_id', $this->fieldValueResolver->entityIdentifier(...)),
             new TwigFunction('admin_menu_current', $this->adminMenuCurrent(...)),
