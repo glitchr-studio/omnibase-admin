@@ -150,8 +150,11 @@
            but opened by the notifications script (is-open on the panel itself,
            not on a [data-dropdown] parent), hence its own display rule. #}
         .admin-notifications-trigger { position: relative; }
-        .admin-notifications-badge { position: absolute; top: -2px; right: -2px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; box-sizing: border-box;
-            background: var(--admin-danger, #d33); color: #fff; font-size: .65rem; font-weight: 700; line-height: 16px; text-align: center; border: 2px solid var(--admin-surface); }
+        {# A small pill on the button's top-right corner, outside the bell
+           glyph: the 34px button leaves no room for a 20px badge over it. #}
+        .admin-notifications-badge { position: absolute; top: 0; right: 0; transform: translate(35%, -35%); min-width: 15px; height: 15px; padding: 0 4px; border-radius: 8px; box-sizing: border-box;
+            background: var(--admin-danger, #d33); color: #fff; font-size: 10px; font-weight: 700; line-height: 15px; text-align: center;
+            box-shadow: 0 0 0 1.5px var(--admin-surface); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; pointer-events: none; }
         .admin-notifications-badge[hidden] { display: none; }
         .admin-notifications-panel { min-width: 320px; max-width: min(380px, calc(100vw - 2rem)); }
         .admin-notifications-panel.is-open { display: block; }
