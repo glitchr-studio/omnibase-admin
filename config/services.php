@@ -59,6 +59,12 @@ return function (ContainerConfigurator $configurator) {
     $services->set(AdminUrlGenerator::class)
         ->args([service('router'), service(AdminRouteRegistry::class)]);
 
+    // Notifications opened from the back-office land on the record's edit
+    // page: replaces base-bundle's null linker (same alias id, this one wins).
+    $services->set(\Base\Admin\Notifier\AdminNotificationLinker::class)
+        ->args([service(AdminRouteRegistry::class), service(AdminUrlGenerator::class), service('doctrine.orm.entity_manager')]);
+    $services->alias(\Base\Notifier\NotificationLinkerInterface::class, \Base\Admin\Notifier\AdminNotificationLinker::class);
+
 
     $services->set(SecurityVoter::class)
         ->args([service('security.authorization_checker')])

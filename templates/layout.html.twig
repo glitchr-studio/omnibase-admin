@@ -293,6 +293,19 @@
            always the subtitle's last span, whether or not it carries the
            editable attributes, so one rule covers both. #}
         .admin-header-subtitle:has(> span:last-child:empty) .admin-header-sep { display: none; }
+        {# While customising, an empty description is the thing to click on:
+           a thin dashed slot with the placeholder inside, on the same line as
+           the flags and vertically centred with them. #}
+        body.is-customizing [data-page-desc][contenteditable="true"]:empty {
+            display: inline-block; min-width: 9rem; min-height: 1.4em; padding: .1rem .5rem; border: 1px dashed var(--admin-muted); border-radius: 5px; vertical-align: middle; }
+        body.is-customizing [data-page-desc][contenteditable="true"]:empty::before { content: attr(data-placeholder); color: var(--admin-muted); font-style: italic; }
+        body.is-customizing [data-page-desc][contenteditable="true"]:empty:focus::before { content: ""; }
+        .admin-header-subtitle, .admin-header-subtitle > span { vertical-align: middle; }
+        {# The subtitle line and the flags share a row under the title: centred
+           on each other rather than on the title's baseline, so the flag chips
+           (taller than the muted text) do not float above it. #}
+        .admin-header-titles > .admin-header-subtitle, .admin-header-titles > .page-locale-badges { align-self: center; }
+        body.is-customizing .admin-header-subtitle:has(> span:last-child:empty) .admin-header-sep { display: inline; }
         .admin-menu { list-style: none; margin: .75rem 0 0; padding: 0; }
         {# Used to push a standalone "Tableau de bord" quick-link away from
            the sections below it (prod-style rhythm: quick link at the very
@@ -3803,6 +3816,7 @@
                         {% set unreadNotifications = notifications_unread() %}
                         <div class="admin-icon-dropdown admin-notifications"
                              data-notifications
+                             data-notifications-context="admin"
                              data-csrf="{{ notifications_token() }}"
                              data-read-url="{{ path('user_notifications_read') }}"
                              data-latest-url="{{ path('user_notifications_latest') }}"
@@ -3820,7 +3834,7 @@
                                 </div>
                                 <div class="admin-notifications-list">
                                 {% for notification in notifications_latest(8) %}
-                                    <a class="admin-notification {{ notification.isRead ? '' : 'is-unread' }}" data-notification-item data-id="{{ notification.id }}" href="{{ notification.url ?? path('user_notifications') }}">
+                                    <a class="admin-notification {{ notification.isRead ? '' : 'is-unread' }}" data-notification-item data-id="{{ notification.id }}" href="{{ notification_admin_url(notification) ?? notification.url ?? path('user_notifications') }}">
                                         <span class="admin-notification-title">{{ notification.getTitle() ?: notification.getSubject() }}</span>
                                         {% if notification.getContent() %}<span class="admin-notification-body">{{ notification.getContent()|striptags|slice(0, 90) }}</span>{% endif %}
                                         {% if notification.sentAt %}<span class="admin-notification-time">{{ notification.sentAt|date('d/m/Y H:i') }}</span>{% endif %}
