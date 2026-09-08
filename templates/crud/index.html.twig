@@ -142,7 +142,7 @@
     {% for property, filter in filters.all %}
         {% set value = filter_values[property]|default(null) %}
         <label>
-            <span>{{ filter.label ?? property|humanize }}</span>
+            <span>{{ (filter.label ?? property|humanize)|trans({}, 'forms') }}</span>
             {% if filter.type == 'boolean' %}
                 <select name="filters[{{ property }}]">
                     <option value=""></option>
@@ -217,11 +217,11 @@
                 <th class="{{ field.property == 'id' ? 'cell-id' }}" style="{{ field.textAlign ? 'text-align:' ~ field.textAlign }}">
                     {% if field.isSortable is not defined or field.isSortable != false %}
                         <a href="{{ admin_url(controller_fqcn, 'index', null, {'sort': {(field.property): direction == 'ASC' ? 'DESC' : 'ASC'}}) }}">
-                            {{ field.label ?? field.property|humanize }}
+                            {{ (field.label ?? field.property|humanize)|trans({}, 'forms') }}
                             {%- if direction %} {{ direction == 'ASC' ? '▲' : '▼' }}{% endif %}
                         </a>
                     {% else %}
-                        {{ field.label ?? field.property|humanize }}
+                        {{ (field.label ?? field.property|humanize)|trans({}, 'forms') }}
                     {% endif %}
                 </th>
             {% endfor %}
@@ -240,7 +240,7 @@
                         value alone says nothing (see the max-width:720px block
                         in @Admin/layout.html.twig). -#}
                     <td class="{{ field.cssClass }} {{ field.property == 'id' ? 'cell-id' }}"
-                        data-label="{{ field.label ?? field.property|humanize }}"
+                        data-label="{{ (field.label ?? field.property|humanize)|trans({}, 'forms') }}"
                         style="{{ field.textAlign ? 'text-align:' ~ field.textAlign }}">
                         {{ include(['@Admin/' ~ field.templateName ~ '.html.twig', '@Admin/crud/field/text.html.twig'], {field: field, entity: row.entity}) }}
                     </td>

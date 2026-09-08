@@ -94,8 +94,18 @@
    other flags used to be _switch_locale links, and a stray click flipped
    the whole back-office into a language whose catalogues are partial. #}
 {% if editable and app.localizer.availableLocales|length > 1 %}
-    <span class="page-locale-badges" title="{{ 'customize.locale_hint'|trans({'%locale%': app.localizer.locale|lang_name|capitalize}, 'admin') }}">
-        <span class="page-locale-badge is-active"><img alt="{{ app.localizer.locale }}" src="{{ asset('bundles/base/images/flags/' ~ (app.localizer.locale|country) ~ '.svg') }}"> {{ app.localizer.locale|lang_name|capitalize }}</span>
+    {#- The stored custom title/description of every language, so the flags
+        can swap the editable text client-side without leaving the page (the
+        default language lives in the plain keys, the others under intl). -#}
+    {% set _perLocale = {} %}
+    {% for _locale in app.localizer.availableLocales %}
+        {% set _entry = stored ? (_locale == _def ? stored : (stored.intl[_locale] ?? {})) : {} %}
+        {% set _perLocale = _perLocale|merge({ (_locale): { label: _entry.label|default(''), description: _entry.description|default('') } }) %}
+    {% endfor %}
+    <span class="page-locale-badges" data-page-locales="{{ _perLocale|json_encode }}" data-page-fallback-title="{{ fallbackTitle }}" data-edit-locale="{{ _loc }}" title="{{ 'customize.locale_hint'|trans({'%locale%': _loc|lang_name|capitalize}, 'admin') }}">
+        {% for _locale in app.localizer.availableLocales %}
+            <button type="button" class="page-locale-badge {{ _locale == _loc ? 'is-active' }}" data-page-locale="{{ _locale }}" title="{{ _locale|lang_name|capitalize }}"><img alt="{{ _locale }}" src="{{ asset('bundles/base/images/flags/' ~ (_locale|country) ~ '.svg') }}"></button>
+        {% endfor %}
     </span>
 {% endif %}
 </div>

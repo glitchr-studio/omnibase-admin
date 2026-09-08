@@ -230,6 +230,18 @@ class LayoutController extends AbstractController
         // dashboard widget content never localized.
         $locale = $this->localizer?->getLocale();
         $defaultLocale = $this->localizer ? $this->localizer::getDefaultLocale() : null;
+        // The heading's flags let the editor pick the language of a title or
+        // description without leaving their own: honoured when it names one
+        // of the site's locales, ignored otherwise.
+        $requestedLocale = $data['locale'] ?? null;
+        if (\is_string($requestedLocale) && $this->localizer) {
+            // Compared in one normalised form: the page carries "de-DE"
+            // (Localizer::getLocale()), the available list "de_DE".
+            $norm = fn (string $l) => \Base\Service\Localizer::__toLocale($l, '_');
+            if (\in_array($norm($requestedLocale), array_map($norm, $this->localizer->getAvailableLocales()), true)) {
+                $locale = $requestedLocale;
+            }
+        }
         $intlLocale = (null !== $locale && null !== $defaultLocale && $locale !== $defaultLocale
             && \in_array($field, ['label', 'description'], true) && null === $paneIndex)
             ? $locale : null;

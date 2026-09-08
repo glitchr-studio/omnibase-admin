@@ -786,8 +786,10 @@
            rest so the ACTIVE flag reads as "you are editing this
            language" at a glance, full-strength on hover as the "click to
            edit that one instead" affordance. #}
-        a.page-locale-badge { opacity: .4; cursor: pointer; }
-        a.page-locale-badge:hover { opacity: 1; border-color: var(--admin-accent); }
+        button.page-locale-badge { cursor: pointer; font: inherit; line-height: 0; }
+        .page-locale-badge:not(.is-active) { opacity: .4; }
+        .page-locale-badge:not(.is-active):hover { opacity: 1; border-color: var(--admin-accent); }
+        .page-locale-badge img { width: 1.15rem; height: .85rem; object-fit: cover; border-radius: 2px; }
         .page-locale-badge.is-active { border-color: var(--admin-accent); }
         .page-locale-badge img { width: 1.15rem; height: .85rem; object-fit: cover; border-radius: 2px; display: block; }
         {# The page-icon box doubles as its own edit surface in customize
@@ -5095,6 +5097,30 @@
             });
             return quickSaveChain;
         }
+        // The flags under a CRUD page's title pick which LANGUAGE the custom
+        // title/description being typed belongs to - they do not switch the
+        // back-office's locale (they used to, and a stray click landed the
+        // whole admin in a language with partial catalogues). Picking one
+        // swaps the editable text to that language's stored value (or the
+        // code-defined title when nothing was stored yet).
+        document.addEventListener('click', function (e) {
+            var flag = e.target.closest('.page-locale-badge[data-page-locale]');
+            if (!flag) return;
+            e.preventDefault();
+            var badges = flag.closest('.page-locale-badges');
+            var locale = flag.dataset.pageLocale;
+            var all = {};
+            try { all = JSON.parse(badges.dataset.pageLocales || '{}'); } catch (err) {}
+            var entry = all[locale] || {};
+            badges.dataset.editLocale = locale;
+            badges.querySelectorAll('.page-locale-badge').forEach(function (b) { b.classList.toggle('is-active', b === flag); });
+            var titles = badges.closest('.admin-header-titles');
+            var title = titles && titles.querySelector('[data-page-title]');
+            var desc = titles && titles.querySelector('[data-page-desc]');
+            if (title) title.textContent = entry.label || badges.dataset.pageFallbackTitle || '';
+            if (desc) desc.textContent = entry.description || '';
+        });
+
         document.addEventListener('blur', function (e) {
             var field = e.target.closest('[data-page-title][contenteditable="true"], [data-page-desc][contenteditable="true"]');
             if (!field) return;
@@ -5105,6 +5131,10 @@
             var isCrudScope = 'crud' === field.dataset.layoutScope;
 
             var payload = { key: key, field: isTitle ? 'label' : 'description', value: value };
+            // Which language this text is for: the flag picked in the heading
+            // (see the data-page-locale handler), the admin's own otherwise.
+            var badges = field.closest('.admin-header-titles') && field.closest('.admin-header-titles').querySelector('.page-locale-badges');
+            if (badges && badges.dataset.editLocale) payload.locale = badges.dataset.editLocale;
             // The item's section (see groupIntoSections()) - quickSave's
             // upsert needs it to place a never-before-stored entry at the
             // right nesting level, not the top of the tree. Never sent for
