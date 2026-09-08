@@ -48,8 +48,12 @@
             {% if _isHidden and not _editable %}
             {% elseif action.htmlElement == 'button' %}
                 {% set isMainSave = 'action-saveAndReturn' in action.cssClass %}
+                {#- Any data-* the action declares travels to the button: a
+                    data-confirm question (asked by the layout's confirm dialog),
+                    a data-confirm-check checkbox to tick on yes, ... -#}
                 <button class="btn {{ isMainSave ? 'btn-success' : 'btn-primary' }} {{ _isHidden ? 'is-hidden' }}"{% if isMainSave %} data-primary-action{% endif %} type="submit" form="admin-form"
-                        name="{{ action.htmlAttributes.name|default('submit_action') }}" value="{{ action.htmlAttributes.value|default(action.name) }}"{{ _edit|raw }}>
+                        name="{{ action.htmlAttributes.name|default('submit_action') }}" value="{{ action.htmlAttributes.value|default(action.name) }}"
+                        {%- for _k, _v in action.htmlAttributes %}{% if _k starts with 'data-' %} {{ _k }}="{{ _v }}"{% endif %}{% endfor %}{{ _edit|raw }}>
                     {% if _icon %}<i class="{{ _icon }}"></i> {% endif %}{{ action.label|trans }}
                 </button>
             {% elseif action.crudActionName == 'index' %}

@@ -1170,7 +1170,7 @@
         dialog#admin-confirm { border: 1px solid var(--admin-border); border-radius: var(--admin-radius); background: var(--admin-surface);
                                color: inherit; padding: 1.5rem; max-width: 420px; box-shadow: 0 18px 50px rgba(0,0,0,.25); }
         dialog#admin-confirm::backdrop { background: rgba(15, 23, 42, .45); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
-        dialog#admin-confirm p { margin: 0 0 1.25rem; }
+        dialog#admin-confirm p { margin: 0 0 1.25rem; white-space: pre-line; }
         .admin-confirm-actions { display: flex; justify-content: flex-end; gap: .5rem; }
         {# Was `.btn-danger { background: var(--admin-danger) }` - a leftover that
            filled every destructive button everywhere and overrode the neutral
@@ -3923,12 +3923,20 @@
 
         document.addEventListener('submit', function (e) {
             var form = e.target;
-            if (!(form instanceof HTMLFormElement) || !form.dataset.confirm) return;
+            if (!(form instanceof HTMLFormElement)) return;
+            // The question can sit on the form, or on the submit button that
+            // fired it (a header action such as "Publier", hoisted out of the
+            // form through form="admin-form"). A button may also name a
+            // checkbox (data-confirm-check) to tick once the answer is yes.
+            var submitter = e.submitter || null;
+            var message = (submitter && submitter.dataset && submitter.dataset.confirm) || form.dataset.confirm;
+            if (!message) return;
             if (form.dataset.confirmed === '1') { delete form.dataset.confirmed; return; }
             e.preventDefault();
+            e.stopImmediatePropagation();
             pendingForm = form;
-            pendingSubmitter = e.submitter || null;
-            document.getElementById('admin-confirm-message').textContent = form.dataset.confirm;
+            pendingSubmitter = submitter;
+            document.getElementById('admin-confirm-message').textContent = message;
             dialog.showModal();
         }, true);
 
@@ -3937,6 +3945,10 @@
             if (!role) return;
             dialog.close();
             if (role === 'confirm' && pendingForm) {
+                if (pendingSubmitter && pendingSubmitter.dataset && pendingSubmitter.dataset.confirmCheck) {
+                    var check = document.getElementById(pendingSubmitter.dataset.confirmCheck);
+                    if (check) { check.checked = true; check.dispatchEvent(new Event('change', { bubbles: true })); }
+                }
                 pendingForm.dataset.confirmed = '1';
                 pendingForm.requestSubmit(pendingSubmitter);
             }
