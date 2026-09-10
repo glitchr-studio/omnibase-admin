@@ -52,8 +52,13 @@
        declare and that the OLD EasyAdmin dashboard rendered; the enum()
        twig function returns a live instance so its static methods are
        callable directly from the template. #}
-    {%- set icon = enumClass ? enum(enumClass).getIcon(raw) : null -%}
-    {%- set color = enumClass ? enum(enumClass).getColor(raw) : null -%}
+    {#- enum() returns null for anything that is not an EnumType subclass
+       (a Doctrine type name it doesn't know, a plain class), so calling
+       .getIcon() straight off it fataled the whole index rather than
+       falling back to the humanized label below. Resolved once, guarded. -#}
+    {%- set enumType = enumClass ? enum(enumClass) : null -%}
+    {%- set icon = enumType ? enumType.getIcon(raw) : null -%}
+    {%- set color = enumType ? enumType.getColor(raw) : null -%}
     <span class="badge badge-accent"{% if color %} style="background:{{ color }}22; color:{{ color }}; border-color:{{ color }}55;"{% endif %}>
         {%- if icon -%}<i class="{{ icon }}"></i> {%- endif -%}
         <span class="badge-label">

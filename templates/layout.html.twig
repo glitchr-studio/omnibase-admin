@@ -292,20 +292,37 @@
            enumerating every case that should show it: the description is
            always the subtitle's last span, whether or not it carries the
            editable attributes, so one rule covers both. #}
-        .admin-header-subtitle:has(> span:last-child:empty) .admin-header-sep { display: none; }
+        .admin-header-subtitle:has(> span:last-child:is(:empty, .is-empty)) .admin-header-sep { display: none; }
+        {# An empty description renders for anyone who CAN customize (see
+           crud/_page_heading.html.twig's `_desc or editable` guard), which
+           means a zero-height row sat under every heading even with customize
+           mode OFF - .admin-header-titles is a wrapping flex column-ish row,
+           so that phantom row made the block taller than the <h1> and pushed
+           the title a few px above the centre of the icon box beside it.
+           Nothing to click when not customizing, so nothing to reserve. #}
+        body:not(.is-customizing) .admin-header-titles > [data-page-desc]:is(:empty, .is-empty) { display: none; }
         {# While customising, an empty description is the thing to click on:
            a thin dashed slot with the placeholder inside, on the same line as
-           the flags and vertically centred with them. #}
-        body.is-customizing [data-page-desc][contenteditable="true"]:empty {
+           the flags and vertically centred with them.
+
+           Keyed on .is-empty (maintained in JS, see
+           normalizeEmptyDescriptions below) as well as :empty, and that is
+           load-bearing rather than belt-and-braces: a contenteditable that
+           has been focused holds a browser-inserted <br>, so it stops
+           matching :empty while still being empty to the user. The slot then
+           lost its min-width and collapsed to a 0px-wide sliver of outline
+           next to the flags - reported live, and exactly what the user
+           screenshotted. #}
+        body.is-customizing [data-page-desc][contenteditable="true"]:is(:empty, .is-empty) {
             display: inline-block; min-width: 9rem; min-height: 1.4em; padding: .1rem .5rem; border: 1px dashed var(--admin-muted); border-radius: 5px; vertical-align: middle; }
-        body.is-customizing [data-page-desc][contenteditable="true"]:empty::before { content: attr(data-placeholder); color: var(--admin-muted); font-style: italic; }
-        body.is-customizing [data-page-desc][contenteditable="true"]:empty:focus::before { content: ""; }
+        body.is-customizing [data-page-desc][contenteditable="true"]:is(:empty, .is-empty)::before { content: attr(data-placeholder); color: var(--admin-muted); font-style: italic; }
+        body.is-customizing [data-page-desc][contenteditable="true"]:is(:empty, .is-empty):focus::before { content: ""; }
         .admin-header-subtitle, .admin-header-subtitle > span { vertical-align: middle; }
         {# The subtitle line and the flags share a row under the title: centred
            on each other rather than on the title's baseline, so the flag chips
            (taller than the muted text) do not float above it. #}
         .admin-header-titles > .admin-header-subtitle, .admin-header-titles > .page-locale-badges { align-self: center; }
-        body.is-customizing .admin-header-subtitle:has(> span:last-child:empty) .admin-header-sep { display: inline; }
+        body.is-customizing .admin-header-subtitle:has(> span:last-child:is(:empty, .is-empty)) .admin-header-sep { display: inline; }
         .admin-menu { list-style: none; margin: .75rem 0 0; padding: 0; }
         {# Used to push a standalone "Tableau de bord" quick-link away from
            the sections below it (prod-style rhythm: quick link at the very
@@ -5295,19 +5312,47 @@
             var title = titles && titles.querySelector('[data-page-title]');
             var desc = titles && titles.querySelector('[data-page-desc]');
             if (title) title.textContent = entry.label || badges.dataset.pageFallbackTitle || '';
-            if (desc) desc.textContent = entry.description || '';
+            // Swapping to a language with no stored description empties the
+            // field, so the dashed-slot state has to be recomputed with it
+            // (markEmptyDescription is declared below, hoisted).
+            if (desc) { desc.textContent = entry.description || ''; markEmptyDescription(desc); }
         });
 
         // An emptied contenteditable keeps a <br> or a stray newline, which
         // defeats the :empty rule that draws the dashed "add a description"
         // slot. Normalise on load and after every edit.
+        //
+        // The <br> is the browser's, not ours: Chrome inserts one the moment
+        // a block-level contenteditable takes focus, and puts it back after
+        // the last character is deleted. So :empty alone was never enough -
+        // the slot silently lost its min-width and collapsed into a bare
+        // sliver of focus outline beside the flags for the whole time the
+        // field was focused. .is-empty is maintained here instead and the
+        // CSS keys on both.
+        //
+        // Clearing innerHTML is only safe while the element is NOT focused -
+        // doing it under the caret would move it - so a focused-and-empty
+        // field gets the class and keeps its stray <br> until blur.
+        function markEmptyDescription(el) {
+            var empty = el.textContent.trim() === '';
+            if (empty && el.innerHTML !== '' && document.activeElement !== el) el.innerHTML = '';
+            el.classList.toggle('is-empty', empty);
+        }
+
         function normalizeEmptyDescriptions() {
-            document.querySelectorAll('[data-page-desc]').forEach(function (el) {
-                if (el.textContent.trim() === '' && el.innerHTML !== '') el.innerHTML = '';
-            });
+            document.querySelectorAll('[data-page-desc]').forEach(markEmptyDescription);
         }
         normalizeEmptyDescriptions();
         window.addEventListener('load', normalizeEmptyDescriptions);
+        // Delegated, and on every event that can change emptiness: the
+        // heading is re-rendered on each SPA nav, so nothing may be bound
+        // directly to these elements.
+        ['input', 'focusin', 'focusout'].forEach(function (type) {
+            document.addEventListener(type, function (e) {
+                var el = e.target && e.target.closest ? e.target.closest('[data-page-desc]') : null;
+                if (el) markEmptyDescription(el);
+            }, true);
+        });
 
         document.addEventListener('blur', function (e) {
             var field = e.target.closest('[data-page-title][contenteditable="true"], [data-page-desc][contenteditable="true"]');
