@@ -77,10 +77,21 @@
 {%- if raw is null or raw == '' or (raw is iterable and raw|length == 0) -%}
     <span class="badge-muted">—</span>
 {%- elseif raw is iterable -%}
+    {#- The field sets displayLimit (2 by default, see SelectField), and this
+        template used to ignore it and print the WHOLE collection - which on
+        the newsletter subscribers list meant one article title followed by
+        ~73 identical bell glyphs per row. Same contract association.html.twig
+        already honours: 0 means "just say how many", otherwise show that many
+        chips and collapse the rest into +N. -#}
+    {%- set limit = field.customOption('displayLimit') ?? 2 -%}
+    {%- set total = raw|length -%}
+    {%- if limit == 0 -%}
+        <span class="badge{{ total == 0 ? ' badge-muted' }}">{{ total }}</span>
+    {%- else -%}
     {%- set showFirstMode = field.customOption('showFirst') -%}
     {%- set showRestMode = field.customOption('show') ?? showFirstMode -%}
     <span class="badge-list">
-        {%- for item in raw -%}
+        {%- for item in raw|slice(0, limit) -%}
             {#- a to-many association's raw value is a collection of real
                entity objects (not scalar ids/strings) - admin_display()
                turns each into the same safe string FieldValueResolver
@@ -97,7 +108,11 @@
                exactly as before. #}
             {{ _self.entity(item, choices, enumClass, entityDisplay, crudFqcn ?? admin_entity_crud(item), loop.first ? showFirstMode : showRestMode) }}
         {%- endfor -%}
+        {%- if total > limit -%}
+            <span class="badge badge-muted">+{{ total - limit }}</span>
+        {%- endif -%}
     </span>
+    {%- endif -%}
 {%- elseif raw is not iterable and raw.id is defined -%}
     {#- A to-ONE association (SelectField over a single related entity, e.g.
         an Article's Destination parent). This branch used to fall through to

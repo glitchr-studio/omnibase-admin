@@ -755,6 +755,26 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
         } catch (e) {}
     }
 
+    // Drop every cached page. Called after a write goes through, because each
+    // snapshot is HTML captured BEFORE it: Back replays one verbatim, with the
+    // form's pre-edit field values and a CSRF token the session still accepts,
+    // so saving from a replayed page would write the old record back over the
+    // new one. Reported live - an article edited in the back-office, then the
+    // page behind it still showed the previous version until a refresh. The
+    // whole cache goes rather than one entry because a write is rarely
+    // confined to the page that made it (a list, a count, a sidebar); the
+    // cost of being wrong is one refetch.
+    Transparent.invalidateResponses = function() {
+
+        try {
+            var array = JSON.parse(sessionStorage.getItem('transparent')) || [];
+            array.forEach(removeResponseEntry);
+            sessionStorage.removeItem('transparent');
+        } catch (e) {}
+
+        Transparent.clearLiveResponse();
+    };
+
     Transparent.configure = function (options) {
 
         var key, value;
@@ -2771,6 +2791,11 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
             // navigation before applying it.
             if (uuid !== currentNavUuid) return;
             if (currentXhr === xhr) currentXhr = null;
+
+            // That answered a write, so everything cached predates it.
+            if (String(method).toUpperCase() === "POST" && status < 400) {
+                Transparent.invalidateResponses();
+            }
 
             var responseURL;
             responseURL = xhr !== null ? xhr.responseURL : url.href;

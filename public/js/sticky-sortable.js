@@ -23,6 +23,7 @@
         dragThreshold: 4,      // px of pointer movement before a press counts as a drag, not a click
         autoscroll: true,
         autoscrollEdge: 40,    // px from the scroll container's edge that triggers scrolling
+        autoscrollInsetTop: null, // px of the top edge already covered by something pinned over it; null = measure it
         autoscrollSpeed: 12,   // px per animation frame at full deflection
         draggingClass: 'is-dragging',
         placeholderClass: 'is-sortable-placeholder',
@@ -364,13 +365,50 @@
         }
     };
 
+    // How much of the scroller's top edge is hidden under something pinned
+    // across it. A sticky header covers exactly the band that triggers upward
+    // scrolling, so the pointer can never reach it and dragging a card upwards
+    // simply refuses to scroll - reported on the dashboard, whose topbar is
+    // sticky and ~53px tall against a 40px band. Measured once per drag.
+    StickySortable.prototype.topInset = function (rect) {
+
+        if (this._topInset !== undefined && this._topInset !== null) return this._topInset;
+        if (this.options.autoscrollInsetTop !== null && this.options.autoscrollInsetTop !== undefined) {
+            this._topInset = this.options.autoscrollInsetTop;
+            return this._topInset;
+        }
+
+        var inset = 0;
+        try {
+            var probe = document.elementFromPoint(Math.max(1, Math.round(window.innerWidth / 2)), Math.round(rect.top) + 1);
+            while (probe && probe !== document.body) {
+                var position = getComputedStyle(probe).position;
+                if (position === 'sticky' || position === 'fixed') {
+                    var bottom = probe.getBoundingClientRect().bottom;
+                    if (bottom > rect.top) inset = Math.max(inset, bottom - rect.top);
+                    break;
+                }
+                probe = probe.parentElement;
+            }
+        } catch (e) {}
+
+        this._topInset = inset;
+        return inset;
+    };
+
     StickySortable.prototype.updateAutoscroll = function (clientY) {
         var rect = this.scroller === document.scrollingElement || this.scroller === document.documentElement
             ? { top: 0, bottom: window.innerHeight }
             : this.scroller.getBoundingClientRect();
 
         var edge = this.options.autoscrollEdge;
-        if (clientY < rect.top + edge) {
+        // A finger needs a wider target than a pointer, and on a phone the
+        // outermost pixels belong to the browser's own edge gestures.
+        if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) {
+            edge = Math.max(edge, 90);
+        }
+
+        if (clientY < rect.top + this.topInset(rect) + edge) {
             this.autoscrollDirection = -1;
         } else if (clientY > rect.bottom - edge) {
             this.autoscrollDirection = 1;
@@ -393,6 +431,9 @@
     };
 
     StickySortable.prototype.onPointerUp = function (e) {
+
+        // Measured per drag: a swap or a resize can move the sticky header.
+        this._topInset = undefined;
         if (!this.dragging || e.pointerId !== this.pointerId) {
             return;
         }

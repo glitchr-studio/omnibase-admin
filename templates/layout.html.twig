@@ -4424,7 +4424,17 @@
         // every SPA swap, a direct listener died with the first navigation.
         document.addEventListener('click', function (e) {
             if (!e.target.closest('#admin-customize-toggle')) return;
-            setCustomizing(!body.classList.contains('is-customizing'));
+
+            // Turning customize mode OFF is just as much a "done" as the Done
+            // button; without this the arrangement was thrown away.
+            var leaving = body.classList.contains('is-customizing');
+            if (leaving && typeof saveAllScopes === 'function') {
+                saveAllScopes().then(function () { setCustomizing(false); })
+                               .catch(function () { /* stay in customize mode rather than lose it */ });
+                return;
+            }
+
+            setCustomizing(!leaving);
         });
 
         // hide/show toggle - flips the class + icon only, batched to the
@@ -6628,20 +6638,42 @@
             });
         }
 
+        // The topbar this lives in sits inside #page, which transparent.js
+        // replaces wholesale on every in-admin navigation - so an element
+        // captured here once is a detached ghost afterwards, and the menu the
+        // reader is actually looking at keeps its "Chargement..." placeholder
+        // forever. That is the reported "no widget list ever loads": arrive at
+        // the dashboard through any in-admin link and neither the fetch nor
+        // the click listener was ever wired to the menu on screen. So: cache
+        // the DATA, look the menu up at render time, and delegate the click.
         var paletteTypes = null;
-        var paletteTrigger = document.getElementById('admin-add-widget-trigger');
-        var paletteMenu = document.querySelector('[data-widget-palette-menu]');
-        if (paletteTrigger && paletteMenu) {
+        function paletteMenuNode() {
+            return document.querySelector('[data-widget-palette-menu]');
+        }
+        function renderPalette() {
+            var menu = paletteMenuNode();
+            if (!menu || !paletteTypes) return;
+            menu.innerHTML = paletteTypes.map(function (t) {
+                return '<button type="button" data-add-widget-type="' + t.name + '">'
+                    + (t.icon ? '<i class="' + t.icon + '"></i> ' : '') + t.label + '</button>';
+            }).join('');
+        }
+        {
             function loadPaletteTypes() {
-                if (paletteTypes) return;
+                if (!paletteMenuNode()) return;
+                // Already in hand: re-render into the menu now on screen
+                // rather than return and leave it on the placeholder.
+                if (paletteTypes) { renderPalette(); return; }
                 fetch('{{ path("admin_dashboard_widget_types") }}')
-                    .then(function (r) { return r.json(); })
+                    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
                     .then(function (data) {
                         paletteTypes = data.types || [];
-                        paletteMenu.innerHTML = paletteTypes.map(function (t) {
-                            return '<button type="button" data-add-widget-type="' + t.name + '">'
-                                + (t.icon ? '<i class="' + t.icon + '"></i> ' : '') + t.label + '</button>';
-                        }).join('');
+                        renderPalette();
+                    })
+                    .catch(function () {
+                        // Say so instead of spinning forever.
+                        var menu = paletteMenuNode();
+                        if (menu) menu.textContent = '{{ 'customize.add_widget'|trans({}, 'admin')|e('js') }}';
                     });
             }
             // Fetched as soon as customize mode's own toolbar exists, not
@@ -6654,7 +6686,13 @@
             // loading". Firing this early means the list is very likely
             // already in hand by the time anyone actually clicks.
             loadPaletteTypes();
-            paletteTrigger.addEventListener('click', loadPaletteTypes);
+            // Delegated, and re-run after each SPA swap (transparent.js
+            // re-dispatches load), so the menu currently on screen is the one
+            // that gets filled.
+            document.addEventListener('click', function (e) {
+                if (e.target.closest('#admin-add-widget-trigger')) loadPaletteTypes();
+            });
+            window.addEventListener('load', loadPaletteTypes);
         }
         document.addEventListener('click', function (e) {
             var button = e.target.closest('[data-add-widget-type]');
@@ -6696,7 +6734,7 @@
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-Token': doneBtn.dataset.csrfToken },
                 body: 'key=' + encodeURIComponent(button.dataset.restoreWidgetKey),
             }).then(function (r) {
-                if (r.ok) window.location.reload();
+                if (r.ok) reloadPage();
             });
         });
 
@@ -6779,17 +6817,46 @@
             });
         }
 
+        // window.location.reload() is the wrong instrument inside the nest.
+        // The admin is mounted in a srcdoc iframe, so its location reads
+        // "about:srcdoc" and the srcdoc string is assigned exactly once - when
+        // the overlay opened. Reloading re-parses THAT string, so the overlay
+        // snaps back to whichever page it was opened with: "Terminé" looked
+        // like a back button. document.baseURI is the real URL (the nest
+        // injects a <base href>), so navigate to it instead.
+        function reloadPage() {
+            try {
+                if (window.location.origin === 'null' && document.baseURI) {
+                    window.location.replace(document.baseURI);
+                    return;
+                }
+            } catch (e) {}
+            window.location.reload();
+        }
+
+        // Every pending arrangement, committed. Dragging a widget only moves
+        // the DOM - nothing reached the server until "Terminé" was pressed -
+        // so leaving customize mode any other way (the paintbrush toggle, or
+        // any in-admin link, which replaces #page wholesale) discarded the lot
+        // while the titles, saved on blur, stayed. That is the reported
+        // "titles keep, layout reverts".
+        function saveAllScopes() {
+            var pending = [];
+            // Commit a title still being edited before reading the DOM.
+            try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (e) {}
+            document.querySelectorAll('[data-sortable="sidebar"]').forEach(function (el) { pending.push(saveScope('sidebar', el)); });
+            document.querySelectorAll('[data-sortable="dashboard"]').forEach(function (el) { pending.push(saveScope('dashboard', el)); });
+            return Promise.all(pending);
+        }
+
         // Delegated for the same SPA-swap-survival reason as the customize
         // toggle above.
         document.addEventListener('click', function (e) {
             if (!e.target.closest('#admin-customize-done')) return;
-            var saves = [];
-            document.querySelectorAll('[data-sortable="sidebar"]').forEach(function (el) { saves.push(saveScope('sidebar', el)); });
-            document.querySelectorAll('[data-sortable="dashboard"]').forEach(function (el) { saves.push(saveScope('dashboard', el)); });
 
-            Promise.all(saves).then(function () {
+            saveAllScopes().then(function () {
                 setCustomizing(false);
-                window.location.reload();
+                reloadPage();
             }).catch(function () {
                 // leave customize mode open so nothing is silently lost
             });
