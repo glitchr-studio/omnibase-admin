@@ -55,7 +55,7 @@ class AnalyticsController extends AbstractController
         }
 
         $formattedLabels = \array_map(
-            fn (array $day) => (new \DateTimeImmutable($day['date']))->format($dateFormat),
+            fn (array $day) => \Base\Service\Analytics::displayBucket($day['date'])->format($dateFormat),
             $series,
         );
 

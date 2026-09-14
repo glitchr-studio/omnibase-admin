@@ -101,7 +101,7 @@ final class AnalyticsCardWidgetType implements PaletteDashboardWidgetTypeInterfa
         $change = $this->analytics->periodOverPeriodChange($days);
 
         $dateFormat = 'd/m';
-        $labels = \array_map(fn (array $day) => (new \DateTimeImmutable($day['date']))->format($dateFormat), $series);
+        $labels = \array_map(fn (array $day) => \Base\Service\Analytics::displayBucket($day['date'])->format($dateFormat), $series);
 
         return [
             'series' => $series,

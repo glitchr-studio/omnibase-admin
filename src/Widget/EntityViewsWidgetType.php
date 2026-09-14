@@ -101,7 +101,7 @@ final class EntityViewsWidgetType implements PaletteDashboardWidgetTypeInterface
         $series = null !== $path ? $this->analytics->dailyBreakdown($days, $path) : [];
 
         $dateFormat = 'd/m';
-        $labels = \array_map(fn (array $day) => (new \DateTimeImmutable($day['date']))->format($dateFormat), $series);
+        $labels = \array_map(fn (array $day) => \Base\Service\Analytics::displayBucket($day['date'])->format($dateFormat), $series);
 
         // Same 3 source slots (Human/Bot/AI) the site-wide traffic widget
         // uses, same colors - Visitors/Users are deliberately excluded
