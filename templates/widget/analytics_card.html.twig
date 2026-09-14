@@ -48,6 +48,9 @@
    chart's own bot line was hidden. The legend handler in layout.html.twig
    keeps that invariant afterwards (recomputeStatsFromChart sums exactly
    the datasets that aren't hidden). #}
+{# Absent when a caller renders this card without it (older callers,
+   composite panes): no retention line rather than a Twig error. #}
+{% set retention = retention|default({visitors: null, users: null}) %}
 {% set totalPageViews = series|reduce((carry, day) => carry + visibleSources|reduce((sum, key) => sum + day[key], 0), 0) %}
 <div class="analytics-card {{ (embedded is not defined or not embedded) ? 'card' }}" data-analytics-card>
     <div class="analytics-card-header">
@@ -64,7 +67,7 @@
                 </span>
                 <span class="analytics-stat-label">{{ 'analytics.label.page_views'|trans({}, 'admin') }}</span>
             </div>
-            {% for key in ['uniqueVisitors', 'uniqueUsers'] %}
+            {% for key in ['uniqueVisitors', 'uniqueUsers', 'uniqueViews'] %}
                 {% set keyTotal = series|reduce((carry, day) => carry + day[key], 0) %}
                 <div class="analytics-stat" data-stat="{{ key }}">
                     <span class="analytics-stat-value">
@@ -78,6 +81,21 @@
                     <span class="analytics-stat-label">{{ palette[key].label }}</span>
                 </div>
             {% endfor %}
+        </div>
+        {# Retention (Analytics::retention()): the share of the previous
+           window's visitors and users who came back in this one. Beside the
+           stats rather than on the chart - a ratio between two windows has no
+           per-day value to plot. The range picker updates it with the rest
+           (updateRetention() in layout.html.twig); hidden while there is no
+           earlier window to measure against. #}
+        <div class="analytics-retention" data-analytics-retention
+             data-label-visitors="{{ 'analytics.retention.visitors'|trans({}, 'admin') }}"
+             data-label-users="{{ 'analytics.retention.users'|trans({}, 'admin') }}"
+             title="{{ 'analytics.retention.hint'|trans({}, 'admin') }}"
+             {% if retention.visitors is null and retention.users is null %}hidden{% endif %}>
+            <span class="analytics-retention-title">{{ 'analytics.retention.label'|trans({}, 'admin') }}</span>
+            <span data-retention="visitors" {% if retention.visitors is null %}hidden{% endif %}>{{ 'analytics.retention.visitors'|trans({}, 'admin') }} {{ retention.visitors }}%</span>
+            <span data-retention="users" {% if retention.users is null %}hidden{% endif %}>{{ 'analytics.retention.users'|trans({}, 'admin') }} {{ retention.users }}%</span>
         </div>
     </div>
     {# The range picker below now re-renders this stat row too (see

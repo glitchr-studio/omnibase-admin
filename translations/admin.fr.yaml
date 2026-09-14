@@ -222,6 +222,11 @@ analytics:
     page_views: "%count% vues"
     unique_visitors: "%count% visiteurs"
     unique_users: "%count% utilisateurs"
+    retention:
+        label: Fidélisation
+        visitors: Visiteurs
+        users: Utilisateurs
+        hint: "Part des visiteurs et des utilisateurs de la période précédente revenus sur celle-ci"
     label:
         page_views: Vues
         page_views_human: Humain
@@ -229,6 +234,7 @@ analytics:
         page_views_ai: IA
         unique_visitors: Visiteurs
         unique_users: Utilisateurs
+        unique_views: Vues uniques
     range:
         today: Aujourd'hui
         7d: 7 jours

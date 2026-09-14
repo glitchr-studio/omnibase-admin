@@ -111,6 +111,7 @@ final class AnalyticsCardWidgetType implements PaletteDashboardWidgetTypeInterfa
             // picker's own live-refetch in layout.html.twig for how this
             // stays in sync after the initial load too).
             'change' => $change,
+            'retention' => $this->analytics->retention($days),
             'events' => $this->timelineEvents->getFormattedEvents($series, $labels, $dateFormat),
             'palette' => \array_map(
                 fn (array $entry) => \array_merge($entry, ['label' => $this->translator->trans($entry['label'], [], 'admin')]),

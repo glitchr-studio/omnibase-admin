@@ -2510,6 +2510,9 @@
            own, so this wins without having to be repeated inside it. #}
         [data-counter-card] .analytics-card-header { flex-direction: row; flex-wrap: nowrap; gap: .5rem; }
         [data-counter-card] .analytics-card-title { min-width: 0; }
+        .analytics-retention { display: flex; flex-wrap: wrap; gap: .35em .9em; align-items: baseline; margin-top: .4em; font-size: .85em; color: var(--admin-muted, inherit); }
+        .analytics-retention[hidden] { display: none; }
+        .analytics-retention-title { font-weight: 600; }
         .analytics-stat-row { display: flex; gap: 1.75rem; flex-wrap: wrap; }
         .analytics-stat { min-width: 6rem; }
         .analytics-stat-value { display: block; font-size: 1.4rem; font-weight: 700; line-height: 1.2; }
@@ -4828,6 +4831,24 @@
             });
         }
 
+        // Retention is a ratio between two windows, so it moves with the
+        // range picker and never with the legend or a pinned day.
+        function updateRetention(card, retention) {
+            var box = card.querySelector('[data-analytics-retention]');
+            if (!box || !retention) return;
+            var any = false;
+            ['visitors', 'users'].forEach(function (key) {
+                var el = box.querySelector('[data-retention="' + key + '"]');
+                if (!el) return;
+                var pct = retention[key];
+                if (pct === null || pct === undefined) { el.hidden = true; return; }
+                el.textContent = box.getAttribute('data-label-' + key) + ' ' + pct + '%';
+                el.hidden = false;
+                any = true;
+            });
+            box.hidden = !any;
+        }
+
         // Same idea as updateStatRow above, but sourced from the chart's
         // OWN currently-plotted data (chart.data.datasets[i].data, summed)
         // rather than a fresh server payload - a legend click has no
@@ -4843,13 +4864,13 @@
         function recomputeStatsFromChart(card, chart) {
             var row = card.querySelector('.analytics-stat-row');
             if (!row) return;
-            var sums = { pageViews: 0, uniqueVisitors: 0, uniqueUsers: 0 };
+            var sums = { pageViews: 0, uniqueVisitors: 0, uniqueUsers: 0, uniqueViews: 0 };
             var pageViewKeys = { pageViewsHuman: true, pageViewsBot: true, pageViewsAi: true };
             chart.data.datasets.forEach(function (ds, i) {
                 if (chart.getDatasetMeta(i).hidden) return;
                 var total = (ds.data || []).reduce(function (a, b) { return a + (Number(b) || 0); }, 0);
                 if (pageViewKeys[ds.key]) sums.pageViews += total;
-                else if (ds.key === 'uniqueVisitors' || ds.key === 'uniqueUsers') sums[ds.key] = total;
+                else if (ds.key === 'uniqueVisitors' || ds.key === 'uniqueUsers' || ds.key === 'uniqueViews') sums[ds.key] = total;
             });
             Object.keys(sums).forEach(function (key) {
                 var number = row.querySelector('[data-stat="' + key + '"] .analytics-stat-number');
@@ -4874,13 +4895,13 @@
         // of the whole series - pageViews is Human+Bot+AI combined, every
         // other stat is one dataset 1:1.
         function statsAtIndex(chart, index) {
-            var sums = { pageViews: 0, uniqueVisitors: 0, uniqueUsers: 0 };
+            var sums = { pageViews: 0, uniqueVisitors: 0, uniqueUsers: 0, uniqueViews: 0 };
             var pageViewKeys = { pageViewsHuman: true, pageViewsBot: true, pageViewsAi: true };
             chart.data.datasets.forEach(function (ds, i) {
                 if (chart.getDatasetMeta(i).hidden) return;
                 var value = Number((ds.data || [])[index]) || 0;
                 if (pageViewKeys[ds.key]) sums.pageViews += value;
-                else if (ds.key === 'uniqueVisitors' || ds.key === 'uniqueUsers') sums[ds.key] = value;
+                else if (ds.key === 'uniqueVisitors' || ds.key === 'uniqueUsers' || ds.key === 'uniqueViews') sums[ds.key] = value;
             });
             return sums;
         }
@@ -5108,6 +5129,7 @@
                         window.AdminCharts.update(canvas, { labels: data.labels, datasets: datasets, events: data.events });
                     }
                     updateStatRow(card, data.totals, data.change);
+                    updateRetention(card, data.retention);
                     // "Depuis toujours" only covers days actually tracked, so
                     // it can show a SHORTER span than "30 jours" (which
                     // zero-fills days before tracking even began) - a title

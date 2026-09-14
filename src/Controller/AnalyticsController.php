@@ -65,7 +65,7 @@ class AnalyticsController extends AbstractController
         // different range got picked - see layout.html.twig's range-picker
         // handler for where these two land back in the DOM.
         $totals = [];
-        foreach (['pageViews', 'uniqueVisitors', 'uniqueUsers'] as $key) {
+        foreach (['pageViews', 'uniqueVisitors', 'uniqueUsers', 'uniqueViews'] as $key) {
             $totals[$key] = \array_sum(\array_column($series, $key));
         }
 
@@ -85,6 +85,8 @@ class AnalyticsController extends AbstractController
             'events' => $this->timelineEvents->getFormattedEvents($series, $formattedLabels, $dateFormat),
             'totals' => $totals,
             'change' => $this->analytics->periodOverPeriodChange(self::RANGES[$range]),
+            // Same window as the chart, so picking a range moves this too.
+            'retention' => $this->analytics->retention(self::RANGES[$range]),
         ]);
     }
 }

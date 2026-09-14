@@ -10,10 +10,16 @@ namespace Base\Admin\Widget;
  * two hand-copied color maps eventually do.
  *
  * Order and colors are both load-bearing, not decoration: this is slots
- * 1-5 of the design system's validated 8-hue categorical ramp, kept in
+ * 1-6 of the design system's validated 8-hue categorical ramp, kept in
  * THIS sequence - `node scripts/validate_palette.js` (dataviz skill)
  * confirms it passes the adjacent-pair CVD/contrast checks in both light
  * and dark for this exact order, not for any color individually.
+ *
+ * Slot 6 (green, uniqueViews) was appended 2026-09-14 and the six-slot
+ * ramp re-validated: worst adjacent CVD dE 9.1 light / 8.4 dark, normal-
+ * vision dE 19.6 / 19.3, all dark steps >= 3:1. The light-mode contrast
+ * WARN (slots 3-5 below 3:1) predates it; the card's legend and stat
+ * labels are the relief it requires.
  * Reordering the keys, swapping a color, or inserting a new series
  * between two existing ones invalidates that guarantee and needs
  * re-validating, not just re-eyeballing.
@@ -26,6 +32,7 @@ final class AnalyticsSeriesPalette
         'pageViewsAi' => ['label' => 'analytics.label.page_views_ai', 'color' => '#1baf7a', 'colorDark' => '#199e70'],
         'uniqueVisitors' => ['label' => 'analytics.label.unique_visitors', 'color' => '#eda100', 'colorDark' => '#c98500'],
         'uniqueUsers' => ['label' => 'analytics.label.unique_users', 'color' => '#e87ba4', 'colorDark' => '#d55181'],
+        'uniqueViews' => ['label' => 'analytics.label.unique_views', 'color' => '#008300', 'colorDark' => '#008300'],
     ];
 
     /**
@@ -62,5 +69,5 @@ final class AnalyticsSeriesPalette
      * layout.html.twig) - which is the property that makes this safe, since
      * the number is always exactly the sum of the lines you can see.
      */
-    public const DEFAULT_VISIBLE = ['pageViewsHuman', 'uniqueVisitors', 'uniqueUsers'];
+    public const DEFAULT_VISIBLE = ['pageViewsHuman', 'uniqueVisitors', 'uniqueUsers', 'uniqueViews'];
 }
