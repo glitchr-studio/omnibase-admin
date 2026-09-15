@@ -18,14 +18,14 @@ ifneq ($(strip $(APP_DEBUG_BAK)),)
 endif
 export APP_ENV APP_DEBUG
 
+# One-shot production build, as run by the application's
+# `make build-vendor glitchr/base-bundle-admin`. It used to start `yarn run
+# watch` whenever APP_DEBUG=1 - which build-vendor passes on a dev machine - and
+# a watcher never returns, so the command could only hang there. Build once and
+# exit; use `cd assets && yarn run watch` by hand to iterate on the sources.
 assets:
-ifeq ($(APP_DEBUG),1)
-	@cd assets && yarn install
-	@cd assets && yarn run watch
-else
 	@cd assets && yarn install
 	@cd assets && yarn run prod
-endif
 
 deploy:
 	@composer update
