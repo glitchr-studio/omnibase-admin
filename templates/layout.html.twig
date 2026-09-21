@@ -275,24 +275,12 @@
         [data-page-desc][contenteditable="true"]:focus {
             outline: 2px solid var(--admin-accent); outline-offset: 2px; border-radius: 4px;
         }
-        {# The dash before the page description is punctuation between two
-           things, so it has no reason to exist when the second one is
-           absent. crud/_page_heading.html.twig renders it for anyone who
-           CAN customize (its `_desc or editable` guard), which left every
-           superadmin looking at a bare "User ID #40 -" trailing into an
-           empty span on every page with no description yet.
-
-           Hidden unconditionally when the description is empty - including
-           during customize mode. There is deliberately no placeholder text
-           to introduce: the element's data-placeholder is inert markup that
-           nothing has ever drawn, and an empty description is not something
-           the heading needs to advertise.
-
-           Stated as "hide it when what follows is empty" rather than
-           enumerating every case that should show it: the description is
-           always the subtitle's last span, whether or not it carries the
-           editable attributes, so one rule covers both. #}
-        .admin-header-subtitle:has(> span:last-child:is(:empty, .is-empty)) .admin-header-sep { display: none; }
+        {# The dash that used to separate the record id from the page
+           description ("Article ID #1143 - Test en Francais") and the rules
+           that hid it when the description was empty are gone with the
+           description itself: crud/_page_heading.html.twig no longer puts a
+           CRUD-wide blurb on a single record's page, so the subtitle's last
+           span is the id and there is nothing to punctuate. #}
         {# An empty description renders for anyone who CAN customize (see
            crud/_page_heading.html.twig's `_desc or editable` guard), which
            means a zero-height row sat under every heading even with customize
@@ -322,7 +310,6 @@
            on each other rather than on the title's baseline, so the flag chips
            (taller than the muted text) do not float above it. #}
         .admin-header-titles > .admin-header-subtitle, .admin-header-titles > .page-locale-badges { align-self: center; }
-        body.is-customizing .admin-header-subtitle:has(> span:last-child:is(:empty, .is-empty)) .admin-header-sep { display: inline; }
         .admin-menu { list-style: none; margin: .75rem 0 0; padding: 0; }
         {# Used to push a standalone "Tableau de bord" quick-link away from
            the sections below it (prod-style rhythm: quick link at the very

@@ -73,13 +73,28 @@
             the stored title belongs to the CRUD page as a whole, so letting
             an entity id inside the contenteditable would save that one row's
             number as every row's title. -#}
-        {%- if suffix is defined and suffix %} ID <span class="admin-header-suffix">{{ suffix }}</span>{% endif -%}
-        {#- The page description joins the SAME line, dash-separated - "Article
-            ID #1143 - Test en Francais" - instead of stacking a second subtitle
-            row under the first. Still its own span: the in-place editor targets
-            data-page-desc, and the id/suffix must stay outside anything
-            contenteditable. -#}
-        {%- if _desc or editable %} <span class="admin-header-sep">&ndash;</span> <span{% if editable %} data-page-desc data-menu-key="{{ pageKey }}" data-layout-scope="crud" data-placeholder="{{ 'customize.description_hint'|trans({}, 'admin') }}"{% endif %}>{{ _desc }}</span>{% endif -%}
+        {#- "ID" is wrapped rather than left as a bare text node, and that span
+            is load-bearing: layout.html.twig gives every DIRECT SPAN CHILD of
+            .admin-header-subtitle `vertical-align: middle` (so the rest of the
+            line lines up with the taller dashed description slot customize
+            mode shows when the description is empty). A bare text node is not
+            a span, so it kept the parent's baseline instead and sat ~0.4px -
+            one device pixel at 2x - above everything around it. Visible, and
+            reported. -#}
+        {%- if suffix is defined and suffix %} <span class="admin-header-id">ID</span> <span class="admin-header-suffix">{{ suffix }}</span>{% endif -%}
+        {#- No description here, deliberately. There is ONE stored entry per
+            CRUD (LayoutScope::CRUD, keyed by the URL slug), so the text
+            written on the index - a blurb about the listing, "Interdit aux
+            affreux !" - is the same text that would be appended here. On a
+            page about one record it reads as an annotation OF THAT RECORD,
+            which it is not: "Covid ou Silver Week ? / Mon tableau de bord
+            secret ID #1381 - Interdit aux affreux !" was reported as exactly
+            that kind of confusing. Reported by the user 2026-09-21.
+
+            The TITLE still travels (it names the section the record belongs
+            to, which is context worth having); only the blurb stops here.
+            It stays editable from the index, where it describes what it is
+            actually about. -#}
     </div>
 {% else %}
     <h1{{ _editAttrs|raw }}>{{ _pageTitle }}</h1>
