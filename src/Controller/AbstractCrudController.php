@@ -992,22 +992,30 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         }
 
         if (null === $entity) {
-            $metadata = $this->entityManager->getClassMetadata($fqcn);
-            $repository = $this->entityManager->getRepository($fqcn);
+            // The CRUD's own class first, then its mapped subclasses: an
+            // application entity extending a bundle one (App\Entity\User\Group
+            // on Base\Entity\User\Group) may add the slug the parent lacks,
+            // and entityIdentifier() builds the URL from the loaded object -
+            // the subclass - so the lookup must reach the subclass's fields.
+            $classes = [$fqcn, ...$this->entityManager->getClassMetadata($fqcn)->subClasses];
+            foreach ($classes as $class) {
+                $metadata = $this->entityManager->getClassMetadata($class);
+                $repository = $this->entityManager->getRepository($class);
 
-            // Asks the resolver rather than holding its own list, so what we
-            // RESOLVE always covers what entityIdentifier() GENERATES under
-            // the current admin.url_identifier config - and then some: this
-            // list is deliberately the WIDER one, so narrowing the config
-            // shortens new URLs without 404ing links already in the wild.
-            foreach ($this->fieldValueResolver->resolvableIdentifierFieldsFor($fqcn) as $field) {
-                if (!$metadata->hasField($field)) {
-                    continue;
-                }
+                // Asks the resolver rather than holding its own list, so what we
+                // RESOLVE always covers what entityIdentifier() GENERATES under
+                // the current admin.url_identifier config - and then some: this
+                // list is deliberately the WIDER one, so narrowing the config
+                // shortens new URLs without 404ing links already in the wild.
+                foreach ($this->fieldValueResolver->resolvableIdentifierFieldsFor($class) as $field) {
+                    if (!$metadata->hasField($field)) {
+                        continue;
+                    }
 
-                $entity = $repository->findOneBy([$field => $entityId]);
-                if (null !== $entity) {
-                    break;
+                    $entity = $repository->findOneBy([$field => $entityId]);
+                    if (null !== $entity) {
+                        break 2;
+                    }
                 }
             }
         }
