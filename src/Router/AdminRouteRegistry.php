@@ -18,6 +18,19 @@ class AdminRouteRegistry
     protected ?string $dashboardControllerFqcn = null;
 
     /**
+     * The registry of the running kernel, for the static lookups that have
+     * no container at hand (AbstractCrudController::getCrudControllerFqcn(),
+     * called from form types and Twig): the controllers it knows are the
+     * ones that answer, App\ overrides included, whatever their namespace.
+     */
+    private static ?self $current = null;
+
+    public static function current(): ?self
+    {
+        return self::$current;
+    }
+
+    /**
      * @param string[] $controllerFqcns
      * @param string[] $dashboardControllerFqcns every concrete (non-abstract)
      *                 class tagged base.admin.dashboard_controller - normally
@@ -27,6 +40,8 @@ class AdminRouteRegistry
      */
     public function __construct(array $controllerFqcns = [], array $dashboardControllerFqcns = [], protected readonly string $urlPrefix = '/admin')
     {
+        self::$current = $this;
+
         // cross-bundle override: when an App\ controller and a bundle
         // controller resolve to the same slug (same entity or same entity
         // inheritance chain), the App\ one wins - the bundle controller is

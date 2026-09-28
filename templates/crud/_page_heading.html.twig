@@ -9,7 +9,8 @@
 
    Params: editable (bool), pageKey (string), stored (array|null),
            fallbackTitle (string), suffix (string|null),
-           recordTitle (string|null).
+           recordTitle (string|null), note (string|null: the CRUD's
+           configureRecordNote(), a line under a record's heading).
 
    recordTitle switches the heading into DETAIL shape: the record's own name
    becomes the <h1> and the CRUD's (editable) page title drops to a small
@@ -96,6 +97,7 @@
             It stays editable from the index, where it describes what it is
             actually about. -#}
     </div>
+    {% if note is defined and note %}<div class="admin-header-note">{{ note }}</div>{% endif %}
 {% else %}
     <h1{{ _editAttrs|raw }}>{{ _pageTitle }}</h1>
     {%- if suffix is defined and suffix %} <span class="admin-header-suffix">{{ suffix }}</span>{% endif -%}

@@ -61,8 +61,8 @@ class TrashController extends AbstractController
                 'deletedAt' => $trashBall->getCreatedAt(),
                 'permanentAfter' => $trashBall->getPermanentAfter(),
                 'expired' => $trashBall->getPermanentAfter() !== null && $trashBall->getPermanentAfter() <= new \DateTime(),
-                'by' => $trashBall->getInitiator()?->getUsername(),
-                'impersonator' => $trashBall->getImpersonator()?->getUsername(),
+                'by' => \Base\Entity\User::nameOf($trashBall->getInitiator()),
+                'impersonator' => \Base\Entity\User::nameOf($trashBall->getImpersonator()),
             ];
         }
 

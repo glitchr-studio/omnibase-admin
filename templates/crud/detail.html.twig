@@ -29,6 +29,7 @@
         fallbackTitle: crud.pageTitle('detail') ?? _entityLabel,
         suffix: '#' ~ entity.id,
         recordTitle: _record,
+        note: record_note ?? null,
     } only %}
     {# Reorderable in customize mode - see crud/index.html.twig's twin. #}
     <div class="global-actions"{% if _editable %} data-action-row data-page-key="{{ crud_page_key }}"{% endif %}>
@@ -44,6 +45,7 @@
             {% set _isHidden = _hidden[action.name]|default(false) %}
             {% set _hideAttr = _editable ? ' data-action-hidden="' ~ (_isHidden ? '1' : '0') ~ '"' : '' %}
             {% if _isHidden and not _editable %}
+            {% elseif not action.isDisplayed(entity) %}
             {% elseif action.name == 'delete' %}
                 <form method="post" action="{{ admin_url(controller_fqcn, 'delete', entityId) }}" style="display:contents"{% if _editable %} data-action-key="{{ action.name }}" data-action-page="{{ crud_page_key }}" data-page-icon data-page-icon-value="{{ crud_action_icons[action.name] ?? action.icon }}"{% endif %}{{ _hideAttr|raw }}
                       data-confirm="{{ 'action.delete_confirm'|trans({}, 'admin') }}">

@@ -1,14 +1,19 @@
+{#- One country, or a list of them (a region's countries): each shown the
+    same way, comma-separated. -#}
 {%- set raw = field.value -%}
-{%- if raw is null or raw == '' -%}
+{%- set codes = raw is iterable ? raw : (raw is null or raw == '' ? [] : [raw]) -%}
+{%- if codes is empty -%}
     <span class="badge-muted">—</span>
 {%- else -%}
-    {%- set code = (raw|length > 2 ? raw|slice(0, 2) : raw)|upper -%}
     {%- set showName = field.customOption('showName') is not same as(false) -%}
     {%- set showCode = field.customOption('showCode') is same as(true) -%}
+    {%- for raw in codes -%}
+    {%- set code = (raw|length > 2 ? raw|slice(0, 2) : raw)|upper -%}
     <span class="field-country">
         {%- if showName -%}
             {{- code|country_name(app.request.locale)|default(code) -}}
         {%- endif -%}
         {%- if showCode or not showName %} <span class="badge-muted">{{ code }}</span>{% endif -%}
-    </span>
+    </span>{{ not loop.last ? ', ' }}
+    {%- endfor -%}
 {%- endif -%}

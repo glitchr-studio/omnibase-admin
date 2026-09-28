@@ -27,6 +27,7 @@
         fallbackTitle: crud.pageTitle(crud.currentPage) ?? _entityLabel,
         suffix: entity is defined and entity is not null and entity.id ? '#' ~ entity.id : null,
         recordTitle: _record,
+        note: record_note ?? null,
     } only %}
 {#- Same customization contract as index/detail: the row is a sortable
     action row and every action inside it is both a drag target and an icon
@@ -46,6 +47,7 @@
             {% set _isHidden = _hiddenActions[action.name]|default(false) %}
             {% set _edit = _editable ? ' data-action-key="' ~ action.name ~ '" data-action-page="' ~ crud_page_key ~ '" data-page-icon data-page-icon-value="' ~ _icon ~ '" data-action-hidden="' ~ (_isHidden ? '1' : '0') ~ '"' : '' %}
             {% if _isHidden and not _editable %}
+            {% elseif entity is defined and entity and entity.id and not action.isDisplayed(entity) %}
             {% elseif action.htmlElement == 'button' %}
                 {% set isMainSave = 'action-saveAndReturn' in action.cssClass %}
                 {#- Any data-* the action declares travels to the button: a

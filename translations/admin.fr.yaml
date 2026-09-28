@@ -189,6 +189,7 @@ flash:
     updated: Les modifications ont été enregistrées.
     deleted: L'élément a été supprimé.
     batch_deleted: Les éléments sélectionnés ont été supprimés.
+    not_deletable: "Cet élément est encore utilisé : il n'a pas été supprimé."
 
 filters:
     apply: Appliquer

@@ -23,6 +23,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Contracts\Service\Attribute\Required;
+use Base\Admin\Router\AdminRouteRegistry;
 
 /**
  * Direct, linear CRUD pipeline: every page is an ordinary controller action
@@ -108,6 +109,13 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         // strip doctrine proxy prefix
         if (false !== ($pos = strrpos($entityFqcn, '\\__CG__\\'))) {
             $entityFqcn = substr($entityFqcn, $pos + 8);
+        }
+
+        // The registered controller first: an App\ override answers even
+        // when it sits outside the namespace convention (the bundle one it
+        // replaces is no longer registered, and linking to it throws).
+        if (null !== $registered = AdminRouteRegistry::current()?->getControllerForEntity($entityFqcn)) {
+            return $registered;
         }
 
         // App\ wins regardless of WHICH namespace candidate it lives under -
@@ -245,6 +253,28 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         return $filters;
     }
 
+    /**
+     * A line about THIS record under its heading on the detail and edit
+     * pages - what the list cannot say at a glance: a payment method's
+     * gateway reachable or not, when an order last moved. Plain text,
+     * escaped; null (the default) shows nothing.
+     */
+    public function configureRecordNote(object $entity): ?string
+    {
+        return null;
+    }
+
+    /**
+     * Whether this record may be deleted now - false for one others still
+     * rely on (a payment method orders were paid with, a feature products
+     * carry). The delete button disappears from every page and the delete
+     * routes refuse it, so the rule holds whatever the button shows.
+     */
+    public function isDeletable(object $entity): bool
+    {
+        return true;
+    }
+
     // -----------------------------------------------------------------
     // page actions
     // -----------------------------------------------------------------
@@ -323,7 +353,8 @@ abstract class AbstractCrudController extends AbstractController implements Crud
             }
 
             $controller = static::getCrudControllerFqcn($class);
-            if (null === $controller) {
+            // a kind nothing but this (abstract) list manages cannot be created from here
+            if (null === $controller || ($controller === static::class && (new \ReflectionClass(static::getEntityFqcn()))->isAbstract())) {
                 continue;
             }
 
@@ -357,6 +388,7 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         return $this->renderCrud('@Admin/crud/detail.html.twig', [
             'crud' => $crud,
             'entity' => $entity,
+            'record_note' => $this->configureRecordNote($entity),
             'entityId' => $entityId,
             'fields' => $this->fieldValueResolver->resolveAll($this->getFields(Crud::PAGE_DETAIL), $entity, FieldDescriptor::PAGE_DETAIL),
             'actions' => $this->getActionsConfig(),
@@ -367,6 +399,19 @@ abstract class AbstractCrudController extends AbstractController implements Crud
     {
         $crud = $this->getCrudConfig(Crud::PAGE_NEW, Action::NEW);
         $this->denyAccessUnlessGrantedToRun($crud);
+        $this->denyUnlessEnabled(Action::NEW);
+
+        // An abstract list creates through its concrete kinds: straight to
+        // the only one, else nothing to create here (the list's "new" menu
+        // names them).
+        if ((new \ReflectionClass(static::getEntityFqcn()))->isAbstract()) {
+            $variants = $this->getNewVariants();
+            if (1 === \count($variants)) {
+                return $this->redirect($variants[0]['url']);
+            }
+
+            throw $this->createNotFoundException(sprintf('"%s" is abstract: create one of its kinds.', static::getEntityFqcn()));
+        }
 
         $entity = $this->createEntity(static::getEntityFqcn());
         $this->adminContext->setEntity($entity);
@@ -393,6 +438,7 @@ abstract class AbstractCrudController extends AbstractController implements Crud
     {
         $crud = $this->getCrudConfig(Crud::PAGE_EDIT, Action::EDIT);
         $this->denyAccessUnlessGrantedToRun($crud);
+        $this->denyUnlessEnabled(Action::EDIT);
 
         $entity = $this->findEntity($entityId);
         if (null !== $redirect = $this->canonicalIdentifierRedirect($request, $entity, $entityId, Action::EDIT)) {
@@ -413,6 +459,7 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         return $this->renderCrud('@Admin/crud/edit.html.twig', [
             'crud' => $crud,
             'entity' => $entity,
+            'record_note' => $this->configureRecordNote($entity),
             'entityId' => $entityId,
             'form' => $form,
             'actions' => $this->getActionsConfig(),
@@ -437,6 +484,7 @@ abstract class AbstractCrudController extends AbstractController implements Crud
     {
         $crud = $this->getCrudConfig(Crud::PAGE_EDIT, Action::EDIT);
         $this->denyAccessUnlessGrantedToRun($crud);
+        $this->denyUnlessEnabled(Action::EDIT);
 
         $entity = $this->findEntity($entityId);
         $offset = max(0, $request->query->getInt('offset'));
@@ -485,6 +533,7 @@ abstract class AbstractCrudController extends AbstractController implements Crud
     {
         $crud = $this->getCrudConfig(Crud::PAGE_INDEX, Action::DELETE);
         $this->denyAccessUnlessGrantedToRun($crud);
+        $this->denyUnlessEnabled(Action::DELETE);
 
         // same token as the batch form: the row delete button submits it
         if (!$this->isCsrfTokenValid('admin-batch-' . static::getEntityFqcn(), $request->request->getString('_token'))) {
@@ -492,6 +541,11 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         }
 
         $entity = $this->findEntity($entityId);
+        if (!$this->isDeletable($entity)) {
+            $this->addFlash('warning', new \Symfony\Component\Translation\TranslatableMessage('flash.not_deletable', [], 'admin'));
+
+            return $this->redirect($this->adminUrlGenerator->setController(static::class)->setAction(Action::INDEX)->generateUrl());
+        }
         $this->deleteEntity($this->entityManager, $entity);
         $this->addFlash('success', new \Symfony\Component\Translation\TranslatableMessage('flash.deleted', [], 'admin'));
 
@@ -502,16 +556,26 @@ abstract class AbstractCrudController extends AbstractController implements Crud
     {
         $crud = $this->getCrudConfig(Crud::PAGE_INDEX, Action::BATCH_DELETE);
         $this->denyAccessUnlessGrantedToRun($crud);
+        $this->denyUnlessEnabled(Action::BATCH_DELETE);
 
         if (!$this->isCsrfTokenValid('admin-batch-' . static::getEntityFqcn(), $request->request->getString('_token'))) {
             throw $this->createAccessDeniedException('Invalid CSRF token.');
         }
 
+        $kept = 0;
         foreach ($request->request->all('batchIds') as $entityId) {
             $entity = $this->entityManager->find(static::getEntityFqcn(), $entityId);
-            if (null !== $entity) {
-                $this->deleteEntity($this->entityManager, $entity);
+            if (null === $entity) {
+                continue;
             }
+            if (!$this->isDeletable($entity)) {
+                ++$kept;
+                continue;
+            }
+            $this->deleteEntity($this->entityManager, $entity);
+        }
+        if ($kept > 0) {
+            $this->addFlash('warning', new \Symfony\Component\Translation\TranslatableMessage('flash.not_deletable', [], 'admin'));
         }
 
         return $this->redirect($this->adminUrlGenerator->setController(static::class)->setAction(Action::INDEX)->generateUrl());
@@ -532,6 +596,7 @@ abstract class AbstractCrudController extends AbstractController implements Crud
     {
         $crud = $this->getCrudConfig(Crud::PAGE_EDIT, Action::EDIT);
         $this->denyAccessUnlessGrantedToRun($crud);
+        $this->denyUnlessEnabled(Action::EDIT);
 
         $payload = $request->toArray();
         $property = (string) ($payload['property'] ?? '');
@@ -896,6 +961,16 @@ abstract class AbstractCrudController extends AbstractController implements Crud
 
         $actions = $this->configureActions(Actions::new());
 
+        // isDeletable() hides every delete button, on top of whatever
+        // display condition the CRUD gave it.
+        foreach ([Actions::PAGE_INDEX, Actions::PAGE_DETAIL, Actions::PAGE_EDIT] as $pageName) {
+            $delete = $actions->getAll($pageName)[Action::DELETE] ?? null;
+            if (null !== $delete) {
+                $shown = $delete->getDisplayCallable();
+                $delete->displayIf(fn (mixed $entity) => !\is_object($entity) || ($this->isDeletable($entity) && (null === $shown || $shown($entity))));
+            }
+        }
+
         foreach ([Actions::PAGE_INDEX, Actions::PAGE_DETAIL, Actions::PAGE_EDIT, Actions::PAGE_NEW] as $pageName) {
             foreach ($actions->getAll($pageName) as $actionName => $action) {
                 $permission = $actions->getEffectivePermission($actionName, $action);
@@ -1029,6 +1104,17 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         }
 
         return $entity;
+    }
+
+    /**
+     * A disabled action (Actions::disable()) is closed, not only hidden: its
+     * route answers 404 rather than running on a URL typed by hand.
+     */
+    protected function denyUnlessEnabled(string $actionName): void
+    {
+        if ($this->getActionsConfig()->isDisabled(Actions::PAGE_INDEX, $actionName)) {
+            throw $this->createNotFoundException(sprintf('"%s" is disabled for "%s".', $actionName, static::getEntityFqcn()));
+        }
     }
 
     protected function denyAccessUnlessGrantedToRun(Crud $crud): void
