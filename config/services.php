@@ -80,7 +80,8 @@ return function (ContainerConfigurator $configurator) {
     $services->set(\Base\Admin\Twig\AdminTwigExtension::class)
         // Registry: lets admin_entity_crud() resolve a related entity to the
         // CRUD that manages it, so association chips link themselves.
-        ->args([service(AdminUrlGenerator::class), service(\Base\Field\FieldValueResolver::class), service(AdminRouteRegistry::class), service(AdminContext::class), service(\Base\Admin\Security\CrudAccessChecker::class)])
+        // Router: an action linked to a route of its own (linkToRoute).
+        ->args([service(AdminUrlGenerator::class), service(\Base\Field\FieldValueResolver::class), service(AdminRouteRegistry::class), service(AdminContext::class), service(\Base\Admin\Security\CrudAccessChecker::class), service('router')])
         ->tag('twig.extension');
 
     $services->set(\Base\Admin\EventSubscriber\NestHeaderSubscriber::class)

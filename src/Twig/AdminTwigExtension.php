@@ -16,6 +16,7 @@ class AdminTwigExtension extends AbstractExtension
         protected readonly ?\Base\Admin\Router\AdminRouteRegistry $routeRegistry = null,
         protected readonly ?\Base\Admin\Context\AdminContext $adminContext = null,
         protected readonly ?\Base\Admin\Security\CrudAccessChecker $crudAccessChecker = null,
+        protected readonly ?\Symfony\Component\Routing\Generator\UrlGeneratorInterface $router = null,
     ) {
     }
 
@@ -237,6 +238,15 @@ class AdminTwigExtension extends AbstractExtension
 
         if (null !== $action->getLinkUrl()) {
             return $action->getLinkUrl();
+        }
+
+        // linkToRoute(): a route of its own, outside the CRUD (a bundle's
+        // action controller), its parameters possibly made from the row.
+        // Without this the link went to the CRUD's action of the same name.
+        if (null !== $action->getRouteName() && null !== $this->router) {
+            $parameters = $action->getRouteParameters();
+
+            return $this->router->generate($action->getRouteName(), \is_callable($parameters) ? $parameters($entity) : (array) $parameters);
         }
 
         $crudAction = $action->getCrudActionName() ?? $action->getName();
