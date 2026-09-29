@@ -72,6 +72,17 @@
                     <input type="hidden" name="_token" value="{{ csrf_token('admin-batch-' ~ crud.entityFqcn) }}">
                     <button class="btn btn-icon text-danger {{ _isHidden ? 'is-hidden' }}" title="{{ action.label|trans }}"{{ _edit|raw }}><i class="{{ _icons[action.name] ?? 'fa-solid fa-trash' }}"></i></button>
                 </form>
+            {% elseif entity is defined and entity.id and admin_action_post(action, controller_fqcn) %}
+                {# outside admin-form, like delete above: its own form #}
+                {% set isIconOnly = action.htmlAttributes['tooltip'] is defined %}
+                {% include '@Admin/crud/_action_form.html.twig' with {
+                    action: action,
+                    url: admin_action_url(action, entity, controller_fqcn),
+                    class: 'btn ' ~ (isIconOnly ? 'btn-icon ') ~ action.cssClass ~ (_isHidden ? ' is-hidden'),
+                    icon: _icon,
+                    iconOnly: isIconOnly,
+                    attrs: _edit,
+                } only %}
             {% elseif entity is defined and entity.id %}
                 {% set href = admin_action_url(action, entity, controller_fqcn) %}
                 {% if href %}

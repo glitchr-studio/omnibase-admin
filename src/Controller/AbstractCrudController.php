@@ -2,6 +2,7 @@
 
 namespace Base\Admin\Controller;
 
+use Base\Admin\Attribute\AdminAction;
 use Base\Admin\Config\Action;
 use Base\Database\Attribute\Alias;
 use function Symfony\Component\Translation\t;
@@ -357,6 +358,10 @@ abstract class AbstractCrudController extends AbstractController implements Crud
             if (null === $controller || ($controller === static::class && (new \ReflectionClass(static::getEntityFqcn()))->isAbstract())) {
                 continue;
             }
+            // nor one whose own CRUD this user may not open
+            if ($controller !== static::class && !$this->menuBuilder->isCrudGranted($controller)) {
+                continue;
+            }
 
             try {
                 $url = $this->adminUrlGenerator->setController($controller)->setAction(Action::NEW)->generateUrl();
@@ -441,6 +446,7 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         $this->denyUnlessEnabled(Action::EDIT);
 
         $entity = $this->findEntity($entityId);
+        $this->denyAccessUnlessGrantedOn(Action::EDIT, $entity);
         if (null !== $redirect = $this->canonicalIdentifierRedirect($request, $entity, $entityId, Action::EDIT)) {
             return $redirect;
         }
@@ -541,6 +547,7 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         }
 
         $entity = $this->findEntity($entityId);
+        $this->denyAccessUnlessGrantedOn(Action::DELETE, $entity);
         if (!$this->isDeletable($entity)) {
             $this->addFlash('warning', new \Symfony\Component\Translation\TranslatableMessage('flash.not_deletable', [], 'admin'));
 
@@ -562,17 +569,25 @@ abstract class AbstractCrudController extends AbstractController implements Crud
             throw $this->createAccessDeniedException('Invalid CSRF token.');
         }
 
+        // Removed one by one (each still asked isDeletable(), each still
+        // firing its own preRemove), flushed once: a failure midway then
+        // deletes none of the selection instead of the records before it.
         $kept = 0;
+        $removed = 0;
         foreach ($request->request->all('batchIds') as $entityId) {
             $entity = $this->entityManager->find(static::getEntityFqcn(), $entityId);
             if (null === $entity) {
                 continue;
             }
-            if (!$this->isDeletable($entity)) {
+            if (!$this->isDeletable($entity) || !$this->isGrantedOn(Action::BATCH_DELETE, $entity)) {
                 ++$kept;
                 continue;
             }
-            $this->deleteEntity($this->entityManager, $entity);
+            $this->removeEntity($this->entityManager, $entity);
+            ++$removed;
+        }
+        if ($removed > 0) {
+            $this->entityManager->flush();
         }
         if ($kept > 0) {
             $this->addFlash('warning', new \Symfony\Component\Translation\TranslatableMessage('flash.not_deletable', [], 'admin'));
@@ -622,6 +637,7 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         }
 
         $entity = $this->findEntity($entityId);
+        $this->denyAccessUnlessGrantedOn(Action::EDIT, $entity);
         $accessor = \Symfony\Component\PropertyAccess\PropertyAccess::createPropertyAccessor();
         $newValue = !$accessor->getValue($entity, $property);
         $accessor->setValue($entity, $property, $newValue);
@@ -838,8 +854,18 @@ abstract class AbstractCrudController extends AbstractController implements Crud
 
     public function deleteEntity(EntityManagerInterface $entityManager, object $entity): void
     {
-        $entityManager->remove($entity);
+        $this->removeEntity($entityManager, $entity);
         $entityManager->flush();
+    }
+
+    /**
+     * deleteEntity() without its flush - batchDelete() removes each record
+     * through here and flushes the lot once. Override this one, not
+     * deleteEntity(), to change how a record goes: both paths run it.
+     */
+    public function removeEntity(EntityManagerInterface $entityManager, object $entity): void
+    {
+        $entityManager->remove($entity);
     }
 
     public function createIndexQueryBuilder(Crud $crud, array $sort): QueryBuilder
@@ -937,12 +963,7 @@ abstract class AbstractCrudController extends AbstractController implements Crud
 
     protected function getCrudConfig(string $pageName, string $actionName): Crud
     {
-        $crud = $this->configureCrud(
-            Crud::new()
-                ->setEntityFqcn(static::getEntityFqcn())
-                ->setCurrentPage($pageName)
-                ->setCurrentAction($actionName)
-        );
+        $crud = $this->buildCrudConfig($pageName, $actionName);
 
         $this->adminContext
             ->setCrudControllerFqcn(static::class)
@@ -951,7 +972,38 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         return $crud;
     }
 
+    /**
+     * configureCrud()'s result, without making it the page's config - what
+     * getCrudConfig() fills the AdminContext with, and what the screens
+     * linking here read without running a request through this controller.
+     */
+    protected function buildCrudConfig(string $pageName, string $actionName): Crud
+    {
+        return $this->configureCrud(
+            Crud::new()
+                ->setEntityFqcn(static::getEntityFqcn())
+                ->setCurrentPage($pageName)
+                ->setCurrentAction($actionName)
+        );
+    }
+
+    /**
+     * The entity permission configureCrud() declares
+     * (Crud::setEntityPermission()), read for the index - the page a menu
+     * item or a quick access card opens. The menu, the dashboard and the
+     * links to related records ask it through CrudAccessChecker to hide
+     * what denyAccessUnlessGrantedToRun() would refuse; the AdminContext
+     * is left alone.
+     */
+    public function getEntityPermission(): ?string
+    {
+        return $this->buildCrudConfig(Crud::PAGE_INDEX, Action::INDEX)->getEntityPermission();
+    }
+
     protected ?Actions $actionsConfig = null;
+
+    /** @var array<string, ?string> action or crud action name => permission its Action declares */
+    protected array $actionPermissions = [];
 
     protected function getActionsConfig(): Actions
     {
@@ -974,8 +1026,23 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         foreach ([Actions::PAGE_INDEX, Actions::PAGE_DETAIL, Actions::PAGE_EDIT, Actions::PAGE_NEW] as $pageName) {
             foreach ($actions->getAll($pageName) as $actionName => $action) {
                 $permission = $actions->getEffectivePermission($actionName, $action);
+
+                // kept before an ungranted action is dropped below: the
+                // gate of an #[AdminAction] reads it (see guardAdminAction())
+                // and the action it guards may be one this user never sees
+                $this->actionPermissions[$actionName] ??= $permission;
+                if (null !== ($crudActionName = $action->getCrudActionName())) {
+                    $this->actionPermissions[$crudActionName] ??= $permission;
+                }
+
                 if (null !== $permission && !$this->isGranted($permission)) {
                     $actions->remove($pageName, $actionName);
+                } elseif (null !== $permission && $action->isEntityAction()) {
+                    // Granted in general, maybe not on every record (a
+                    // shop's owner, their own shop's products): each row
+                    // asks about its own - see denyAccessUnlessGrantedOn().
+                    $shown = $action->getDisplayCallable();
+                    $action->displayIf(fn (mixed $entity) => !\is_object($entity) || ($this->isGranted($permission, $entity) && (null === $shown || $shown($entity))));
                 }
             }
         }
@@ -1117,6 +1184,27 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         }
     }
 
+    /**
+     * An action's permission asked again about the record itself, once it is
+     * loaded (edit, delete, toggle): a voter given the record as its subject
+     * may grant a user some records only - a shop's owner their own shop's
+     * products. Without a voter looking at the subject, the answer is the
+     * one denyAccessUnlessGrantedToRun() already had.
+     */
+    protected function denyAccessUnlessGrantedOn(string $actionName, object $entity): void
+    {
+        if (!$this->isGrantedOn($actionName, $entity)) {
+            throw $this->createAccessDeniedException(sprintf('"%s" on this record requires "%s".', $actionName, $this->getActionsConfig()->getEffectivePermission($actionName)));
+        }
+    }
+
+    protected function isGrantedOn(string $actionName, object $entity): bool
+    {
+        $permission = $this->getActionsConfig()->getEffectivePermission($actionName);
+
+        return null === $permission || $this->isGranted($permission, $entity);
+    }
+
     protected function denyAccessUnlessGrantedToRun(Crud $crud): void
     {
         $entityPermission = $crud->getEntityPermission();
@@ -1129,6 +1217,65 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         if (null !== $permission && !$this->isGranted($permission)) {
             throw $this->createAccessDeniedException(sprintf('"%s" requires "%s".', $actionName, $permission));
         }
+    }
+
+    /**
+     * The gate of an #[AdminAction] method, run by AdminActionSubscriber
+     * before the method itself: the same entity permission and action
+     * permission as every built-in action (denyAccessUnlessGrantedToRun()),
+     * plus the permission its Action declares in configureActions() -
+     * Action::setPermission() or Actions::setPermission($method, ...) - a
+     * 404 when Actions::disable() closed it, and the CSRF token of a
+     * writing request (isAdminActionTokenValid()) unless the attribute
+     * says csrf: false.
+     *
+     * @internal public for AdminActionSubscriber only
+     */
+    public function guardAdminAction(string $methodName, AdminAction $adminAction, Request $request): void
+    {
+        $crud = $this->getCrudConfig($adminAction->isEntityAction() ? Crud::PAGE_DETAIL : Crud::PAGE_INDEX, $methodName);
+        $this->denyAccessUnlessGrantedToRun($crud);
+        $this->denyUnlessEnabled($methodName);
+
+        $permission = $this->actionPermissions[$methodName] ?? null;
+        if (null !== $permission && !$this->isGranted($permission)) {
+            throw $this->createAccessDeniedException(sprintf('"%s" requires "%s".', $methodName, $permission));
+        }
+
+        if ($adminAction->csrf && !$request->isMethodSafe() && !$this->isAdminActionTokenValid($request, $methodName)) {
+            throw $this->createAccessDeniedException('Invalid CSRF token.');
+        }
+    }
+
+    /**
+     * The token an #[AdminAction] form posts (AdminAction::tokenId(), as
+     * `_token`, or an X-CSRF-Token header for a script) - already checked
+     * before the method runs, unless the attribute says csrf: false and
+     * leaves it to the method:
+     *
+     *     if (!$this->isAdminActionTokenValid($request, __FUNCTION__)) { throw $this->createAccessDeniedException(); }
+     */
+    protected function isAdminActionTokenValid(Request $request, string $methodName): bool
+    {
+        $token = $request->request->getString('_token') ?: (string) $request->headers->get('X-CSRF-Token', '');
+
+        return $this->isCsrfTokenValid(AdminAction::tokenId($methodName), $token);
+    }
+
+    /**
+     * Back to this CRUD's list - the usual end of an #[AdminAction], after
+     * its flash:
+     *
+     *     $this->addFlash('success', new TranslatableMessage('flash.rates_refreshed', [], 'admin'));
+     *
+     *     return $this->redirectToIndex();
+     *
+     * A record's action can go back to the record instead:
+     * $this->redirect($this->adminUrlGenerator->setController(static::class)->setAction(Action::DETAIL)->setEntityId($entityId)->generateUrl()).
+     */
+    protected function redirectToIndex(): Response
+    {
+        return $this->redirect($this->adminUrlGenerator->setController(static::class)->setAction(Action::INDEX)->generateUrl());
     }
 
     protected function redirectAfterSubmit(Request $request, object $entity): Response

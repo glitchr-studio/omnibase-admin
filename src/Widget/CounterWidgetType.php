@@ -67,6 +67,7 @@ final class CounterWidgetType implements PaletteDashboardWidgetTypeInterface
         private readonly EntityManagerInterface $entityManager,
         private readonly AdminRouteRegistry $routes,
         private readonly UrlGeneratorInterface $urlGenerator,
+        private readonly ?\Base\Admin\Security\CrudAccessChecker $crudAccessChecker = null,
     ) {
     }
 
@@ -188,6 +189,11 @@ final class CounterWidgetType implements PaletteDashboardWidgetTypeInterface
     {
         $controller = $this->routes->getControllerForEntity($class);
         if (null === $controller) {
+            return null;
+        }
+
+        // the number stays, the link to a list this user may not open goes
+        if (null !== $this->crudAccessChecker && !$this->crudAccessChecker->isGranted($controller)) {
             return null;
         }
 

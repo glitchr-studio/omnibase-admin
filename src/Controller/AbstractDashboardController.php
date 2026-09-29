@@ -221,7 +221,8 @@ abstract class AbstractDashboardController extends AbstractController
     }
 
     /**
-     * One card per registered CRUD: label, icon and index URL.
+     * One card per registered CRUD the current user may open: label, icon
+     * and index URL.
      *
      * @param MenuItem[] $menu the already-resolved sidebar menu - its
      *                         hand-written, already-correct labels
@@ -241,6 +242,12 @@ abstract class AbstractDashboardController extends AbstractController
         $cards = [];
         foreach ($this->routeRegistry->getControllers() as $fqcn => $slug) {
             if (!is_subclass_of($fqcn, CrudControllerInterface::class)) {
+                continue;
+            }
+
+            // same gate as the menu: no card for a CRUD whose entity
+            // permission would refuse this user once clicked
+            if (!$this->menuBuilder->isCrudGranted($fqcn)) {
                 continue;
             }
 

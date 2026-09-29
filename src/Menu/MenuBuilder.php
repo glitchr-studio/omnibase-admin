@@ -10,6 +10,7 @@ use Base\Admin\Layout\LayoutScope;
 use Base\Admin\Layout\LayoutStore;
 use Base\Admin\Router\AdminRouteRegistry;
 use Base\Admin\Router\AdminUrlGenerator;
+use Base\Admin\Security\CrudAccessChecker;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
@@ -36,7 +37,20 @@ class MenuBuilder
         protected readonly LayoutArranger $layoutArranger,
         protected readonly ?\Base\Service\LocalizerInterface $localizer = null,
         protected readonly iterable $dashboardControllers = [],
+        protected readonly ?CrudAccessChecker $crudAccessChecker = null,
     ) {
+    }
+
+    /**
+     * Whether a link to this CRUD controller may be shown to the current
+     * user: the entity permission its configureCrud() declares, the same
+     * one the controller enforces once reached (see CrudAccessChecker).
+     * The dashboard's quick access and the CRUD pages' own cross-links ask
+     * here too, so every listing agrees with the menu.
+     */
+    public function isCrudGranted(string $controllerFqcn): bool
+    {
+        return $this->crudAccessChecker?->isGranted($controllerFqcn) ?? true;
     }
 
     /**
@@ -203,6 +217,11 @@ class MenuBuilder
      * nothing after its children are filtered is dropped too, rather than
      * showing an orphaned header.
      *
+     * A CRUD link is also dropped when its controller's own entity
+     * permission (Crud::setEntityPermission()) is not granted: the page
+     * would refuse the user anyway, and the dashboard need not repeat the
+     * role on every linkToCrud().
+     *
      * @param MenuItem[] $items
      * @return MenuItem[]
      */
@@ -212,6 +231,10 @@ class MenuBuilder
         foreach ($items as $item) {
             $permission = $item->getPermission();
             if (null !== $permission && !$this->authorizationChecker->isGranted($permission)) {
+                continue;
+            }
+
+            if (MenuItem::TYPE_CRUD === $item->getType() && null !== ($controllerFqcn = $this->crudControllerFor($item)) && !$this->isCrudGranted($controllerFqcn)) {
                 continue;
             }
 
@@ -248,16 +271,38 @@ class MenuBuilder
 
     protected function generateCrudUrl(MenuItem $item): ?string
     {
-        foreach ($this->registry->getControllers() as $fqcn => $slug) {
-            if (is_subclass_of($fqcn, CrudControllerInterface::class) && $fqcn::getEntityFqcn() === $item->getEntityFqcn()) {
-                return $this->adminUrlGenerator
-                    ->setController($fqcn)
-                    ->setAction($item->getCrudActionName() ?? 'index')
-                    ->generateUrl();
+        $fqcn = $this->crudControllerFor($item);
+        if (null === $fqcn) {
+            return null;
+        }
+
+        return $this->adminUrlGenerator
+            ->setController($fqcn)
+            ->setAction($item->getCrudActionName() ?? 'index')
+            ->generateUrl();
+    }
+
+    /** @var array<string, string>|null entity FQCN => controller FQCN */
+    protected ?array $controllersByEntity = null;
+
+    /**
+     * The registered controller managing exactly the item's entity (first
+     * registered wins, App\ overrides first) - no parent-class fallback, a
+     * menu item names the CRUD it wants. Mapped once: the filter and the
+     * URL both ask, for every CRUD item of every page.
+     */
+    protected function crudControllerFor(MenuItem $item): ?string
+    {
+        if (null === $this->controllersByEntity) {
+            $this->controllersByEntity = [];
+            foreach ($this->registry->getControllers() as $fqcn => $slug) {
+                if (is_subclass_of($fqcn, CrudControllerInterface::class)) {
+                    $this->controllersByEntity[$fqcn::getEntityFqcn()] ??= $fqcn;
+                }
             }
         }
 
-        return null;
+        return $this->controllersByEntity[$item->getEntityFqcn() ?? ''] ?? null;
     }
 
     /**

@@ -15,6 +15,7 @@ class AdminTwigExtension extends AbstractExtension
         protected readonly FieldValueResolver $fieldValueResolver,
         protected readonly ?\Base\Admin\Router\AdminRouteRegistry $routeRegistry = null,
         protected readonly ?\Base\Admin\Context\AdminContext $adminContext = null,
+        protected readonly ?\Base\Admin\Security\CrudAccessChecker $crudAccessChecker = null,
     ) {
     }
 
@@ -105,6 +106,9 @@ class AdminTwigExtension extends AbstractExtension
             // then size it themselves: admin_entity_image(photo)|thumbnail(96, 96).
             new TwigFunction('admin_entity_image', $this->fieldValueResolver->entityImage(...)),
             new TwigFunction('admin_entity_crud', $this->adminEntityCrud(...)),
+            new TwigFunction('admin_crud_granted', $this->adminCrudGranted(...)),
+            new TwigFunction('admin_action_post', $this->adminActionPost(...)),
+            new TwigFunction('admin_action_token_id', \Base\Admin\Attribute\AdminAction::tokenId(...)),
             new TwigFunction('admin_entity_id', $this->fieldValueResolver->entityIdentifier(...)),
             new TwigFunction('admin_menu_current', $this->adminMenuCurrent(...)),
             new TwigFunction('admin_entity_icon', $this->adminEntityIcon(...)),
@@ -179,6 +183,37 @@ class AdminTwigExtension extends AbstractExtension
         }
 
         return $this->routeRegistry->getControllerForEntity($entity);
+    }
+
+    /**
+     * Whether the current user may open this CRUD (its entity permission,
+     * see CrudAccessChecker) - the field templates link a related record
+     * only then, and print it as plain text otherwise. admin_entity_crud()
+     * itself stays a pure lookup: which CRUD manages a class decides how
+     * the value is displayed, not only whether it links.
+     */
+    public function adminCrudGranted(?string $controllerFqcn): bool
+    {
+        return null !== $controllerFqcn && ($this->crudAccessChecker?->isGranted($controllerFqcn) ?? true);
+    }
+
+    /**
+     * Whether the action runs an #[AdminAction] route that takes no GET: the
+     * templates render it as a form posting its CSRF token
+     * (@Admin/crud/_action_form.html.twig) rather than as a link the route
+     * would refuse. False for every built-in action and for any action
+     * pointing at a URL or a route of its own.
+     */
+    public function adminActionPost(Action $action, string $controllerFqcn): bool
+    {
+        $crudAction = $action->getCrudActionName();
+        if (null === $crudAction || null !== $action->getUrl() || null !== $action->getRouteName() || null !== $action->getLinkUrl()) {
+            return false;
+        }
+
+        $adminAction = \Base\Admin\Attribute\AdminAction::of($controllerFqcn, $crudAction);
+
+        return null !== $adminAction && !$adminAction->acceptsGet();
     }
 
     /**

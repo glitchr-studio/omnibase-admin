@@ -61,6 +61,7 @@ class Action
     /** @var callable|null */
     protected mixed $displayCallable = null;
     protected ?string $permission = null;
+    protected TranslatableInterface|string|null $confirmation = null;
 
     protected function __construct(string $name)
     {
@@ -323,6 +324,22 @@ class Action
     public function setPermission(string $permission): static
     {
         $this->permission = $permission;
+        return $this;
+    }
+
+    public function getConfirmation(): TranslatableInterface|string|null
+    {
+        return $this->confirmation;
+    }
+
+    /**
+     * A question asked before the action runs (the layout's confirm
+     * dialog, as for delete) - for an action rendered as a form, i.e. one
+     * whose #[AdminAction] route takes no GET.
+     */
+    public function askConfirmation(TranslatableInterface|string|null $question): static
+    {
+        $this->confirmation = $question;
         return $this;
     }
 

@@ -2,7 +2,9 @@
 
 namespace Base\Admin\Router;
 
+use Base\Admin\Attribute\AdminAction;
 use Symfony\Component\Config\Loader\Loader;
+use Symfony\Component\Config\Resource\FileResource;
 use Symfony\Component\Routing\Attribute\Route as RouteAttribute;
 use Symfony\Component\Routing\Route;
 use Symfony\Component\Routing\RouteCollection;
@@ -17,6 +19,9 @@ use Symfony\Component\Routing\RouteCollection;
  *   {prefix}/{slug}/{entityId}/delete  ..._delete             POST
  *   {prefix}/{slug}/{entityId}/toggle  ..._toggle             PATCH
  *   {prefix}/{slug}/batch      admin_crud_{slug}_batch_delete POST
+ *
+ * plus one route per #[AdminAction] method a controller declares, named
+ * the same way (admin_crud_{slug}_{method}) - see Base\Admin\Attribute\AdminAction.
  *
  * Loaded with: $routes->import('.', 'base_admin') in the app's routing config.
  */
@@ -53,13 +58,13 @@ class AdminRouteLoader extends Loader
         uasort($controllers, static fn (string $a, string $b) => substr_count($b, '/') <=> substr_count($a, '/'));
 
         foreach ($controllers as $fqcn => $slug) {
-            $add = function (string $action, string $path, array $methods) use ($routes, $prefix, $slug, $fqcn) {
+            $add = function (string $action, string $path, array $methods, array $requirements = []) use ($routes, $prefix, $slug, $fqcn) {
                 $routes->add(
                     $this->registry->getRouteName($fqcn, $action),
                     new Route(
                         $prefix . '/' . $slug . $path,
                         ['_controller' => $fqcn . '::' . $action],
-                        ['entityId' => '[^/]+', 'field' => '[A-Za-z0-9_]+'],
+                        $requirements + ['entityId' => '[^/]+', 'field' => '[A-Za-z0-9_]+'],
                         [],
                         '',
                         [],
@@ -71,6 +76,15 @@ class AdminRouteLoader extends Loader
             $add('index', '', ['GET']);
             $add('new', '/new', ['GET', 'POST']);
             $add('batchDelete', '/batch-delete', ['POST']);
+
+            // The controller's own actions, before the {entityId} catch-all
+            // below: a "/refresh" is a path of its own, not a record
+            // called "refresh".
+            foreach ($this->adminActions($fqcn) as $method => $adminAction) {
+                $add($method, $adminAction->getPath($method), $adminAction->methods, $adminAction->requirements);
+            }
+            $routes->addResource(new FileResource((new \ReflectionClass($fqcn))->getFileName()));
+
             $add('detail', '/{entityId}', ['GET']);
             $add('edit', '/{entityId}/edit', ['GET', 'POST']);
             $add('delete', '/{entityId}/delete', ['POST']);
@@ -88,6 +102,33 @@ class AdminRouteLoader extends Loader
         $this->addTrashRoutes($routes, $prefix);
 
         return $routes;
+    }
+
+    /** The routes load() declares itself - an #[AdminAction] cannot replace one. */
+    public const BUILT_IN_ACTIONS = ['index', 'new', 'batchDelete', 'detail', 'edit', 'delete', 'toggle', 'collectionEntries'];
+
+    /**
+     * The public methods of $fqcn carrying #[AdminAction], inherited ones
+     * included (a base CRUD class or a trait can bring them).
+     *
+     * @return array<string, AdminAction> method name => attribute
+     */
+    private function adminActions(string $fqcn): array
+    {
+        $actions = [];
+        foreach ((new \ReflectionClass($fqcn))->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
+            if ($method->isStatic() || [] === $method->getAttributes(AdminAction::class)) {
+                continue;
+            }
+
+            if (\in_array($method->getName(), self::BUILT_IN_ACTIONS, true)) {
+                throw new \LogicException(sprintf('"%s::%s()" is a built-in CRUD action: #[AdminAction] only declares new ones.', $fqcn, $method->getName()));
+            }
+
+            $actions[$method->getName()] = AdminAction::of($fqcn, $method->getName());
+        }
+
+        return $actions;
     }
 
     /**

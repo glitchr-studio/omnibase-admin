@@ -1,0 +1,19 @@
+{#- An action whose #[AdminAction] route takes no GET (admin_action_post()),
+    rendered as what it is: a form posting its CSRF token
+    (admin_action_token_id(), checked before the method runs) with one
+    submit button, instead of a link its route would refuse.
+    display:contents keeps the button a direct child of the action row, as
+    the delete form next to it. Action::askConfirmation() rides on the
+    button as data-confirm, asked by the layout's confirm dialog.
+
+    Expects: action, url, class; optional: icon, iconOnly, attrs (raw
+    customize-mode attributes for the form). -#}
+<form method="post" action="{{ url }}" style="display:contents"{{ attrs|default('')|raw }}>
+    <input type="hidden" name="_token" value="{{ csrf_token(admin_action_token_id(action.crudActionName)) }}">
+    <button type="submit" class="{{ class }}"
+            {%- if action.confirmation %} data-confirm="{{ action.confirmation|trans }}"{% endif %}
+            {%- if iconOnly|default(false) %} title="{{ action.label|trans }}"{% endif %}>
+        {%- if icon|default(null) %}<i class="{{ icon }}"></i>{% endif -%}
+        {%- if not iconOnly|default(false) %} {{ action.label|trans }}{% endif -%}
+    </button>
+</form>

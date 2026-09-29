@@ -4,7 +4,8 @@
     chips link to the related record's admin page by default instead of
     rendering as dead text. Resolution is per-VALUE, not per-field: a
     polymorphic association (Thread -> Article/Comment/...) can hold
-    several concrete types in one collection. -#}
+    several concrete types in one collection. A CRUD the user may not open
+    (admin_crud_granted) leaves the chip as text. -#}
 {%- set crudFqcnOption = field.customOption('crudControllerFqcn') -%}
 {#- Optional display mode (username | fullname | avatar); unset keeps the
     historical admin_display() label. See SelectField::OPTION_ENTITY_DISPLAY. -#}
@@ -57,7 +58,7 @@
                 {%- elseif itemIcon %}<i class="{{ itemIcon }}"></i>{% endif -%}
                 {%- if withName %}<span class="badge-label">{{ shortLabel }}</span>{% endif -%}
             {%- endset -%}
-            {%- if itemCrud and item.id is defined -%}
+            {%- if itemCrud and item.id is defined and admin_crud_granted(itemCrud) -%}
                 <a class="badge{{ itemIcon and not withName ? ' badge-icon' }}" href="{{ admin_url(itemCrud, 'detail', admin_entity_id(item)) }}" title="{{ itemLabel }}">{{ chipBody }}</a>
             {%- else -%}
                 <span class="badge{{ itemIcon and not withName ? ' badge-icon' }}" title="{{ itemLabel }}">{{ chipBody }}</span>
@@ -98,7 +99,7 @@
     {%- set maxLength = field.customOption('maxLength') ?? 40 -%}
     {%- set rawLabel = '' ~ (entityDisplay ? admin_entity_label(raw, entityDisplay) : admin_display(raw)) -%}
     {%- set shortRaw = rawLabel|length > maxLength ? rawLabel|slice(0, maxLength) ~ '…' : rawLabel -%}
-    {%- if rawCrud and raw.id is defined -%}
+    {%- if rawCrud and raw.id is defined and admin_crud_granted(rawCrud) -%}
         <span class="field-association"><a href="{{ admin_url(rawCrud, 'detail', admin_entity_id(raw)) }}" title="{{ rawLabel }}">{{ shortRaw }}</a></span>
     {%- else -%}
         <span title="{{ rawLabel }}">{{ shortRaw }}</span>

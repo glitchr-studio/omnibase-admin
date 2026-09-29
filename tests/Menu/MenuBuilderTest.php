@@ -9,11 +9,16 @@ use Base\Admin\Layout\LayoutStore;
 use Base\Admin\Menu\MenuBuilder;
 use Base\Admin\Router\AdminRouteRegistry;
 use Base\Admin\Router\AdminUrlGenerator;
+use Base\Admin\Security\CrudAccessChecker;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
+use Tests\Base\Admin\Router\Fixtures\Crud\ReportCrudController;
+
+require_once __DIR__ . '/../Router/Fixtures/Crud/ReportCrudController.php';
 
 class MenuBuilderTest extends TestCase
 {
@@ -117,5 +122,65 @@ class MenuBuilderTest extends TestCase
         $result = $builder->deletedItems([$granted, $denied], 'dashboard');
 
         $this->assertSame([$granted], $result);
+    }
+
+    /**
+     * A builder whose one registered CRUD (ReportCrudController) declares
+     * ROLE_CREATOR in its configureCrud(), for a user who has it or not.
+     */
+    private function builderForCrud(bool $granted, ?int $expectedChecks = null): MenuBuilder
+    {
+        $registry = $this->createStub(AdminRouteRegistry::class);
+        $registry->method('getControllers')->willReturn([ReportCrudController::class => 'reports']);
+
+        $urls = $this->createStub(AdminUrlGenerator::class);
+        $urls->method('setController')->willReturnSelf();
+        $urls->method('setAction')->willReturnSelf();
+        $urls->method('generateUrl')->willReturn('/admin/reports');
+
+        $authChecker = $this->createMock(AuthorizationCheckerInterface::class);
+        $authChecker->expects(null === $expectedChecks ? $this->any() : $this->exactly($expectedChecks))
+            ->method('isGranted')->with('ROLE_CREATOR')->willReturn($granted);
+
+        $checker = new CrudAccessChecker(new ServiceLocator([ReportCrudController::class => fn () => new ReportCrudController()]), $authChecker);
+
+        return new MenuBuilder(
+            $registry,
+            $urls,
+            $this->createStub(UrlGeneratorInterface::class),
+            $this->createStub(RequestStack::class),
+            $this->createStub(TranslatorInterface::class),
+            $authChecker,
+            $this->createStub(LayoutStore::class),
+            $this->createStub(LayoutArranger::class),
+            null,
+            [],
+            $checker,
+        );
+    }
+
+    public function testHidesACrudItemItsControllerWouldRefuse(): void
+    {
+        $section = MenuItem::section('Reports')->setSubItems([MenuItem::linkToCrud(\ArrayObject::class, 'Reports')]);
+        $other = MenuItem::linkToUrl('Elsewhere', null, '/elsewhere');
+
+        // the section left empty goes too, as for an item's own permission
+        $this->assertSame([$other], $this->builderForCrud(false)->resolve([$section, $other]));
+    }
+
+    public function testKeepsACrudItemItsControllerWouldLetThrough(): void
+    {
+        $item = MenuItem::linkToCrud(\ArrayObject::class, 'Reports');
+
+        $this->assertSame([$item], $this->builderForCrud(true)->resolve([$item]));
+        $this->assertSame('/admin/reports', $item->getLinkUrl());
+    }
+
+    public function testAsksOnceAboutAControllerLinkedSeveralTimes(): void
+    {
+        $builder = $this->builderForCrud(true, 1);
+
+        $builder->resolve([MenuItem::linkToCrud(\ArrayObject::class, 'Reports'), MenuItem::linkToCrud(\ArrayObject::class, 'New report')->setCrudAction('new')]);
+        $this->assertTrue($builder->isCrudGranted(ReportCrudController::class));
     }
 }

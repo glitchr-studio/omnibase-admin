@@ -9,7 +9,8 @@ use Base\Notifier\NotificationLinkerInterface;
 
 /**
  * A notification's target, seen from the back-office: the edit page of the
- * CRUD that manages its class. Nothing when the class has no CRUD here.
+ * CRUD that manages its class. Nothing when the class has no CRUD here, or
+ * one the current user may not open.
  */
 final class AdminNotificationLinker implements NotificationLinkerInterface
 {
@@ -17,6 +18,7 @@ final class AdminNotificationLinker implements NotificationLinkerInterface
         private readonly AdminRouteRegistry $registry,
         private readonly AdminUrlGenerator $urlGenerator,
         private readonly ?\Doctrine\ORM\EntityManagerInterface $entityManager = null,
+        private readonly ?\Base\Admin\Security\CrudAccessChecker $crudAccessChecker = null,
     ) {
     }
 
@@ -30,6 +32,12 @@ final class AdminNotificationLinker implements NotificationLinkerInterface
 
         $controller = $this->registry->getControllerForEntity($class);
         if (!$controller) {
+            return null;
+        }
+
+        // a CRUD this reader may not open: the notification keeps its own
+        // (front) url instead of a link the admin would refuse
+        if ($this->crudAccessChecker && !$this->crudAccessChecker->isGranted($controller)) {
             return null;
         }
 

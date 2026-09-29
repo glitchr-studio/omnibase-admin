@@ -52,6 +52,16 @@
                     <input type="hidden" name="_token" value="{{ csrf_token('admin-batch-' ~ crud.entityFqcn) }}">
                     <button class="btn btn-icon text-danger {{ _isHidden ? 'is-hidden' }}" title="{{ action.label|trans }}"><i class="fa-solid fa-trash"></i></button>
                 </form>
+            {% elseif admin_action_post(action, controller_fqcn) %}
+                {% set isIconOnly = action.htmlAttributes['tooltip'] is defined %}
+                {% include '@Admin/crud/_action_form.html.twig' with {
+                    action: action,
+                    url: admin_action_url(action, entity, controller_fqcn),
+                    class: 'btn ' ~ (isIconOnly ? 'btn-icon ') ~ action.cssClass ~ (_isHidden ? ' is-hidden'),
+                    icon: crud_action_icons[action.name] ?? action.icon,
+                    iconOnly: isIconOnly,
+                    attrs: (_editable ? ' data-action-key="' ~ action.name ~ '" data-action-page="' ~ crud_page_key ~ '" data-page-icon data-page-icon-value="' ~ (crud_action_icons[action.name] ?? action.icon) ~ '"' : '') ~ _hideAttr,
+                } only %}
             {% elseif action.name != 'separator' %}
                 {% set href = admin_action_url(action, entity, controller_fqcn) %}
                 {% if href %}

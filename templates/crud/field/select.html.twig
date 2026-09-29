@@ -37,7 +37,8 @@
             {%- endif -%}
         {%- endset -%}
         {%- set chipClass = 'badge badge-accent badge-entity' ~ (icon and not withName ? ' badge-icon' : '') -%}
-        {%- if crudFqcn and item is not null and item.id is defined -%}
+        {#- a CRUD the user may not open keeps the chip, without the link -#}
+        {%- if crudFqcn and item is not null and item.id is defined and admin_crud_granted(crudFqcn) -%}
             <a class="{{ chipClass }}" href="{{ admin_url(crudFqcn, 'detail', admin_entity_id(item)) }}" title="{{ label }}">{{ body }}</a>
         {%- else -%}
             <span class="{{ chipClass }}" title="{{ label }}">{{ body }}</span>

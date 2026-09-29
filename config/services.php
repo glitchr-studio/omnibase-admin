@@ -62,9 +62,16 @@ return function (ContainerConfigurator $configurator) {
     // Notifications opened from the back-office land on the record's edit
     // page: replaces base-bundle's null linker (same alias id, this one wins).
     $services->set(\Base\Admin\Notifier\AdminNotificationLinker::class)
-        ->args([service(AdminRouteRegistry::class), service(AdminUrlGenerator::class), service('doctrine.orm.entity_manager')]);
+        ->args([service(AdminRouteRegistry::class), service(AdminUrlGenerator::class), service('doctrine.orm.entity_manager'), service(\Base\Admin\Security\CrudAccessChecker::class)]);
     $services->alias(\Base\Notifier\NotificationLinkerInterface::class, \Base\Admin\Notifier\AdminNotificationLinker::class);
 
+
+    // Filled by AdminRoutePass: a locator of every CRUD controller, keyed
+    // by class, so the menu can read one's entity permission.
+    $services->set(\Base\Admin\Security\CrudAccessChecker::class)
+        ->arg('$controllers', null)
+        ->arg('$authorizationChecker', service('security.authorization_checker'))
+        ->tag('kernel.reset', ['method' => 'reset']);
 
     $services->set(SecurityVoter::class)
         ->args([service('security.authorization_checker')])
@@ -73,10 +80,14 @@ return function (ContainerConfigurator $configurator) {
     $services->set(\Base\Admin\Twig\AdminTwigExtension::class)
         // Registry: lets admin_entity_crud() resolve a related entity to the
         // CRUD that manages it, so association chips link themselves.
-        ->args([service(AdminUrlGenerator::class), service(\Base\Field\FieldValueResolver::class), service(AdminRouteRegistry::class), service(AdminContext::class)])
+        ->args([service(AdminUrlGenerator::class), service(\Base\Field\FieldValueResolver::class), service(AdminRouteRegistry::class), service(AdminContext::class), service(\Base\Admin\Security\CrudAccessChecker::class)])
         ->tag('twig.extension');
 
     $services->set(\Base\Admin\EventSubscriber\NestHeaderSubscriber::class)
+        ->tag('kernel.event_subscriber');
+
+    // The CRUD gate in front of every #[AdminAction] method.
+    $services->set(\Base\Admin\EventSubscriber\AdminActionSubscriber::class)
         ->tag('kernel.event_subscriber');
 
     $services->set(\Base\Admin\EventSubscriber\ActiveAdminsSubscriber::class)
@@ -205,6 +216,7 @@ return function (ContainerConfigurator $configurator) {
             service('doctrine.orm.entity_manager'),
             service(\Base\Admin\Router\AdminRouteRegistry::class),
             service('router'),
+            service(\Base\Admin\Security\CrudAccessChecker::class),
         ])
         ->tag('base.admin.dashboard_widget_type')
         ->tag('base.admin.dashboard_widget_type.palette');
@@ -244,5 +256,6 @@ return function (ContainerConfigurator $configurator) {
             service(LayoutArranger::class),
             service('localizer')->nullOnInvalid(),
             tagged_iterator('base.admin.dashboard_controller'),
+            service(\Base\Admin\Security\CrudAccessChecker::class),
         ]);
 };

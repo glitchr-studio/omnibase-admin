@@ -98,6 +98,14 @@
                         {% endfor %}
                     </div>
                 </details>
+            {% elseif admin_action_post(action, controller_fqcn) %}
+                {% include '@Admin/crud/_action_form.html.twig' with {
+                    action: action,
+                    url: admin_url(controller_fqcn, action.crudActionName),
+                    class: (action.cssClass ?: 'btn') ~ (_isHidden ? ' is-hidden'),
+                    icon: crud_action_icons[action.name] ?? action.icon,
+                    attrs: (_editable ? ' data-action-key="' ~ action.name ~ '" data-action-page="' ~ crud_page_key ~ '" data-page-icon data-page-icon-value="' ~ (crud_action_icons[action.name] ?? action.icon) ~ '"' : '') ~ _hideAttr,
+                } only %}
             {% else %}
                 {# action.cssClass already carries its own "btn btn-X" variant
                    (see Actions::configureNewAction()/etc - e.g. "action-new
@@ -252,6 +260,16 @@
                                 {# submits the surrounding batch form to the row's delete URL (same CSRF token) #}
                                 <button class="btn btn-icon text-danger" title="{{ action.label|trans }}"
                                         formaction="{{ admin_url(controller_fqcn, 'delete', row.entity.id) }}"><i class="fa-solid fa-trash"></i></button>
+                            {% elseif admin_action_post(action, controller_fqcn) %}
+                                {# a row sits inside the batch form, and a form
+                                   cannot nest: the button belongs to its
+                                   action's own form below (form=) and posts
+                                   to this row's URL (formaction) #}
+                                <button type="submit" class="btn {{ action.icon ? 'btn-icon' }} {{ action.cssClass }}" title="{{ action.label|trans }}"
+                                        form="admin-action-form-{{ action.name }}" formaction="{{ admin_action_url(action, row.entity, controller_fqcn) }}"
+                                        {%- if action.confirmation %} data-confirm="{{ action.confirmation|trans }}"{% endif %}>
+                                    {%- if action.icon -%}<i class="{{ action.icon }}"></i>{%- else -%}{{ action.label|trans }}{%- endif -%}
+                                </button>
                             {% else %}
                                 {% set isIconOnly = action.name in ['edit', 'detail', 'goto'] %}
                                 <a class="btn {{ isIconOnly ? 'btn-icon' }} {{ action.cssClass }}"
@@ -281,6 +299,13 @@
         <button class="btn text-danger" type="submit">{{ 'action.delete'|trans({}, 'admin') }}</button>
     </div>
     </form>
+    {# the forms the rows' POST actions submit (see the row buttons above):
+       one per action, carrying its token; each button brings its own URL #}
+    {% for action in actions.entityActions('index')|filter(a => admin_action_post(a, controller_fqcn)) %}
+        <form id="admin-action-form-{{ action.name }}" method="post" hidden>
+            <input type="hidden" name="_token" value="{{ csrf_token(admin_action_token_id(action.crudActionName)) }}">
+        </form>
+    {% endfor %}
     <div class="paginator">
         <span>{{ paginator.total }} {{ 'datagrid.results'|trans({}, 'admin') }}</span>
         <div class="pages">
