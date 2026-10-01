@@ -1,5 +1,5 @@
 {
-    "name": "glitchr/base-bundle-admin",
+    "name": "omnibase/admin",
     "type": "symfony-bundle",
     "description": "Administration backoffice for base-bundle: dynamic CRUD, dashboard, menus and field-based form generation",
     "keywords": [
@@ -33,7 +33,7 @@
         "symfony/dependency-injection": "^6.0|^7.0|^8.0",
         "symfony/http-kernel": "^6.0|^7.0|^8.0",
         "symfony/form": "^6.0|^7.0|^8.0",
-        "glitchr/base-bundle": "3.0.*-dev"
+        "glitchr/omnibase": "3.0.*-dev"
     },
     "require-dev": {
         "phpunit/phpunit": "^9.6",
