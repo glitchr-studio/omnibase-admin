@@ -2,7 +2,6 @@
 
 namespace Tests\Base\Admin\Widget;
 
-use App\Entity\Article\Article;
 use App\Entity\User;
 use Base\Admin\Widget\LinkableEntityRegistry;
 use Base\Entity\Thread;
@@ -10,14 +9,17 @@ use Base\Service\Model\LinkableInterface;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
 /**
- * Runs under the host app's PHPUnit (`make tests glitchr`, KERNEL_CLASS=
- * App\Kernel) - same convention as AnalyticsTest, since discovery genuinely
+ * Runs under a host application's PHPUnit (KERNEL_CLASS=App\Kernel: an
+ * application's own suite, or the omnibase harness's `demo test admin`) -
+ * same convention as AnalyticsTest, since discovery genuinely
  * needs the app's real Doctrine metadata (there's nothing to discover
  * against base-bundle-admin's own kernel, which has no app entities at
  * all).
  */
 class LinkableEntityRegistryTest extends KernelTestCase
 {
+    use HostContentType;
+
     private LinkableEntityRegistry $registry;
 
     protected function setUp(): void
@@ -34,15 +36,26 @@ class LinkableEntityRegistryTest extends KernelTestCase
     {
         $classes = $this->registry->getPickableClasses();
 
-        $this->assertArrayHasKey(Article::class, $classes);
-        $this->assertArrayHasKey(User::class, $classes);
+        $this->assertArrayHasKey($this->contentType(), $classes);
+
+        // The application's User is offered when it has a page of its own
+        // (glitchr's members do; the omnibase harness's do not).
+        if (\is_a(User::class, LinkableInterface::class, true)) {
+            $this->assertArrayHasKey(User::class, $classes);
+        } else {
+            $this->assertArrayNotHasKey(User::class, $classes);
+        }
     }
 
     public function testGetPickableClassesHumanizesTheShortClassName(): void
     {
         $classes = $this->registry->getPickableClasses();
 
-        $this->assertSame('Article', $classes[Article::class]);
+        // omnibase's own short links, in every application: ShortLink reads
+        // "Short Link".
+        $shortLinks = \array_values(\array_filter(\array_keys($classes), static fn (string $class) => \str_ends_with($class, '\\Layout\\ShortLink')));
+        $this->assertCount(1, $shortLinks);
+        $this->assertSame('Short Link', $classes[$shortLinks[0]]);
     }
 
     public function testGetPickableClassesExcludesThreadItself(): void
@@ -73,7 +86,7 @@ class LinkableEntityRegistryTest extends KernelTestCase
 
     public function testFindInstancesReturnsRealLinkableEntities(): void
     {
-        $instances = $this->registry->findInstances(Article::class, 3);
+        $instances = $this->registry->findInstances($this->contentType(), 3);
 
         $this->assertLessThanOrEqual(3, \count($instances));
         foreach ($instances as $instance) {
@@ -88,17 +101,18 @@ class LinkableEntityRegistryTest extends KernelTestCase
 
     public function testFindReturnsNullForAnUnknownId(): void
     {
-        $this->assertNull($this->registry->find(Article::class, 999999999));
+        $this->assertNull($this->registry->find($this->contentType(), 999999999));
     }
 
     public function testFindReturnsTheRealEntityForAKnownId(): void
     {
-        $any = $this->registry->findInstances(Article::class, 1);
+        $type = $this->contentType();
+        $any = $this->registry->findInstances($type, 1);
         if ([] === $any) {
-            self::markTestSkipped('No Article rows to look up in this environment.');
+            self::markTestSkipped('No content rows to look up in this environment.');
         }
 
-        $found = $this->registry->find(Article::class, $any[0]->getId());
+        $found = $this->registry->find($type, $any[0]->getId());
 
         $this->assertSame($any[0], $found);
     }
@@ -106,7 +120,7 @@ class LinkableEntityRegistryTest extends KernelTestCase
     public function testAllPathsForAThreadSubtypeOnlyReturnsRealNonNullLinks(): void
     {
         try {
-            $paths = $this->registry->allPaths(Article::class);
+            $paths = $this->registry->allPaths($this->contentType());
         } catch (\Symfony\Component\Config\Exception\LoaderLoadException $e) {
             // Pre-existing test-kernel gap, not caused by this class: URL
             // generation (which __toLink() needs) fails to load routes
@@ -120,6 +134,8 @@ class LinkableEntityRegistryTest extends KernelTestCase
             self::markTestSkipped('Route generation unavailable under this test kernel (pre-existing gap): ' . $e->getMessage());
         }
 
+        // A list, empty on a database with no published rows (a fresh one).
+        $this->assertIsArray($paths);
         foreach ($paths as $path) {
             $this->assertIsString($path);
             $this->assertNotSame('', $path);

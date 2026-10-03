@@ -2,18 +2,20 @@
 
 namespace Tests\Base\Admin\Widget;
 
-use App\Entity\Article\Article;
 use Base\Admin\Config\MenuItem;
 use Base\Admin\Widget\EntityViewsWidgetType;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
 /**
- * Runs under the host app's PHPUnit (`make tests glitchr`, KERNEL_CLASS=
- * App\Kernel) - same convention as AnalyticsTest/LinkableEntityRegistryTest,
- * since this widget's whole point is discovering real app entities.
+ * Runs under a host application's PHPUnit (KERNEL_CLASS=App\Kernel: an
+ * application's own suite, or the omnibase harness's `demo test admin`) -
+ * same convention as AnalyticsTest/LinkableEntityRegistryTest, since this
+ * widget's whole point is discovering real app entities.
  */
 class EntityViewsWidgetTypeTest extends KernelTestCase
 {
+    use HostContentType;
+
     private EntityViewsWidgetType $type;
 
     protected function setUp(): void
@@ -41,7 +43,7 @@ class EntityViewsWidgetTypeTest extends KernelTestCase
     {
         $vars = $this->type->getTemplateVars(MenuItem::block('entity_views'));
 
-        $this->assertArrayHasKey(Article::class, $vars['classes']);
+        $this->assertArrayHasKey($this->contentType(), $vars['classes']);
     }
 
     public function testAStaleUnknownEntityClassDegradesToNothingPickedRatherThanErroring(): void
@@ -61,13 +63,14 @@ class EntityViewsWidgetTypeTest extends KernelTestCase
     public function testPickingARealEntityReturnsASeriesScopedToItsOwnPath(): void
     {
         $registry = static::getContainer()->get(\Base\Admin\Widget\LinkableEntityRegistry::class);
-        $any = $registry->findInstances(Article::class, 1);
+        $type = $this->contentType();
+        $any = $registry->findInstances($type, 1);
         if ([] === $any) {
-            self::markTestSkipped('No Article rows to pick in this environment.');
+            self::markTestSkipped('No content rows to pick in this environment.');
         }
 
         $widget = MenuItem::block('entity_views', null, null, null, [
-            'entityClass' => Article::class,
+            'entityClass' => $type,
             'entityId' => $any[0]->getId(),
         ]);
 
@@ -87,12 +90,13 @@ class EntityViewsWidgetTypeTest extends KernelTestCase
         // here every run while the code under test was behaving correctly: with
         // no rows, falling back to the empty-state series is the right answer.
         $registry = static::getContainer()->get(\Base\Admin\Widget\LinkableEntityRegistry::class);
-        if ([] === $registry->findInstances(Article::class, 1)) {
-            self::markTestSkipped('No Article rows in this environment; nothing to aggregate.');
+        $type = $this->contentType();
+        if ([] === $registry->findInstances($type, 1)) {
+            self::markTestSkipped('No content rows in this environment; nothing to aggregate.');
         }
 
         $widget = MenuItem::block('entity_views', null, null, null, [
-            'entityClass' => Article::class,
+            'entityClass' => $type,
             'entityId' => EntityViewsWidgetType::ALL_INSTANCES,
         ]);
 

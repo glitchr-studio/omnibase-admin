@@ -96,4 +96,9 @@ yield MenuItem::linkToCrud(\Base\Entity\Layout\TextOverride::class, 'Textes du s
 `vendor/bin/phpunit` in this checkout, or from the omnibase harness:
 `docker compose -f compose.yml -f compose.checkouts.yml run --rm omnibase test admin`
 (`tests/bootstrap.php` registers the test namespace in a host's autoloader). The
-widget tests that boot a kernel need a host application's environment.
+widget tests that boot a kernel need a host application's environment: the
+harness gives them one (its test environment, a fresh SQLite database), as does
+an application's own suite. They take the host's content types as they find
+them - the first `Thread` subtype the picker offers (`HostContentType`: an
+Article in glitchr, a forum Topic or forge Software in the harness) - and skip
+what needs rows when the database has none.

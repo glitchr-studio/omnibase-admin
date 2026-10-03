@@ -2,18 +2,20 @@
 
 namespace Tests\Base\Admin\Widget;
 
-use App\Entity\Article\Article;
 use Base\Admin\Config\MenuItem;
 use Base\Admin\Widget\CounterWidgetType;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
 /**
- * Runs under the host app's PHPUnit (`make tests glitchr`, KERNEL_CLASS=
- * App\Kernel) - same convention as EntityViewsWidgetTypeTest, since this
- * widget's whole point is discovering real app entities too.
+ * Runs under a host application's PHPUnit (KERNEL_CLASS=App\Kernel: an
+ * application's own suite, or the omnibase harness's `demo test admin`) -
+ * same convention as EntityViewsWidgetTypeTest, since this widget's whole
+ * point is discovering real app entities too.
  */
 class CounterWidgetTypeTest extends KernelTestCase
 {
+    use HostContentType;
+
     private CounterWidgetType $type;
 
     protected function setUp(): void
@@ -40,7 +42,7 @@ class CounterWidgetTypeTest extends KernelTestCase
     {
         $vars = $this->type->getTemplateVars(MenuItem::block('counter'));
 
-        $this->assertArrayHasKey(Article::class, $vars['classes']);
+        $this->assertArrayHasKey($this->contentType(), $vars['classes']);
     }
 
     public function testAStaleUnknownEntityClassDegradesToNothingPickedRatherThanErroring(): void
@@ -59,13 +61,14 @@ class CounterWidgetTypeTest extends KernelTestCase
     public function testPickingARealEntityReturnsANumericTotal(): void
     {
         $registry = static::getContainer()->get(\Base\Admin\Widget\LinkableEntityRegistry::class);
-        $any = $registry->findInstances(Article::class, 1);
+        $type = $this->contentType();
+        $any = $registry->findInstances($type, 1);
         if ([] === $any) {
-            self::markTestSkipped('No Article rows to pick in this environment.');
+            self::markTestSkipped('No content rows to pick in this environment.');
         }
 
         $widget = MenuItem::block('counter', null, null, null, [
-            'entityClass' => Article::class,
+            'entityClass' => $type,
             'entityId' => $any[0]->getId(),
         ]);
 
@@ -86,12 +89,13 @@ class CounterWidgetTypeTest extends KernelTestCase
         // no rows to sum, falling back to the empty-state total is the right
         // answer, not a regression.
         $registry = static::getContainer()->get(\Base\Admin\Widget\LinkableEntityRegistry::class);
-        if ([] === $registry->findInstances(Article::class, 1)) {
-            self::markTestSkipped('No Article rows in this environment; nothing to sum.');
+        $type = $this->contentType();
+        if ([] === $registry->findInstances($type, 1)) {
+            self::markTestSkipped('No content rows in this environment; nothing to sum.');
         }
 
         $widget = MenuItem::block('counter', null, null, null, [
-            'entityClass' => Article::class,
+            'entityClass' => $type,
             'entityId' => CounterWidgetType::ALL_INSTANCES,
         ]);
 
@@ -123,7 +127,7 @@ class CounterWidgetTypeTest extends KernelTestCase
         // something that does not mean the same thing.
         $vars = $this->type->getTemplateVars(MenuItem::block('counter', null, null, null, [
             'mode' => CounterWidgetType::MODE_RECORDS,
-            'countClass' => Article::class,
+            'countClass' => $this->contentType(),
         ]));
 
         $this->assertNull($vars['change']);
@@ -132,7 +136,7 @@ class CounterWidgetTypeTest extends KernelTestCase
 
     public function testStateNarrowingCannotExceedTheUnfilteredCount(): void
     {
-        $params = ['mode' => CounterWidgetType::MODE_RECORDS, 'countClass' => Article::class];
+        $params = ['mode' => CounterWidgetType::MODE_RECORDS, 'countClass' => $this->contentType()];
 
         $all = $this->type->getTemplateVars(MenuItem::block('counter', null, null, null, $params))['total'];
         $published = $this->type->getTemplateVars(MenuItem::block('counter', null, null, null,
@@ -148,7 +152,7 @@ class CounterWidgetTypeTest extends KernelTestCase
     {
         $vars = $this->type->getTemplateVars(MenuItem::block('counter', null, null, null, [
             'mode' => CounterWidgetType::MODE_RECORDS,
-            'countClass' => Article::class,
+            'countClass' => $this->contentType(listed: true),
             'states' => [\Base\Enum\ThreadState::DRAFT],
         ]));
 
@@ -163,7 +167,7 @@ class CounterWidgetTypeTest extends KernelTestCase
     {
         $vars = $this->type->getTemplateVars(MenuItem::block('counter', null, null, null, [
             'mode' => CounterWidgetType::MODE_RECORDS,
-            'countClass' => Article::class,
+            'countClass' => $this->contentType(listed: true),
             'states' => [\Base\Enum\ThreadState::PUBLISH, \Base\Enum\ThreadState::DRAFT],
         ]));
 
