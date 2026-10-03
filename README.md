@@ -42,4 +42,4 @@ make tests
 
 ## License
 
-LGPL-3.0-or-later — see [SECURITY.md](SECURITY.md) for the vulnerability disclosure policy.
+LGPL-3.0-or-later: the text of the license is in [LICENSE](LICENSE), and the GNU GPL v3 it supplements in [COPYING](COPYING). See [SECURITY.md](SECURITY.md) for the vulnerability disclosure policy.
