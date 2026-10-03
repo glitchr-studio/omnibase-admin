@@ -65,6 +65,10 @@ class AdminBundle extends AbstractBaseBundle
         $container->registerForAutoconfiguration(DashboardWidgetTypeInterface::class)
             ->addTag('base.admin.dashboard_widget_type');
 
+        // The system pages' sections (SystemController): every bundle's and the application's.
+        $container->registerForAutoconfiguration(\Base\Admin\Settings\SettingsSectionInterface::class)
+            ->addTag('base.admin.settings_section');
+
         // Additive: a type implementing this ALSO gets tagged for the
         // palette, on top of the base tag above (both autoconfiguration
         // rules apply independently to the same class).

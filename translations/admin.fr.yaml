@@ -243,3 +243,36 @@ analytics:
         30d: 30 jours
         all: Depuis toujours
         since_prefix: "Depuis le"
+complaint:
+    singular: Signalement
+    plural: Signalements
+    created_at: Reçu le
+    status: Statut
+    complainant: Signalé par
+    target: Au sujet de
+    target_status: Son rang alors
+    source: Où
+    location: Endroit
+    text: Signalement
+    answer: Réponse
+    handled_by: Traité par
+    handled_at: Traité le
+    action:
+        handle: Traité
+        dismiss: Classer sans suite
+        reopen: Rouvrir
+    flash:
+        handled: Signalement traité.
+        dismissed: Signalement classé sans suite.
+        reopened: Signalement rouvert.
+    widget:
+        open: "signalement(s) à traiter"
+        none: Aucun signalement en attente.
+text_override:
+    key: Texte
+    key_placeholder: Choisir le texte à réécrire
+    key_help: Chaque texte du site, avec sa formulation actuelle.
+    locale: Langue
+    value: Nouveau texte
+    value_help: "Gardez les {accolades} telles quelles : elles reçoivent un nom, un nombre, une date."
+    updated_at: Modifié le

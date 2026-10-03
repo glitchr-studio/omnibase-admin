@@ -54,6 +54,9 @@ class AdminRouteLoader extends Loader
         // the Article detail action with entityId="comments". Registering
         // "articles/comments" first means the literal path wins and only
         // genuinely unmatched segments fall through to {entityId}.
+        // Before the CRUDs: a "settings" slug's catch-all must not take /admin/settings.
+        $this->addSystemRoutes($routes, $prefix);
+
         $controllers = $this->registry->getControllers();
         uasort($controllers, static fn (string $a, string $b) => substr_count($b, '/') <=> substr_count($a, '/'));
 
@@ -344,5 +347,19 @@ class AdminRouteLoader extends Loader
         }
 
         $routes->add('admin', new Route($prefix, ['_controller' => $fqcn . '::index'], [], [], '', [], ['GET']));
+    }
+
+    /**
+     * The system pages (Base\Admin\Controller\SystemController): settings and
+     * API keys, their fields declared by SettingsSectionInterface services.
+     * An application whose own controller is routed under the same names
+     * keeps it: its routes are imported after this loader's.
+     */
+    private function addSystemRoutes(RouteCollection $routes, string $prefix): void
+    {
+        $controller = \Base\Admin\Controller\SystemController::class;
+        $routes->add('admin_settings', new Route($prefix.'/settings', ['_controller' => $controller.'::settings'], [], [], '', [], ['GET', 'POST']));
+        $routes->add('admin_apikey', new Route($prefix.'/api-key', ['_controller' => $controller.'::apiKey'], [], [], '', [], ['GET', 'POST']));
+        $routes->add('admin_settings_quick', new Route($prefix.'/settings/quick', ['_controller' => $controller.'::settingsQuick'], [], [], '', [], ['POST']));
     }
 }

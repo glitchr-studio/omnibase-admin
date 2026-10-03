@@ -259,4 +259,21 @@ return function (ContainerConfigurator $configurator) {
             tagged_iterator('base.admin.dashboard_controller'),
             service(\Base\Admin\Security\CrudAccessChecker::class),
         ]);
+
+    // The system pages (settings, API keys) and the sections that fill them:
+    // omnibase's own here, each bundle's and the application's tagged
+    // base.admin.settings_section (SettingsSectionInterface is autoconfigured).
+    $services->set(\Base\Admin\Settings\SettingsSections::class)
+        ->args([tagged_iterator('base.admin.settings_section')]);
+    $services->set(\Base\Admin\Settings\SiteSettingsSection::class)->autowire()->autoconfigure();
+    $services->set(\Base\Admin\Settings\SpamKeySection::class)->autowire()->autoconfigure();
+    $services->set(\Base\Admin\Controller\SystemController::class)
+        ->autowire()->autoconfigure()->public()
+        ->tag('controller.service_arguments');
+
+    // Reports (Base\Entity\User\Complaint) and the texts rewritten in the
+    // back office (Base\Entity\Layout\TextOverride): CRUD screens and a tile.
+    $services->set(\Base\Admin\Controller\Crud\ComplaintCrudController::class)->autowire()->autoconfigure();
+    $services->set(\Base\Admin\Controller\Crud\TextOverrideCrudController::class)->autowire()->autoconfigure();
+    $services->set(\Base\Admin\Widget\ComplaintsWidgetType::class)->autowire()->autoconfigure();
 };

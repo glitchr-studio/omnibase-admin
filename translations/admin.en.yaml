@@ -243,3 +243,36 @@ analytics:
         30d: 30 days
         all: All time
         since_prefix: "Since"
+complaint:
+    singular: Report
+    plural: Reports
+    created_at: Received
+    status: Status
+    complainant: Reported by
+    target: About
+    target_status: Their rank then
+    source: Where
+    location: Place
+    text: Report
+    answer: Answer
+    handled_by: Handled by
+    handled_at: Handled on
+    action:
+        handle: Handled
+        dismiss: Dismiss
+        reopen: Reopen
+    flash:
+        handled: Report handled.
+        dismissed: Report dismissed.
+        reopened: Report reopened.
+    widget:
+        open: "report(s) to handle"
+        none: No report waiting.
+text_override:
+    key: Text
+    key_placeholder: Choose the text to rewrite
+    key_help: Every text of the site, with its current wording.
+    locale: Language
+    value: New text
+    value_help: "Keep the {braces} as they are: they receive a name, a number, a date."
+    updated_at: Updated
