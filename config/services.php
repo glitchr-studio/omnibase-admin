@@ -44,8 +44,10 @@ return function (ContainerConfigurator $configurator) {
         ->arg('$identifierFieldsByEntity', [])
         ->arg('$lowercaseIdentifiers', false);
 
+    // doctrine: an AssociationField on a user account is found by the
+    // association's target class and built as a picker (FieldFormBuilder::addField()).
     $services->set(FieldFormBuilder::class)
-        ->args([service('form.factory')]);
+        ->args([service('form.factory'), service('doctrine')->nullOnInvalid()]);
 
     $services->set(AdminRouteRegistry::class)
         ->arg('$controllerFqcns', [])
