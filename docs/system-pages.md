@@ -5,8 +5,15 @@ What omnibase/admin gives every site so that none keeps a copy of its own.
 ## The back office as a website-in-website
 
 `Base\Admin\EventSubscriber\NestHeaderSubscriber` answers `X-Transparent-Nest: overlay`
-for every back-office route (`admin`, `admin_crud_*`, `admin_*`) and for any route
-that asks for it:
+for every page of the back office:
+
+- any path under its prefix (`/admin`, `/admin/...`), whoever routed it - the
+  CRUDs and the system pages of this bundle, and a screen an application or a
+  bundle routes there itself (`#[Route('/admin/outils/canva', name: 'app_admin_canva')]`):
+  nothing to add to the route;
+- a route named `admin`, `admin_crud_*` or `admin_*`, wherever it is routed.
+
+A page of the site that should open the same way, outside `/admin`, asks for it:
 
 ```php
 #[Route('/cuisine', name: 'app_kitchen', defaults: ['_nest' => true])]
@@ -39,7 +46,7 @@ A screen of its own - a controller routed outside the CRUD loader, whose
 template extends `@Admin/layout.html.twig` - needs nothing to get it:
 
 ```php
-#[Route('/admin/outils/canva', name: 'app_admin_canva', defaults: ['_nest' => true])]
+#[Route('/admin/outils/canva', name: 'app_admin_canva')]   // under /admin: nested without asking
 public function canva(): Response
 {
     return $this->render('admin/tools/canva.html.twig', [...]);   // {% extends '@Admin/layout.html.twig' %}

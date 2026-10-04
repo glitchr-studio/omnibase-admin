@@ -86,7 +86,9 @@ return function (ContainerConfigurator $configurator) {
         ->args([service(AdminUrlGenerator::class), service(\Base\Field\FieldValueResolver::class), service(AdminRouteRegistry::class), service(AdminContext::class), service(\Base\Admin\Security\CrudAccessChecker::class), service('router'), service_closure(\Base\Admin\Menu\MenuBuilder::class), service('security.helper')->nullOnInvalid()])
         ->tag('twig.extension');
 
+    // The registry: its URL prefix (/admin) - every path under it is an admin page.
     $services->set(\Base\Admin\EventSubscriber\NestHeaderSubscriber::class)
+        ->args([service(AdminRouteRegistry::class)])
         ->tag('kernel.event_subscriber');
 
     // The CRUD gate in front of every #[AdminAction] method.
