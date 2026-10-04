@@ -103,6 +103,7 @@ class AdminRouteLoader extends Loader
         $this->addDashboardWidgetRoutes($routes, $prefix);
         $this->addRevisionRoute($routes, $prefix);
         $this->addTrashRoutes($routes, $prefix);
+        $this->addHoursRoutes($routes, $prefix);
 
         return $routes;
     }
@@ -213,6 +214,19 @@ class AdminRouteLoader extends Loader
             ['_controller' => \Base\Admin\Controller\TrashController::class . '::empty'],
             [], [], '', [], ['POST']
         ));
+    }
+
+    /**
+     * The opening hours - see HoursController. The page is GET; saving the
+     * week, adding and deleting a special day are POST + CSRF.
+     */
+    private function addHoursRoutes(RouteCollection $routes, string $prefix): void
+    {
+        $controller = \Base\Admin\Controller\HoursController::class;
+        $routes->add('admin_hours', new Route($prefix.'/hours', ['_controller' => $controller.'::index'], [], [], '', [], ['GET']));
+        $routes->add('admin_hours_week', new Route($prefix.'/hours/week', ['_controller' => $controller.'::week'], [], [], '', [], ['POST']));
+        $routes->add('admin_hours_special', new Route($prefix.'/hours/special', ['_controller' => $controller.'::addSpecialDay'], [], [], '', [], ['POST']));
+        $routes->add('admin_hours_special_delete', new Route($prefix.'/hours/special/{id}/delete', ['_controller' => $controller.'::deleteSpecialDay'], ['id' => '\d+'], [], '', [], ['POST']));
     }
 
     /**

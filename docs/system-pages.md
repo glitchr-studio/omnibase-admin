@@ -74,6 +74,7 @@ What the pages hold is declared by sections, services implementing
 | Section | Page | Fields |
 |---|---|---|
 | `Base\Admin\Settings\SiteSettingsSection` (100) | settings | logos, title, slogan, meta, launch date, access, maintenance, security, mail |
+| `Base\Admin\Settings\BusinessSettingsSection` (90) | settings | phone, address |
 | `Base\Admin\Settings\SpamKeySection` (100) | apikey | `api.spam.akismet` |
 | `Base\Marketplace\Settings\PaymentKeysSection` (50) | apikey | Stripe's three keys, when omnitrade's `stripe` gateway is there |
 
@@ -134,6 +135,48 @@ text's current wording in the site's first enabled locale.
 ```php
 yield MenuItem::linkToCrud(\Base\Entity\Layout\TextOverride::class, 'Textes du site', 'fa-solid fa-font');
 ```
+
+## Opening hours
+
+`Base\Admin\Controller\HoursController` serves `/admin/hours` (`admin_hours`, ROLE_ADMIN;
+routed by the `base_admin` loader): what glitchr/omnibase's `OpeningHours` reads
+everywhere - the footer, the day an order is for, the time slots, the page's JSON-LD.
+
+- **The usual week**: seven days, up to three slots each (`Base\Entity\Hours\WeekDayHours`);
+  a day left empty is closed. Until a week is saved, the page shows the configured one
+  (`base.opening_hours.week`).
+- **Special days**: closed, or open at other hours, for one day or a run of days
+  (`Base\Entity\Hours\SpecialDay`), added and deleted here.
+- **One place** of a site that has several: `/admin/hours?scope=store:12` (or
+  `path('admin_hours', {scope: opening_hours(store).scope})`) edits that place's own
+  week (`ScopedWeek`) and days off; "Follow the site's week" gives its week up.
+
+Plain forms, a POST and a CSRF token each (`admin_hours_week`, `admin_hours_special`,
+`admin_hours_special_delete`); hours that make no sense (a closing before its opening,
+two slots overlapping) are refused with a message.
+
+```php
+yield MenuItem::linkToRoute('admin_hours', [], 'Horaires', 'fa-solid fa-clock');
+```
+
+## Redirections
+
+`Base\Admin\Controller\Crud\RedirectionCrudController` (`/admin/redirections`): the old
+addresses of a site taken over and where each leads now (`Base\Entity\Layout\Redirection`,
+glitchr/omnibase - see its `docs/40-commons/redirections.md`). An old address is typed
+or pasted whole and kept as its path; the list is sorted by visitors carried, with the
+date each was last used.
+
+```php
+yield MenuItem::linkToCrud(\Base\Entity\Layout\Redirection::class, 'Redirections', 'fa-solid fa-diamond-turn-right');
+```
+
+## The business's phone and address
+
+`Base\Admin\Settings\BusinessSettingsSection` (90) adds to the settings page
+`base.settings.phone` and `base.settings.address.{street, postal_code, locality, region, country}`:
+what glitchr/omnibase's `local_business_jsonld()` prints, ahead of `base.local_business`
+in the configuration.
 
 ## Tests
 

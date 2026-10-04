@@ -1,0 +1,164 @@
+{% extends '@Admin/layout.html.twig' %}
+
+{#
+ # The opening hours (Base\Admin\Controller\HoursController): the usual week,
+ # day by day, and the days off it. Plain forms, each a POST with its CSRF
+ # token; no script. With `scope`, one place's hours instead of the site's.
+ #}
+
+{% block page_title %}{{ 'page.hours.title'|trans({}, 'admin') }}{% endblock %}
+
+{% block content_header %}
+<div class="admin-header">
+    <span class="admin-header-icon"><i class="fa-solid fa-clock"></i></span>
+    <div class="admin-header-titles">
+        <h1>{{ 'page.hours.title'|trans({}, 'admin') }}</h1>
+        <div class="admin-header-subtitle">
+            {{ 'page.hours.description'|trans({}, 'admin') }}
+            {% if scope %} <strong>{{ 'page.hours.scope'|trans({'%scope%': scope}, 'admin') }}</strong>{% endif %}
+        </div>
+    </div>
+    <div class="global-actions">
+        <span class="badge hours-state{{ open_now ? ' is-open' }}">{{ (open_now ? 'page.hours.open_now' : 'page.hours.closed_now')|trans({}, 'admin') }}</span>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+    .hours-card { padding: 1.25rem 1.5rem; margin-bottom: 1.25rem; }
+    .hours-card h2 { margin: 0 0 .25rem; font-size: 1.05rem; }
+    .hours-card .hours-hint { margin: 0 0 1rem; color: var(--admin-muted); font-size: .85rem; }
+    .hours-state.is-open { color: var(--admin-success); }
+    .hours-week { display: grid; gap: .5rem; }
+    .hours-day { display: grid; grid-template-columns: 8rem 1fr; align-items: center; gap: .75rem; padding: .45rem 0; border-bottom: 1px solid var(--admin-border); }
+    .hours-day:last-child { border-bottom: 0; }
+    .hours-day-name { font-weight: 600; }
+    .hours-slots { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1.25rem; }
+    .hours-slot { display: inline-flex; align-items: center; gap: .35rem; white-space: nowrap; }
+    .hours-card input[type=time], .hours-card input[type=date], .hours-card input[type=text] {
+        width: auto; padding: .4rem .55rem; border: 1px solid var(--admin-border); border-radius: 6px; font: inherit; color: inherit; background: var(--admin-surface);
+    }
+    .hours-card input[type=text] { min-width: 14rem; }
+    .hours-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin-top: 1rem; }
+    .hours-special-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .75rem 1.25rem; margin-bottom: 1rem; }
+    .hours-special-form label { display: grid; gap: .2rem; font-size: .82rem; color: var(--admin-muted); }
+    .hours-special-form .hours-mode { display: inline-flex; align-items: center; gap: .35rem; color: inherit; font-size: inherit; }
+    .datagrid td.hours-row-actions form { display: contents; }
+    @media (max-width: 640px) { .hours-day { grid-template-columns: 1fr; } }
+</style>
+
+{# ── The usual week ─────────────────────────────────────────────── #}
+<div class="card hours-card">
+    <h2>{{ 'page.hours.week.title'|trans({}, 'admin') }}</h2>
+    <p class="hours-hint">
+        {{ 'page.hours.week.hint'|trans({}, 'admin') }}
+        {{ 'page.hours.timezone'|trans({'%timezone%': timezone}, 'admin') }}
+        {% if scope and not own_week %}<br>{{ 'page.hours.week.follows_site'|trans({}, 'admin') }}{% endif %}
+    </p>
+    <form method="post" action="{{ path('admin_hours_week') }}" id="hours-week-form">
+        <input type="hidden" name="_token" value="{{ csrf_token('admin-hours-week') }}">
+        {% if scope %}<input type="hidden" name="scope" value="{{ scope }}">{% endif %}
+        <div class="hours-week">
+            {% for n in 1..7 %}
+                {% set day_slots = week[n] ?? [] %}
+                <div class="hours-day">
+                    <span class="hours-day-name">{{ ('page.hours.day.' ~ n)|trans({}, 'admin') }}</span>
+                    <span class="hours-slots">
+                        {% for i in 0..(max(slots, day_slots|length) - 1) %}
+                            <span class="hours-slot">
+                                <input type="time" name="week[{{ n }}][{{ i }}][open]" value="{{ day_slots[i][0] ?? '' }}" aria-label="{{ ('page.hours.day.' ~ n)|trans({}, 'admin') }} - {{ 'page.hours.week.open'|trans({}, 'admin') }} {{ i + 1 }}">
+                                <span aria-hidden="true">–</span>
+                                <input type="time" name="week[{{ n }}][{{ i }}][close]" value="{{ day_slots[i][1] ?? '' }}" aria-label="{{ ('page.hours.day.' ~ n)|trans({}, 'admin') }} - {{ 'page.hours.week.close'|trans({}, 'admin') }} {{ i + 1 }}">
+                            </span>
+                        {% endfor %}
+                    </span>
+                </div>
+            {% endfor %}
+        </div>
+        <div class="hours-actions">
+            <button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> {{ 'page.hours.week.save'|trans({}, 'admin') }}</button>
+            {% if scope and own_week %}
+                <button class="btn" type="submit" name="follow_site" value="1">{{ 'page.hours.week.follow_site'|trans({}, 'admin') }}</button>
+            {% endif %}
+        </div>
+    </form>
+</div>
+
+{# ── The special days ───────────────────────────────────────────── #}
+<div class="card hours-card">
+    <h2>{{ 'page.hours.special.title'|trans({}, 'admin') }}</h2>
+    <p class="hours-hint">{{ 'page.hours.special.description'|trans({}, 'admin') }}</p>
+
+    <form method="post" action="{{ path('admin_hours_special') }}" class="hours-special-form">
+        <input type="hidden" name="_token" value="{{ csrf_token('admin-hours-special') }}">
+        {% if scope %}<input type="hidden" name="scope" value="{{ scope }}">{% endif %}
+        <label>{{ 'page.hours.special.from'|trans({}, 'admin') }}<input type="date" name="from" required></label>
+        <label>{{ 'page.hours.special.until'|trans({}, 'admin') }}<input type="date" name="until"></label>
+        <label>{{ 'page.hours.special.reason'|trans({}, 'admin') }}<input type="text" name="reason" maxlength="120"></label>
+        <label class="hours-mode"><input type="radio" name="mode" value="closed" checked> {{ 'page.hours.special.mode_closed'|trans({}, 'admin') }}</label>
+        <span class="hours-slots">
+            <label class="hours-mode"><input type="radio" name="mode" value="hours"> {{ 'page.hours.special.mode_hours'|trans({}, 'admin') }}</label>
+            {% for i in 0..1 %}
+                <span class="hours-slot">
+                    <input type="time" name="hours[{{ i }}][open]" aria-label="{{ 'page.hours.week.open'|trans({}, 'admin') }} {{ i + 1 }}">
+                    <span aria-hidden="true">–</span>
+                    <input type="time" name="hours[{{ i }}][close]" aria-label="{{ 'page.hours.week.close'|trans({}, 'admin') }} {{ i + 1 }}">
+                </span>
+            {% endfor %}
+        </span>
+        <button class="btn btn-primary" type="submit"><i class="fa-solid fa-plus"></i> {{ 'page.hours.special.add'|trans({}, 'admin') }}</button>
+    </form>
+
+    {% if special_days is empty and site_special_days is empty %}
+        <div class="empty-state">{{ 'page.hours.special.empty'|trans({}, 'admin') }}</div>
+    {% else %}
+    <div class="table-responsive">
+    <table class="datagrid">
+        <thead>
+            <tr>
+                <th>{{ 'page.hours.special.column.dates'|trans({}, 'admin') }}</th>
+                <th>{{ 'page.hours.special.column.reason'|trans({}, 'admin') }}</th>
+                <th>{{ 'page.hours.special.column.hours'|trans({}, 'admin') }}</th>
+                <th class="actions"></th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for day in special_days %}
+            <tr>
+                <td data-label="{{ 'page.hours.special.column.dates'|trans({}, 'admin') }}">
+                    {{ day.from|date('d/m/Y') }}{% if not day.oneDay %} – {{ day.until|date('d/m/Y') }}{% endif %}
+                </td>
+                <td data-label="{{ 'page.hours.special.column.reason'|trans({}, 'admin') }}">{{ day.reason ?: '—' }}</td>
+                <td data-label="{{ 'page.hours.special.column.hours'|trans({}, 'admin') }}">
+                    {% if day.closed %}<span class="badge">{{ 'page.hours.special.closed'|trans({}, 'admin') }}</span>
+                    {% else %}{% for slot in day.hours %}{{ slot[0] }} – {{ slot[1] }}{{ not loop.last ? ', ' }}{% endfor %}{% endif %}
+                </td>
+                <td class="actions hours-row-actions">
+                    <form method="post" action="{{ path('admin_hours_special_delete', {id: day.id}) }}" data-confirm="{{ 'page.hours.special.delete_confirm'|trans({}, 'admin') }}">
+                        <input type="hidden" name="_token" value="{{ csrf_token('admin-hours-special-delete-' ~ day.id) }}">
+                        <button class="btn btn-icon text-danger" type="submit" title="{{ 'page.hours.special.delete'|trans({}, 'admin') }}"><i class="fa-solid fa-xmark"></i></button>
+                    </form>
+                </td>
+            </tr>
+        {% endfor %}
+        {# A place also keeps the site's days off (its own win on a shared date): shown, changed on the site's screen. #}
+        {% for day in site_special_days %}
+            <tr class="hours-site-day">
+                <td data-label="{{ 'page.hours.special.column.dates'|trans({}, 'admin') }}">
+                    {{ day.from|date('d/m/Y') }}{% if not day.oneDay %} – {{ day.until|date('d/m/Y') }}{% endif %}
+                </td>
+                <td data-label="{{ 'page.hours.special.column.reason'|trans({}, 'admin') }}">{{ day.reason ?: '—' }} <span class="badge">{{ 'page.hours.special.site'|trans({}, 'admin') }}</span></td>
+                <td data-label="{{ 'page.hours.special.column.hours'|trans({}, 'admin') }}">
+                    {% if day.closed %}<span class="badge">{{ 'page.hours.special.closed'|trans({}, 'admin') }}</span>
+                    {% else %}{% for slot in day.hours %}{{ slot[0] }} – {{ slot[1] }}{{ not loop.last ? ', ' }}{% endfor %}{% endif %}
+                </td>
+                <td class="actions"><a class="btn btn-icon" href="{{ path('admin_hours') }}" title="{{ 'page.hours.title'|trans({}, 'admin') }}"><i class="fa-solid fa-arrow-up-right-from-square"></i></a></td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

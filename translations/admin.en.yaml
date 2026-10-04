@@ -205,6 +205,103 @@ page.apikey:
     title: API keys
     description: Sensitive information used to connect to third-party service APIs.
     empty: No API key to display.
+page.settings.group:
+    content: Content
+    technical: Technical
+page.settings.field:
+    logo: Logo
+    logo_admin: Back office logo
+    logo_email: E-mail logo
+    title: Site title
+    slogan: Slogan
+    meta_author: Author (meta tag)
+    meta_description: Description (meta tag)
+    meta_keywords: Keywords (meta tag)
+    launchdate: Launch date
+    launchdate_redirect_on_deny: Redirect visitors until the launch
+    access_redirect_on_deny: Page shown when access is refused
+    access_public: Open to the public
+    access_user: Open to members
+    access_admin: Open to administrators
+    maintenance: Maintenance
+    maintenance_downtime: Maintenance starts
+    maintenance_uptime: Maintenance ends
+    security_two_factor: Two-factor authentication offered
+    security_two_factor_mandatory: Two-factor authentication mandatory for everyone
+    security_passkeys: Passkeys offered
+    security_new_device_email: E-mail on a sign-in from a new browser
+    security_new_device_prompt: Offer two-factor authentication on a sign-in from a new browser
+    mail_from: Sender address
+    mail_name: Sender name
+    mail_contact: Contact address
+    phone: Phone
+    address_street: Address - street
+    address_postal_code: Address - postal code
+    address_locality: Address - town
+    address_region: Address - region
+    address_country: Address - country
+page.apikey.field:
+    akismet: Akismet
+page.hours:
+    title: Opening hours
+    description: The usual week, and the days off it.
+    scope: "For: %scope%"
+    open_now: Open now
+    closed_now: Closed now
+    timezone: "Hours are in %timezone% time."
+    week:
+        title: Usual week
+        hint: A day left empty is closed.
+        follows_site: This place follows the site's week; saving gives it one of its own.
+        follow_site: Follow the site's week
+        open: opens
+        close: closes
+        save: Save the week
+    day:
+        1: Monday
+        2: Tuesday
+        3: Wednesday
+        4: Thursday
+        5: Friday
+        6: Saturday
+        7: Sunday
+    special:
+        title: Special days
+        description: Closed, or open at other hours, for one day or a run of days - holidays, a bank holiday, a fair.
+        empty: No special day to come.
+        from: From
+        until: Until (optional)
+        reason: Reason (shown to visitors)
+        mode_closed: Closed
+        mode_hours: "Open at:"
+        add: Add
+        closed: Closed
+        site: whole site
+        delete: Delete
+        delete_confirm: Delete this special day?
+        column:
+            dates: Dates
+            reason: Reason
+            hours: Hours
+    flash:
+        week_saved: Usual week saved.
+        follows_site: This place follows the site's week again.
+        bad_hours: "These hours cannot be saved: each slot needs an opening and a later closing, and two slots of a day cannot overlap."
+        bad_date: This date cannot be read.
+        special_saved: Special day added.
+        special_deleted: Special day deleted.
+redirection:
+    source: Old address
+    source_help: "A path of the old site (/produit/enseigne), or its whole address pasted. End it with * to cover everything beneath (/categorie/*)."
+    target: Leads to
+    target_help: "A path of this site (/savoir-faire/enseigne) or another site's address. A * takes what the old address's star stood for."
+    status: Kind
+    status_301: Permanent (301)
+    status_302: Temporary (302)
+    enabled: Active
+    hits: Visitors carried
+    last_hit_at: Last used
+    created_at: Created
 
 manual:
     title: Documentation

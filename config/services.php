@@ -280,4 +280,13 @@ return function (ContainerConfigurator $configurator) {
     $services->set(\Base\Admin\Controller\Crud\ComplaintCrudController::class)->autowire()->autoconfigure();
     $services->set(\Base\Admin\Controller\Crud\TextOverrideCrudController::class)->autowire()->autoconfigure();
     $services->set(\Base\Admin\Widget\ComplaintsWidgetType::class)->autowire()->autoconfigure();
+
+    // The old addresses of a site taken over (Base\Entity\Layout\Redirection),
+    // the opening hours (the usual week, the days off: Base\Entity\Hours\*),
+    // and the phone and address the page's LocalBusiness JSON-LD reads.
+    $services->set(\Base\Admin\Controller\Crud\RedirectionCrudController::class)->autowire()->autoconfigure();
+    $services->set(\Base\Admin\Settings\BusinessSettingsSection::class)->autowire()->autoconfigure();
+    $services->set(\Base\Admin\Controller\HoursController::class)
+        ->autowire()->autoconfigure()->public()
+        ->tag('controller.service_arguments');
 };

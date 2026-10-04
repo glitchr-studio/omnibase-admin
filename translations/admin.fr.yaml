@@ -205,6 +205,103 @@ page.apikey:
     title: Clefs API
     description: Informations sensibles permettant la connexion aux API de services.
     empty: Aucune clef API à afficher.
+page.settings.group:
+    content: Contenu
+    technical: Technique
+page.settings.field:
+    logo: Logo
+    logo_admin: Logo de l'administration
+    logo_email: Logo des courriels
+    title: Titre du site
+    slogan: Slogan
+    meta_author: Auteur (balise meta)
+    meta_description: Description (balise meta)
+    meta_keywords: Mots-clés (balise meta)
+    launchdate: Date de lancement
+    launchdate_redirect_on_deny: Rediriger les visiteurs jusqu'au lancement
+    access_redirect_on_deny: Page affichée quand l'accès est refusé
+    access_public: Ouvert au public
+    access_user: Ouvert aux membres
+    access_admin: Ouvert aux administrateurs
+    maintenance: Maintenance
+    maintenance_downtime: Début de la maintenance
+    maintenance_uptime: Fin de la maintenance
+    security_two_factor: Double authentification proposée
+    security_two_factor_mandatory: Double authentification obligatoire pour tous
+    security_passkeys: Clés d'accès proposées
+    security_new_device_email: Courriel à la connexion depuis un nouveau navigateur
+    security_new_device_prompt: Proposer la double authentification à la connexion depuis un nouveau navigateur
+    mail_from: Adresse d'expédition
+    mail_name: Nom de l'expéditeur
+    mail_contact: Adresse de contact
+    phone: Téléphone
+    address_street: Adresse - rue
+    address_postal_code: Adresse - code postal
+    address_locality: Adresse - ville
+    address_region: Adresse - région
+    address_country: Adresse - pays
+page.apikey.field:
+    akismet: Akismet
+page.hours:
+    title: Horaires d'ouverture
+    description: La semaine type, et les jours qui en sortent.
+    scope: "Pour : %scope%"
+    open_now: Ouvert en ce moment
+    closed_now: Fermé en ce moment
+    timezone: "Les heures sont celles du fuseau %timezone%."
+    week:
+        title: Semaine type
+        hint: Un jour laissé vide est fermé.
+        follows_site: Ce lieu suit la semaine du site ; l'enregistrer lui donne la sienne.
+        follow_site: Suivre la semaine du site
+        open: ouverture
+        close: fermeture
+        save: Enregistrer la semaine
+    day:
+        1: Lundi
+        2: Mardi
+        3: Mercredi
+        4: Jeudi
+        5: Vendredi
+        6: Samedi
+        7: Dimanche
+    special:
+        title: Jours spéciaux
+        description: Fermé, ou ouvert à d'autres heures, un jour ou plusieurs de suite - congés, jour férié, salon.
+        empty: Aucun jour spécial à venir.
+        from: Du
+        until: Au (facultatif)
+        reason: Motif (affiché aux visiteurs)
+        mode_closed: Fermé
+        mode_hours: "Ouvert de :"
+        add: Ajouter
+        closed: Fermé
+        site: tout le site
+        delete: Supprimer
+        delete_confirm: Supprimer ce jour spécial ?
+        column:
+            dates: Dates
+            reason: Motif
+            hours: Horaires
+    flash:
+        week_saved: Semaine type enregistrée.
+        follows_site: Ce lieu suit de nouveau la semaine du site.
+        bad_hours: "Ces horaires ne peuvent pas être enregistrés : chaque plage a une ouverture et une fermeture plus tardive, et deux plages d'un même jour ne se chevauchent pas."
+        bad_date: Cette date est illisible.
+        special_saved: Jour spécial ajouté.
+        special_deleted: Jour spécial supprimé.
+redirection:
+    source: Ancienne adresse
+    source_help: "Un chemin de l'ancien site (/produit/enseigne), ou son adresse entière collée. Terminez par * pour couvrir tout ce qui est dessous (/categorie/*)."
+    target: Mène à
+    target_help: "Un chemin de ce site (/savoir-faire/enseigne) ou l'adresse d'un autre site. Un * reprend ce que l'étoile de l'ancienne adresse désignait."
+    status: Nature
+    status_301: Définitive (301)
+    status_302: Temporaire (302)
+    enabled: Active
+    hits: Visiteurs conduits
+    last_hit_at: Dernier passage
+    created_at: Créée le
 
 manual:
     title: Documentation
