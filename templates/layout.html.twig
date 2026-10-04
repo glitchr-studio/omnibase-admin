@@ -1,3 +1,10 @@
+{#- Every admin screen has the sidebar and the account menu: the context the
+    controller passed, or omnibase/admin's own with its menus built
+    (admin_context(), AdminTwigExtension) - a screen extending this layout
+    from a plain controller renders without one. -#}
+{%- if admin_context is not defined or admin_context is null or admin_context.mainMenu is empty -%}
+    {%- set admin_context = admin_context() -%}
+{%- endif -%}
 <!DOCTYPE html>
 <html lang="{{ app.request.locale|default('en') }}">
 <head>

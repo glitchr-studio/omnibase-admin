@@ -16,6 +16,43 @@ transparentjs opens such a page as a floating, dockable panel over the site when
 link matches its `nest` patterns (`Base.boot({nest: ['/admin*']})`, glitchr/omnibase's
 `assets/boot.js`). An application deletes its `App\EventSubscriber\NestHeaderSubscriber`.
 
+## The sidebar, on every screen
+
+The sidebar is the dashboard's whole menu, the same on the dashboard, the
+CRUD pages, the system pages and any screen of an application or a bundle:
+
+1. `configureMenuBeforeItems()`;
+2. the dashboard's groups - each section (or submenu) of
+   `configureWidgetItems()` with its links (CRUD, route, URL); its blocks and
+   its "create" shortcuts (`->setCrudAction('new')`) stay on the dashboard;
+3. `configureMenuItems()` and `configureMenuAfterItems()`: the system pages,
+   last. A link the groups already offer is not repeated; a group named like
+   one of these sections adds its links to it.
+
+An application declares its screens once, as the dashboard's groups, and
+keeps `configureMenuItems()` for the "System" section. (The sidebar used to
+show `configureMenuItems()` alone.) Left as it is, `configureMenuItems()`
+adds nothing when the dashboard has groups, and lists every registered CRUD
+when it has none.
+
+A screen of its own - a controller routed outside the CRUD loader, whose
+template extends `@Admin/layout.html.twig` - needs nothing to get it:
+
+```php
+#[Route('/admin/outils/canva', name: 'app_admin_canva', defaults: ['_nest' => true])]
+public function canva(): Response
+{
+    return $this->render('admin/tools/canva.html.twig', [...]);   // {% extends '@Admin/layout.html.twig' %}
+}
+```
+
+The layout takes the `admin_context` the controller passed, or builds the
+menus itself (Twig `admin_context()`: `MenuBuilder::buildDefault()` for the
+sidebar, `buildUserMenuDefault()` for the account menu). A controller that
+seeds the context itself keeps what it set. The item whose URL is the longest
+prefix of the current path is the selected one, so a screen listed in the menu
+(`MenuItem::linkToRoute('app_admin_canva', ...)`) is highlighted on its page.
+
 ## Settings and API keys
 
 `Base\Admin\Controller\SystemController` serves `/admin/settings` (`admin_settings`),

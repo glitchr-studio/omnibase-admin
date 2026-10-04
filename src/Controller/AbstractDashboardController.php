@@ -86,10 +86,21 @@ abstract class AbstractDashboardController extends AbstractController
     }
 
     /**
+     * The sidebar's own entries (the system pages, as a rule), shown after
+     * the dashboard's groups (see resolveMenu()). By default nothing when the
+     * dashboard has groups - they are the sidebar's navigation -, else one
+     * entry per registered CRUD.
+     *
      * @return iterable<MenuItem>
      */
     public function configureMenuItems(): iterable
     {
+        foreach ($this->toArray($this->configureWidgetItems()) as $item) {
+            if ($item instanceof MenuItem && ($item->isSection() || $item->isSubMenu())) {
+                return [];
+            }
+        }
+
         return $this->menuBuilder->buildDefault();
     }
 
@@ -193,10 +204,10 @@ abstract class AbstractDashboardController extends AbstractController
     // -----------------------------------------------------------------
 
     /**
-     * The app's curated menu (dashboard link + configureMenuItems()'s
-     * sections/entries), reusable by CRUD/system pages so every /admin/*
-     * page shares the same sidebar instead of falling back to a generic
-     * unsectioned CRUD listing - see MenuBuilder::buildDefault().
+     * The dashboard's whole menu, reusable by every other admin page (CRUD,
+     * system pages, an application's own screens extending
+     * `@Admin/layout.html.twig`) so the sidebar is the same everywhere - see
+     * MenuBuilder::buildDefault().
      *
      * @return MenuItem[]
      */
@@ -206,18 +217,116 @@ abstract class AbstractDashboardController extends AbstractController
     }
 
     /**
+     * The sidebar: configureMenuBeforeItems(), then the screens the dashboard
+     * offers in its groups (configureWidgetItems()'s sections and submenus,
+     * their links - see sidebarNavigationItems()), then configureMenuItems()
+     * and configureMenuAfterItems() (the "Système" section, pinned last), then
+     * the sidebar's blocks.
+     *
+     * Every application declares its screens as the dashboard's groups and
+     * keeps configureMenuItems() for the system pages; the sidebar used to show
+     * configureMenuItems() alone, so a CRUD or a custom screen offered nothing
+     * but "Système" to go anywhere else.
+     *
      * @return MenuItem[]
      */
     protected function resolveMenu(): array
     {
-        $items = $this->menuBuilder->groupIntoSections(array_merge(
-            $this->toArray($this->configureMenuBeforeItems()),
+        $before = $this->menuBuilder->groupIntoSections($this->toArray($this->configureMenuBeforeItems()));
+        $menu = $this->menuBuilder->groupIntoSections(array_merge(
             $this->toArray($this->configureMenuItems()),
             $this->toArray($this->configureMenuAfterItems()),
             $this->toArray($this->configureSidebarBlockItems()),
         ));
 
-        return $this->menuBuilder->resolve($items, LayoutScope::SIDEBAR);
+        $navigation = $this->sidebarNavigationItems(array_merge($before, $menu));
+
+        return $this->menuBuilder->resolve(array_merge($before, $navigation, $menu), LayoutScope::SIDEBAR);
+    }
+
+    /**
+     * The dashboard's groups as sidebar sections: each section or submenu of
+     * configureWidgetItems() with its links (CRUD, route, URL); blocks and
+     * the groups' "create" shortcuts (->setCrudAction('new')) stay on the
+     * dashboard. A link the menu already has is left out; a group named like
+     * one of the menu's sections adds its other links to that section.
+     *
+     * Copies: the dashboard resolves its own widgets from the same hook, and
+     * a resolved item carries its URL and selection.
+     *
+     * @param MenuItem[] $menu the sidebar's own items, grouped
+     * @return MenuItem[]
+     */
+    protected function sidebarNavigationItems(array $menu): array
+    {
+        $known = [];
+        $sections = [];
+        $collect = function (array $items) use (&$collect, &$known, &$sections): void {
+            foreach ($items as $item) {
+                if ($item->isSection() || $item->isSubMenu()) {
+                    $sections[self::labelOf($item)] ??= $item;
+                } elseif (null !== ($signature = self::linkSignature($item))) {
+                    $known[$signature] = true;
+                }
+                $collect($item->getSubItems());
+            }
+        };
+        $collect($menu);
+
+        $navigation = [];
+        foreach ($this->toArray($this->configureWidgetItems()) as $group) {
+            if (!$group instanceof MenuItem || (!$group->isSection() && !$group->isSubMenu())) {
+                continue;
+            }
+
+            $links = [];
+            foreach ($group->getSubItems() as $subItem) {
+                $signature = self::linkSignature($subItem);
+                if (null === $signature || isset($known[$signature])) {
+                    continue;
+                }
+                $known[$signature] = true;
+                $links[] = clone $subItem;
+            }
+            if ([] === $links) {
+                continue;
+            }
+
+            $existing = $sections[self::labelOf($group)] ?? null;
+            if (null !== $existing) {
+                $existing->setSubItems([...$existing->getSubItems(), ...$links]);
+                continue;
+            }
+
+            $section = (clone $group)->setSubItems($links);
+            $navigation[] = $section;
+            $sections[self::labelOf($group)] = $section;
+        }
+
+        return $navigation;
+    }
+
+    /** A navigable link's identity (null for anything else): where it leads. */
+    private static function linkSignature(MenuItem $item): ?string
+    {
+        $action = $item->getCrudActionName();
+
+        return match ($item->getType()) {
+            MenuItem::TYPE_CRUD => null !== $action && 'index' !== $action ? null : 'crud:'.$item->getEntityFqcn(),
+            MenuItem::TYPE_ROUTE => 'route:'.$item->getRouteName().':'.json_encode($item->getRouteParameters()),
+            MenuItem::TYPE_URL => 'url:'.$item->getUrl(),
+            default => null,
+        };
+    }
+
+    private static function labelOf(MenuItem $item): string
+    {
+        $label = $item->getLabel();
+        if ($label instanceof \Symfony\Contracts\Translation\TranslatableInterface) {
+            $label = method_exists($label, 'getMessage') ? $label->getMessage() : $label::class;
+        }
+
+        return (string) $label;
     }
 
     /**

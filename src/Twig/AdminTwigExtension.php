@@ -17,7 +17,42 @@ class AdminTwigExtension extends AbstractExtension
         protected readonly ?\Base\Admin\Context\AdminContext $adminContext = null,
         protected readonly ?\Base\Admin\Security\CrudAccessChecker $crudAccessChecker = null,
         protected readonly ?\Symfony\Component\Routing\Generator\UrlGeneratorInterface $router = null,
+        protected readonly ?\Closure $menuBuilder = null, // MenuBuilder, built when a page first asks (a service closure)
+        protected readonly ?\Symfony\Bundle\SecurityBundle\Security $security = null,
     ) {
+    }
+
+    /**
+     * The back office's context with its menus, for `@Admin/layout.html.twig`:
+     * the sidebar (the dashboard's whole menu, MenuBuilder::buildDefault())
+     * and the account menu, built here when the page's controller did not.
+     *
+     * A screen of an application or a bundle that extends the layout from a
+     * plain controller - routed outside the CRUD loader, rendering without
+     * `admin_context` - had an empty sidebar; the CRUD and system pages, and
+     * the screens that seed the context themselves, are unchanged.
+     */
+    public function adminContext(): ?\Base\Admin\Context\AdminContext
+    {
+        if (null === $this->adminContext || null === $this->menuBuilder) {
+            return $this->adminContext;
+        }
+
+        /** @var \Base\Admin\Menu\MenuBuilder $menuBuilder */
+        $menuBuilder = ($this->menuBuilder)();
+        // The error page extends the layout too: a menu that cannot be built
+        // leaves the sidebar empty, it does not take the error page down.
+        try {
+            if ([] === $this->adminContext->getMainMenu()) {
+                $this->adminContext->setMainMenu($menuBuilder->buildDefault());
+            }
+            if ([] === $this->adminContext->getUserMenu() && null !== ($user = $this->security?->getUser())) {
+                $this->adminContext->setUserMenu($menuBuilder->buildUserMenuDefault($user));
+            }
+        } catch (\Throwable) {
+        }
+
+        return $this->adminContext;
     }
 
     /**
@@ -112,6 +147,7 @@ class AdminTwigExtension extends AbstractExtension
             new TwigFunction('admin_action_token_id', \Base\Admin\Attribute\AdminAction::tokenId(...)),
             new TwigFunction('admin_entity_id', $this->fieldValueResolver->entityIdentifier(...)),
             new TwigFunction('admin_menu_current', $this->adminMenuCurrent(...)),
+            new TwigFunction('admin_context', $this->adminContext(...)),
             new TwigFunction('admin_entity_icon', $this->adminEntityIcon(...)),
             new TwigFunction('admin_action_order', $this->adminActionOrder(...)),
         ];

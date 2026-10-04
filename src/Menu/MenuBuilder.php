@@ -64,10 +64,19 @@ class MenuBuilder
      */
     public function buildDefault(): array
     {
-        foreach ($this->dashboardControllers as $dashboardController) {
-            // already resolved (URLs + selected state) by the dashboard
-            // controller's own resolveMenu() - no need to redo it here
-            return $dashboardController->getMenuItems();
+        // A dashboard that keeps the default configureMenuItems() asks back
+        // here while resolving its menu: that inner call gets the generic
+        // listing, rather than recursing until the stack gives out.
+        $dashboardController = $this->building ? null : $this->dashboardController();
+        if (null !== $dashboardController) {
+            $this->building = true;
+            try {
+                // already resolved (URLs + selected state) by the dashboard
+                // controller's own resolveMenu() - no need to redo it here
+                return $dashboardController->getMenuItems();
+            } finally {
+                $this->building = false;
+            }
         }
 
         $items = [MenuItemFactory::linkToDashboard($this->translator->trans('menu.dashboard', [], 'admin'), 'fa-solid fa-home')];
@@ -79,6 +88,27 @@ class MenuBuilder
         }
 
         return $this->resolve($items, LayoutScope::SIDEBAR);
+    }
+
+    private bool $building = false;
+
+    /**
+     * The application's dashboard (any outside omnibase/admin's own
+     * Base\Admin\Controller namespace), else the first one registered:
+     * omnibase/admin's zero-config DashboardController is tagged too, and
+     * the order of a tagged iterator is not the application's to choose.
+     */
+    protected function dashboardController(): ?\Base\Admin\Controller\AbstractDashboardController
+    {
+        $first = null;
+        foreach ($this->dashboardControllers as $dashboardController) {
+            $first ??= $dashboardController;
+            if (!str_starts_with($dashboardController::class, 'Base\\Admin\\Controller\\')) {
+                return $dashboardController;
+            }
+        }
+
+        return $first;
     }
 
     /**
