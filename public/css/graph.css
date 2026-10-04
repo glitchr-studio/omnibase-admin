@@ -1,0 +1,413 @@
+/*
+ * graphjs - everything a site changes is a --graph-* variable, set on the
+ * [data-graph] element or above it:
+ *
+ *   --graph-height            the height of the view
+ *   --graph-bg, --graph-grid  the ground, and its dots (transparent: none)
+ *   --graph-border, --graph-radius
+ *   --graph-node-bg, -color, -border, -radius, -padding, -shadow, -font, -min-width, -max-width
+ *   --graph-sub-color         a node's second line
+ *   --graph-edge, --graph-edge-width
+ *   --graph-accent            the focused node, the lit line, the keyboard focus
+ *   --graph-dim               the opacity of what is off the lit line
+ *   --graph-control-bg, -color, -border
+ *   --graph-success, -failed, -running, -warning, -pending   the node states
+ */
+
+.graph {
+    --graph-height: 32rem;
+    --graph-bg: #f6f5f1;
+    --graph-grid: rgba(40, 36, 28, .11);
+    --graph-border: rgba(40, 36, 28, .16);
+    --graph-radius: 6px;
+    --graph-node-bg: #fffefb;
+    --graph-node-color: #23211c;
+    --graph-node-border: rgba(40, 36, 28, .28);
+    --graph-node-radius: 5px;
+    --graph-node-padding: .55rem .8rem;
+    --graph-node-shadow: 0 1px 0 rgba(40, 36, 28, .08);
+    --graph-node-font: inherit;
+    --graph-node-min-width: 7rem;
+    --graph-node-max-width: 15rem;
+    --graph-sub-color: #6c675c;
+    --graph-edge: #8d877a;
+    --graph-edge-width: 1.5px;
+    --graph-accent: #1f4e79;
+    --graph-dim: .32;
+    --graph-control-bg: #fffefb;
+    --graph-control-color: #23211c;
+    --graph-control-border: rgba(40, 36, 28, .28);
+    --graph-success: #2e7650;
+    --graph-failed: #ad3329;
+    --graph-running: #2a5d9f;
+    --graph-warning: #9a6a12;
+    --graph-pending: #8a857a;
+
+    position: relative;
+    display: block;
+    height: var(--graph-height);
+    color: var(--graph-node-color);
+    background-color: var(--graph-bg);
+    background-image: radial-gradient(var(--graph-grid) 1px, transparent 1px);
+    background-size: 20px 20px;
+    border: 1px solid var(--graph-border);
+    border-radius: var(--graph-radius);
+    overflow: hidden;
+}
+
+@media (prefers-color-scheme: dark) {
+    .graph:not([data-graph-theme="light"]) {
+        --graph-bg: #1b1a17;
+        --graph-grid: rgba(240, 234, 220, .09);
+        --graph-border: rgba(240, 234, 220, .16);
+        --graph-node-bg: #26241f;
+        --graph-node-color: #ece7da;
+        --graph-node-border: rgba(240, 234, 220, .26);
+        --graph-node-shadow: 0 1px 0 rgba(0, 0, 0, .4);
+        --graph-sub-color: #a8a292;
+        --graph-edge: #7d776a;
+        --graph-accent: #8fb8e0;
+        --graph-control-bg: #26241f;
+        --graph-control-color: #ece7da;
+        --graph-control-border: rgba(240, 234, 220, .26);
+        --graph-success: #6cba8d;
+        --graph-failed: #e58076;
+        --graph-running: #86b0e6;
+        --graph-warning: #d8a94a;
+        --graph-pending: #8f897c;
+    }
+}
+
+.graph[data-graph-theme="dark"] {
+    --graph-bg: #1b1a17;
+    --graph-grid: rgba(240, 234, 220, .09);
+    --graph-border: rgba(240, 234, 220, .16);
+    --graph-node-bg: #26241f;
+    --graph-node-color: #ece7da;
+    --graph-node-border: rgba(240, 234, 220, .26);
+    --graph-node-shadow: 0 1px 0 rgba(0, 0, 0, .4);
+    --graph-sub-color: #a8a292;
+    --graph-edge: #7d776a;
+    --graph-accent: #8fb8e0;
+    --graph-control-bg: #26241f;
+    --graph-control-color: #ece7da;
+    --graph-control-border: rgba(240, 234, 220, .26);
+    --graph-success: #6cba8d;
+    --graph-failed: #e58076;
+    --graph-running: #86b0e6;
+    --graph-warning: #d8a94a;
+    --graph-pending: #8f897c;
+}
+
+.graph:fullscreen,
+.graph.is-fullscreen {
+    height: 100%;
+    width: 100%;
+    border: 0;
+    border-radius: 0;
+}
+
+.graph.is-fullscreen {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483000;
+}
+
+/* -- the view ---------------------------------------------------------- */
+
+.graph-viewport {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    cursor: grab;
+    touch-action: none;
+    outline: none;
+}
+
+.graph-viewport:focus-visible {
+    box-shadow: inset 0 0 0 2px var(--graph-accent);
+}
+
+.graph.is-dragging .graph-viewport,
+.graph.is-dragging .graph-node {
+    cursor: grabbing;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.graph-canvas {
+    position: absolute;
+    left: 0;
+    top: 0;
+    transform-origin: 0 0;
+    will-change: transform;
+}
+
+.graph.is-gliding .graph-canvas {
+    transition: transform .28s cubic-bezier(.2, .7, .2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .graph.is-gliding .graph-canvas { transition: none; }
+}
+
+/* Before the script has placed them, the nodes the server rendered are not shown out of place. */
+.graph:not(.is-ready) [data-graph-node] {
+    visibility: hidden;
+}
+
+/* -- edges ------------------------------------------------------------- */
+
+.graph-edges {
+    position: absolute;
+    left: 0;
+    top: 0;
+    overflow: visible;
+    pointer-events: none;
+}
+
+.graph-edge {
+    stroke: var(--graph-edge);
+    stroke-width: var(--graph-edge-width);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: opacity .15s, stroke .15s;
+}
+
+.graph-edge-flat {
+    stroke-dasharray: 2 4;
+}
+
+/* -- nodes ------------------------------------------------------------- */
+
+.graph-node {
+    position: absolute;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: var(--graph-node-min-width);
+    max-width: var(--graph-node-max-width);
+    width: max-content;
+    margin: 0;
+    padding: var(--graph-node-padding);
+    font: var(--graph-node-font);
+    line-height: 1.25;
+    color: var(--graph-node-color);
+    text-decoration: none;
+    background: var(--graph-node-bg);
+    border: 1px solid var(--graph-node-border);
+    border-radius: var(--graph-node-radius);
+    box-shadow: var(--graph-node-shadow);
+    transition: opacity .15s, border-color .15s, box-shadow .15s;
+}
+
+a.graph-node,
+.graph-node a {
+    cursor: pointer;
+}
+
+a.graph-node:hover {
+    color: var(--graph-node-color);
+    border-color: var(--graph-accent);
+}
+
+.graph-node:focus-visible {
+    outline: 2px solid var(--graph-accent);
+    outline-offset: 2px;
+}
+
+.graph-node-label {
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.graph-node-sub {
+    margin-top: .15rem;
+    font-size: .82em;
+    color: var(--graph-sub-color);
+}
+
+.graph-node.is-focus {
+    border-color: var(--graph-accent);
+    box-shadow: 0 0 0 2px var(--graph-accent), var(--graph-node-shadow);
+}
+
+/* a junction: a union in a family tree, a gate in a pipeline */
+.graph-node[data-graph-kind="junction"] {
+    min-width: 0;
+    width: 14px;
+    height: 14px;
+    padding: 0;
+    border-radius: 50%;
+    border-color: var(--graph-edge);
+    background: var(--graph-bg);
+    box-shadow: none;
+}
+
+/* -- the lit line ------------------------------------------------------ */
+
+.graph.has-lineage .graph-node:not(.is-lineage) {
+    opacity: var(--graph-dim);
+}
+
+.graph.has-lineage .graph-edge:not(.is-lineage) {
+    opacity: var(--graph-dim);
+}
+
+.graph.has-lineage .graph-edge.is-lineage {
+    stroke: var(--graph-accent);
+    stroke-width: calc(var(--graph-edge-width) + .5px);
+}
+
+/* -- states ------------------------------------------------------------ */
+
+.graph-node[data-graph-state] {
+    --graph-state: var(--graph-pending);
+}
+
+.graph-node[data-graph-state="success"] { --graph-state: var(--graph-success); }
+.graph-node[data-graph-state="failed"] { --graph-state: var(--graph-failed); }
+.graph-node[data-graph-state="running"] { --graph-state: var(--graph-running); }
+.graph-node[data-graph-state="warning"],
+.graph-node[data-graph-state="manual"] { --graph-state: var(--graph-warning); }
+
+.graph-node[data-graph-state="skipped"],
+.graph-node[data-graph-state="canceled"] {
+    border-style: dashed;
+    color: var(--graph-sub-color);
+}
+
+.graph-edge[data-graph-state="success"] { stroke: var(--graph-success); }
+.graph-edge[data-graph-state="failed"] { stroke: var(--graph-failed); }
+.graph-edge[data-graph-state="running"] { stroke: var(--graph-running); stroke-dasharray: 5 5; animation: graph-flow 1s linear infinite; }
+.graph-edge[data-graph-state="pending"],
+.graph-edge[data-graph-state="skipped"],
+.graph-edge[data-graph-state="canceled"],
+.graph-edge[data-graph-state="manual"] { stroke-dasharray: 2 5; }
+
+@keyframes graph-flow {
+    to { stroke-dashoffset: -10; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .graph-edge[data-graph-state="running"] { animation: none; }
+}
+
+/* -- controls ---------------------------------------------------------- */
+
+.graph-controls {
+    position: absolute;
+    right: .6rem;
+    bottom: .6rem;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--graph-control-border);
+    border-radius: var(--graph-radius);
+    background: var(--graph-control-bg);
+    overflow: hidden;
+}
+
+.graph-control {
+    display: grid;
+    place-items: center;
+    width: 2.1rem;
+    height: 2.1rem;
+    margin: 0;
+    padding: 0;
+    color: var(--graph-control-color);
+    background: none;
+    border: 0;
+    border-top: 1px solid var(--graph-control-border);
+    border-radius: 0;
+    cursor: pointer;
+}
+
+.graph-control:first-child {
+    border-top: 0;
+}
+
+.graph-control:hover {
+    background: color-mix(in srgb, var(--graph-control-color) 9%, transparent);
+}
+
+.graph-control:focus-visible {
+    outline: 2px solid var(--graph-accent);
+    outline-offset: -2px;
+}
+
+/* ====================================================================== */
+/* preset: tree - people on cards, the generations from top to bottom     */
+/* ====================================================================== */
+
+.graph[data-graph-preset="tree"] {
+    --graph-node-padding: .5rem .75rem;
+    --graph-node-min-width: 8.5rem;
+    --graph-node-max-width: 12.5rem;
+}
+
+.graph[data-graph-preset="tree"] .graph-node {
+    text-align: center;
+    align-items: center;
+}
+
+/* ====================================================================== */
+/* preset: pipeline - jobs in a row, the stages from left to right        */
+/* ====================================================================== */
+
+.graph[data-graph-preset="pipeline"] {
+    --graph-node-padding: .4rem .8rem .4rem 2rem;
+    --graph-node-radius: 999px;
+    --graph-node-min-width: 8rem;
+    --graph-grid: transparent;
+}
+
+.graph[data-graph-preset="pipeline"] .graph-node {
+    white-space: nowrap;
+}
+
+.graph[data-graph-preset="pipeline"] .graph-node-label {
+    font-weight: 500;
+}
+
+/* the state: a disc at the head of the job */
+.graph[data-graph-preset="pipeline"] .graph-node::before {
+    content: "";
+    position: absolute;
+    left: .6rem;
+    top: 50%;
+    width: .8rem;
+    height: .8rem;
+    margin-top: -.4rem;
+    box-sizing: border-box;
+    border-radius: 50%;
+    border: 2px solid var(--graph-state, var(--graph-pending));
+    background: transparent;
+}
+
+.graph[data-graph-preset="pipeline"] .graph-node[data-graph-state="success"]::before,
+.graph[data-graph-preset="pipeline"] .graph-node[data-graph-state="failed"]::before {
+    background: var(--graph-state);
+}
+
+.graph[data-graph-preset="pipeline"] .graph-node[data-graph-state="running"]::before {
+    border-right-color: transparent;
+    animation: graph-turn .9s linear infinite;
+}
+
+.graph[data-graph-preset="pipeline"] .graph-node[data-graph-state="skipped"]::before,
+.graph[data-graph-preset="pipeline"] .graph-node[data-graph-state="canceled"]::before {
+    border-style: dotted;
+}
+
+.graph[data-graph-preset="pipeline"] .graph-node[data-graph-state="failed"] {
+    border-color: var(--graph-failed);
+}
+
+@keyframes graph-turn {
+    to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .graph[data-graph-preset="pipeline"] .graph-node[data-graph-state="running"]::before { animation: none; }
+}

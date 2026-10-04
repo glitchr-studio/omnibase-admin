@@ -3158,6 +3158,9 @@
            the same way everything else does: AJAX swap of #page, cached
            pages, fade transitions - instead of a hard reload per click. #}
         <link rel="stylesheet" href="{{ asset('bundles/admin/css/transparent.css') }}">
+        {# graphjs (a layered directed graph, dragged and zoomed): vendored the
+           same way, for any screen that draws one - <div data-graph>. #}
+        <link rel="stylesheet" href="{{ asset('bundles/admin/css/graph.css') }}">
         <style>
             {# transparent.css pins its native progress bar to the VIEWPORT's
                top (position:fixed) - generic default for any consumer. In
@@ -3173,6 +3176,10 @@
         </style>
         <script src="{{ asset('bundles/admin/js/jquery.min.js') }}"></script>
         <script src="{{ asset('bundles/admin/js/transparent.js') }}"></script>
+        {# An ES module (it imports ./layout.js beside it): deferred, and it
+           starts every [data-graph] of the page - again after each in-admin
+           navigation, on transparent:load. window.Graph for a screen's own script. #}
+        <script type="module" src="{{ asset('bundles/admin/js/graph.js') }}"></script>
         {% if customize_enabled is defined and customize_enabled %}
             {# Superadmin-only download - moderators/admins never fetch this. #}
             <script src="{{ asset('bundles/admin/js/sticky-sortable.js') }}"></script>

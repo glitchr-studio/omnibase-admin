@@ -1,7 +1,7 @@
 # Vendored assets
 
-`jquery.min.js`, `transparent.js`/`transparent.css`, and `sticky-sortable.js`
-are plain, unbundled copies — this package has no Encore/webpack build step
+`jquery.min.js`, `transparent.js`/`transparent.css`, `sticky-sortable.js` and
+`graph.js`/`layout.js`/`graph.css` are plain, unbundled copies — this package has no Encore/webpack build step
 of its own. They are loaded as ordinary `<script>`/`<link>` tags so the
 admin's own in-page navigation uses the exact same SPA engine as the rest of
 the product and the website-in-website overlay, instead of a second library
@@ -24,6 +24,23 @@ style as this copy, so it's copy-as-is, no build step):
 Currently vendored at stickyjs 1.1.0. Loaded only for `ROLE_SUPERADMIN`
 (see `layout.html.twig`'s topbar block) - moderators/admins never download
 it.
+
+To update after a `@glitchr/graphjs` release (github.com/glitchr-studio/graphjs;
+a layered directed graph that is dragged and zoomed - HTML nodes, SVG edges,
+no dependency, no build step). It is two ES modules and a stylesheet, copied
+as they are; `graph.js` imports `./layout.js`, so the two stay side by side
+under these names:
+
+    cp <graphjs-repo>/src/js/graph.js   public/js/graph.js
+    cp <graphjs-repo>/src/js/layout.js  public/js/layout.js
+    cp <graphjs-repo>/src/css/index.css public/css/graph.css
+
+Currently vendored at graphjs 1.0.0 (commit 226ddfe). Loaded on every admin
+page by `layout.html.twig`, next to transparent.js: `<link>` for the
+stylesheet, `<script type="module">` for `graph.js` (deferred). It starts every
+`[data-graph]` of the page, and again after each in-admin navigation (it
+listens to `transparent:load`); `window.Graph` is the class. See
+`docs/graphs.md`.
 
 IMPORTANT: this is not the only copy in this app. The public site (host
 page) consumes `@glitchr/transparent` via `assets/app-defer.js` from
