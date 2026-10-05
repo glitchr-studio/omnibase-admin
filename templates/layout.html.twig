@@ -3579,6 +3579,9 @@
     {% endblock %}
 </head>
 <body>
+{# The demonstration's banner (glitchr/omnibase, the `demo` environment only: it prints nothing anywhere else),
+   outside #page so that a navigation does not redraw it. ignore missing: an older glitchr/omnibase has no such partial. #}
+{{ include('@Base/demo/_banner.html.twig', ignore_missing = true) }}
 {# id="page": transparentJS only engages its SPA click/swap handling when
    the current document contains this element (same convention the public
    site's base.html.twig uses) - everything inside it is what gets swapped
