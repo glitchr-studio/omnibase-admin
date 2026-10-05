@@ -316,9 +316,12 @@ class MenuBuilder
     protected ?array $controllersByEntity = null;
 
     /**
-     * The registered controller managing exactly the item's entity (first
-     * registered wins, App\ overrides first) - no parent-class fallback, a
-     * menu item names the CRUD it wants. Mapped once: the filter and the
+     * The registered controller managing the item's entity: exactly that
+     * class first (first registered wins, App\ overrides first), else the
+     * nearest parent class that has one - an application names its own
+     * `App\Entity\User`, whose CRUD omnibase registers against
+     * `Base\Entity\User`: with no fallback the "Utilisateurs" entry was
+     * printed with no address (href="#"). Mapped once: the filter and the
      * URL both ask, for every CRUD item of every page.
      */
     protected function crudControllerFor(MenuItem $item): ?string
@@ -332,7 +335,10 @@ class MenuBuilder
             }
         }
 
-        return $this->controllersByEntity[$item->getEntityFqcn() ?? ''] ?? null;
+        $entityFqcn = $item->getEntityFqcn() ?? '';
+
+        return $this->controllersByEntity[$entityFqcn]
+            ?? ('' !== $entityFqcn && class_exists($entityFqcn) ? $this->registry->getControllerForEntity($entityFqcn) : null);
     }
 
     /**

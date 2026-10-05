@@ -176,6 +176,41 @@ class MenuBuilderTest extends TestCase
         $this->assertSame('/admin/reports', $item->getLinkUrl());
     }
 
+    /**
+     * An application links its own class (App\Entity\User) where the CRUD
+     * is registered against the class it extends (Base\Entity\User): the
+     * entry gets that CRUD's address - it was printed with href="#".
+     */
+    public function testACrudItemOnASubclassLeadsToItsParentsCrud(): void
+    {
+        $urls = $this->createStub(AdminUrlGenerator::class);
+        $urls->method('setController')->willReturnSelf();
+        $urls->method('setAction')->willReturnSelf();
+        $urls->method('generateUrl')->willReturn('/admin/reports');
+        $authChecker = $this->createStub(AuthorizationCheckerInterface::class);
+        $authChecker->method('isGranted')->willReturn(true);
+
+        $builder = new MenuBuilder(
+            new AdminRouteRegistry([ReportCrudController::class]),
+            $urls,
+            $this->createStub(UrlGeneratorInterface::class),
+            $this->createStub(RequestStack::class),
+            $this->createStub(TranslatorInterface::class),
+            $authChecker,
+            $this->createStub(LayoutStore::class),
+            $this->createStub(LayoutArranger::class),
+        );
+
+        $subclass = new class extends \ArrayObject {};
+        [$own, $unknown] = $builder->resolve([
+            MenuItem::linkToCrud($subclass::class, 'Our reports'),
+            MenuItem::linkToCrud(\SplStack::class, 'Nobody\'s'),
+        ]);
+
+        $this->assertSame('/admin/reports', $own->getLinkUrl());
+        $this->assertNull($unknown->getLinkUrl(), 'a class no CRUD manages, nor its parents, still has no address');
+    }
+
     public function testAsksOnceAboutAControllerLinkedSeveralTimes(): void
     {
         $builder = $this->builderForCrud(true, 1);

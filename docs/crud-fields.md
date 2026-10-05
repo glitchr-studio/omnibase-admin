@@ -141,3 +141,29 @@ yield CollectionField::new('targets')
 - An `AssociationField` on a one-to-many does this by itself (its inner
   collection sets `allow_object`): `CollectionField` + `allowObject()` is for
   an entry type of your own.
+
+## The words of a CRUD page are translated once
+
+`configureCrud()` gives its labels, page titles and helps as plain words, as
+keys that name their domain, or as `TranslatableInterface`:
+
+```php
+return parent::configureCrud($crud)
+    ->setEntityLabelInSingular('@agenda.admin.event.singular')
+    ->setEntityLabelInPlural('@agenda.admin.event.plural')
+    ->setPageTitle(Crud::PAGE_NEW, new TranslatableMessage('event.new', [], 'agenda'))
+    ->setHelp(Crud::PAGE_INDEX, 'Les dates passées restent visibles.');     // plain words: as they are
+```
+
+The controller translates the keys and the translatables when it builds the
+page's configuration (`AbstractCrudController::translateCrudLabels()`), so
+every template prints words: the list's title printed the key itself
+(`@agenda.admin.event.plural`).
+
+## A menu entry on the application's own class
+
+`MenuItem::linkToCrud(\App\Entity\User::class, 'Utilisateurs')` leads to the
+CRUD registered for that class, else to the one of the nearest parent class:
+omnibase registers its users' CRUD against `Base\Entity\User`, which the
+application's `User` extends. (With no fallback the entry was printed without
+an address, `href="#"`.)
