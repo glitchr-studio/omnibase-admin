@@ -152,6 +152,24 @@ class Actions
     }
 
     /**
+     * Opens the actions that write - those the blanket $defaultPermissions
+     * reserves to the super-admin - and the CRUD's own $custom actions to
+     * $role, wherever no permission was set for them here: what
+     * #[OpenToAdmins] on a CRUD controller does (Base\Admin\Attribute\OpenToAdmins,
+     * applied once configureActions() has run).
+     */
+    public function openTo(string $role, string ...$custom): static
+    {
+        foreach ([...array_keys(static::$defaultPermissions), ...$custom] as $actionName) {
+            if (!\array_key_exists($actionName, $this->permissions)) {
+                $this->permissions[$actionName] = $role;
+            }
+        }
+
+        return $this;
+    }
+
+    /**
      * Documented per-controller opt-out from the blanket $defaultPermissions,
      * e.g. ->allowAnyoneTo(Action::EDIT) lets any backend-authenticated user
      * (including a plain-ROLE_ADMIN moderator) run that action on this CRUD.

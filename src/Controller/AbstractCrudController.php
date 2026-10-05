@@ -3,6 +3,7 @@
 namespace Base\Admin\Controller;
 
 use Base\Admin\Attribute\AdminAction;
+use Base\Admin\Attribute\OpenToAdmins;
 use Base\Admin\Config\Action;
 use Base\Database\Attribute\Alias;
 use function Symfony\Component\Translation\t;
@@ -1061,6 +1062,12 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         }
 
         $actions = $this->configureActions(Actions::new());
+
+        // #[OpenToAdmins] on the CRUD: the actions that write are the site's
+        // administrators', where configureActions() set no permission itself.
+        if (null !== $open = OpenToAdmins::of(static::class)) {
+            $actions->openTo($open->role, ...$open->actions);
+        }
 
         // isDeletable() hides every delete button, on top of whatever
         // display condition the CRUD gave it.
