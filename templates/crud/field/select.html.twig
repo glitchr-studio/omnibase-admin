@@ -1,4 +1,6 @@
-{%- set choices = field.customOption('choices') ?? {} -%}
+{#- value => label: the field's own map, else the choices it gives the form
+    (setChoices(['Label' => 'value'])), turned round by admin_field_choices(). -#}
+{%- set choices = field.customOption('choices') ?? admin_field_choices(field) -%}
 {%- set enumClass = field.customOption('enumClass') -%}
 {%- set entityDisplay = field.customOption('entityDisplay') -%}
 {#- Explicit option wins; otherwise resolved per value from its own class
@@ -19,7 +21,7 @@
     {%- if not entityDisplay and not crudFqcn and not admin_entity_crud(item) -%}
         {#- Neither option configured: the historical path, untouched. A
             plain choice/enum SelectField must keep its icon+colour badge. -#}
-        {{- _self.badge(admin_display(item), choices, enumClass) -}}
+        {{- _self.badge(admin_display(item), choices, enumClass, admin_enum_label(item, enumClass)) -}}
     {%- else -%}
         {%- set label = admin_entity_label(item, entityDisplay ?: 'username') -%}
         {%- set crudFqcn = crudFqcn ?? admin_entity_crud(item) -%}
@@ -45,8 +47,12 @@
         {%- endif -%}
     {%- endif -%}
 {%- endmacro -%}
-{%- macro badge(raw, choices, enumClass) -%}
+{#- `caseLabel`: the words of a PHP enum's case, as its select shows them in
+    the form (admin_enum_label()). A PHP enum is not an omnibase EnumType:
+    trans_enum and enum() are not asked about it. -#}
+{%- macro badge(raw, choices, enumClass, caseLabel = null) -%}
     {%- set label = choices[raw] ?? null -%}
+    {%- set enumClass = caseLabel is null ? enumClass : null -%}
     {%- set enumLabel = enumClass ? raw|trans_enum(enumClass) : null -%}
     {#- EnumType::getIcon()/getColor() (IconizeInterface/ColorizeInterface) -
        same per-value icon+color maps ThreadState/ConnectionState/etc already
@@ -65,6 +71,8 @@
         <span class="badge-label">
         {%- if label is not null -%}
             {{- label|trans -}}
+        {%- elseif caseLabel is not null -%}
+            {{- caseLabel -}}
         {%- elseif enumLabel is not null -%}
             {{- enumLabel -}}
         {%- else -%}
@@ -123,5 +131,5 @@
         cannot drift. -#}
     {{ _self.entity(raw, choices, enumClass, entityDisplay, crudFqcn ?? admin_entity_crud(raw), field.customOption('showFirst')) }}
 {%- else -%}
-    {{ _self.badge(field.formattedValue, choices, enumClass) }}
+    {{ _self.badge(field.formattedValue, choices, enumClass, admin_enum_label(raw, enumClass)) }}
 {%- endif -%}

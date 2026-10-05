@@ -1,4 +1,5 @@
-{%- set value = field.formattedValue -%}
+{#- A PHP enum's case reads as in the form's select, not as its stored value. -#}
+{%- set value = admin_enum_label(field.value) ?? field.formattedValue -%}
 {%- if value is null -%}
     <span style="color: var(--admin-muted)">—</span>
 {%- elseif value is same as(true) or value is same as(false) -%}

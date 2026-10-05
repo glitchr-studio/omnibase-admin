@@ -97,6 +97,27 @@ yield SelectField::new('role')->setChoices([
 (The labels of such choices are now what is shown; the stored value was
 printed in their place.)
 
+### The list and the detail page say what the form says
+
+A cell of the list, a line of the detail page and the form's select name a
+value with the same words:
+
+- a PHP enum's case by the labels above (`admin_enum_label()`), whether the
+  column is a `SelectField` or a plain `TextField`;
+- a value among the field's own choices by its label, translated when it is a
+  key (`admin_field_choices()` turns `['Label' => 'value']` round; groups are
+  looked into, choices made by a closure are not);
+- an omnibase `EnumType` (`->setEnumClass(ThreadState::class)`) by
+  `trans_enum`, as before.
+
+The cell used to print the stored value with a capital - "Pending", "Other" -
+beside a form saying "À valider", "Autre". A field template of your own
+gets the same words from the two functions:
+
+```twig
+{{ admin_enum_label(field.value) ?? field.formattedValue }}
+```
+
 Before this, a `SelectField` on an enum stopped the form on "No choices, or
 autocomplete option, could be guessed without using data information".
 

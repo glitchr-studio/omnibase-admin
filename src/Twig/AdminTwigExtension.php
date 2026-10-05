@@ -5,6 +5,9 @@ namespace Base\Admin\Twig;
 use Base\Admin\Config\Action;
 use Base\Field\FieldValueResolver;
 use Base\Admin\Router\AdminUrlGenerator;
+use Base\Form\Common\NativeEnum;
+use Symfony\Bridge\Twig\Extension\TranslationExtension;
+use Twig\Environment;
 use Twig\Extension\AbstractExtension;
 use Twig\TwigFunction;
 
@@ -150,7 +153,76 @@ class AdminTwigExtension extends AbstractExtension
             new TwigFunction('admin_context', $this->adminContext(...)),
             new TwigFunction('admin_entity_icon', $this->adminEntityIcon(...)),
             new TwigFunction('admin_action_order', $this->adminActionOrder(...)),
+            new TwigFunction('admin_enum_label', $this->adminEnumLabel(...), ['needs_environment' => true]),
+            new TwigFunction('admin_field_choices', $this->adminFieldChoices(...)),
         ];
+    }
+
+    /**
+     * The choices a field brings itself - SelectField::setChoices(['Label'
+     * => 'value']), Symfony's shape, groups nested - turned round for a list
+     * or a detail cell: what the record stores => its label, which the
+     * template translates as the form does ('@agenda.role.soloist'). The
+     * cell printed the stored value with a capital ("Other") where the
+     * form's select said "Autre".
+     *
+     * Choices made by a closure are the form's alone: an empty map.
+     *
+     * @return array<string, string>
+     */
+    public function adminFieldChoices(mixed $field): array
+    {
+        $choices = \is_object($field) && method_exists($field, 'getFormTypeOption') ? $field->getFormTypeOption('choices') : null;
+        if (!\is_array($choices)) {
+            return [];
+        }
+
+        $labels = [];
+        $walk = static function (array $choices) use (&$walk, &$labels): void {
+            foreach ($choices as $label => $stored) {
+                if (\is_array($stored)) {
+                    $walk($stored);
+                    continue;
+                }
+                if ($stored instanceof \UnitEnum) {
+                    $stored = NativeEnum::id($stored);
+                }
+                if (\is_scalar($stored) && \is_string($label) && '' !== $label) {
+                    $labels[(string) $stored] ??= $label;
+                }
+            }
+        };
+        $walk($choices);
+
+        return $labels;
+    }
+
+    /**
+     * The words a list or a detail page prints for a PHP enum's case: the
+     * ones its select shows in the form (Base\Form\Common\NativeEnum::label():
+     * what the enum says itself when it is translatable, else its key in the
+     * "enums" domain, else its name made readable). The cell printed the
+     * stored value with a capital - "Pending" beside a form saying "En
+     * attente".
+     *
+     * $value is a case, or what a column stores of one when $enumClass names
+     * the enum. Null for anything else: the template keeps its own label
+     * (a field's choices, an omnibase EnumType through trans_enum).
+     */
+    public function adminEnumLabel(Environment $twig, mixed $value, ?string $enumClass = null): ?string
+    {
+        if (!$value instanceof \UnitEnum) {
+            $value = NativeEnum::is($enumClass) ? NativeEnum::of($enumClass, $value) : null;
+        }
+        if (null === $value) {
+            return null;
+        }
+
+        // The translator the templates' |trans uses, whatever the host
+        // application wires behind it.
+        $translator = $twig->hasExtension(TranslationExtension::class) ? $twig->getExtension(TranslationExtension::class)->getTranslator() : null;
+
+        return NativeEnum::label($value, $translator);
     }
 
     /**
