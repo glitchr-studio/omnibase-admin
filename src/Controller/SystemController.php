@@ -9,6 +9,7 @@ use Base\Admin\Layout\PageCustomization;
 use Base\Admin\Menu\MenuBuilder;
 use Base\Admin\Settings\SettingsSectionInterface;
 use Base\Admin\Settings\SettingsSections;
+use Base\Database\Attribute\Vault;
 use Base\Field\Type\PasswordType;
 use Base\Form\Type\LayoutSettingListType;
 use Base\Repository\Layout\SettingRepository;
@@ -141,6 +142,16 @@ class SystemController extends AbstractController
 
         $form = $this->createForm(LayoutSettingListType::class, null, ['fields' => $fields]);
         $form->handleRequest($request);
+
+        // The keys typed here are sealed by omnibase's #[Vault], which refuses
+        // to store them in clear: without the environment's key pair, say so
+        // before anything is saved rather than fail in the middle of a flush.
+        $vault = new Vault();
+        if ($form->isSubmitted() && $form->isValid() && method_exists($vault, 'canSeal') && !$vault->canSeal()) {
+            $this->addFlash('danger', new TranslatableMessage('flash.vault_key_missing', ['%command%' => 'php bin/console secrets:generate-keys --env='.$this->getParameter('kernel.environment')], 'admin'));
+
+            return $this->renderSystemPage('apikey', $form->createView());
+        }
 
         if ($form->isSubmitted() && $form->isValid()) {
             $data = array_filter($form->getData(), function ($value, $key) use ($fields) {

@@ -190,6 +190,7 @@ flash:
     deleted: L'élément a été supprimé.
     batch_deleted: Les éléments sélectionnés ont été supprimés.
     not_deletable: "Cet élément est encore utilisé : il n'a pas été supprimé."
+    vault_key_missing: "Ces clés n'ont pas été enregistrées : cet environnement n'a pas de paire de clés pour les sceller, et elles ne sont jamais stockées en clair. Lancez %command% sur le serveur (voir glitchr/omnibase, docs/20-architecture/vault.md), puis enregistrez de nouveau."
 
 filters:
     apply: Appliquer

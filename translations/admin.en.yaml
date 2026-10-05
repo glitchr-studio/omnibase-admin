@@ -190,6 +190,7 @@ flash:
     deleted: The item has been deleted.
     batch_deleted: The selected items have been deleted.
     not_deletable: This item is still in use, so it was not deleted.
+    vault_key_missing: "These keys were not saved: this environment has no key pair to seal them with, and they are never stored in clear. Run %command% on the server (see glitchr/omnibase, docs/20-architecture/vault.md), then save again."
 
 filters:
     apply: Apply
