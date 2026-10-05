@@ -167,3 +167,27 @@ CRUD registered for that class, else to the one of the nearest parent class:
 omnibase registers its users' CRUD against `Base\Entity\User`, which the
 application's `User` extends. (With no fallback the entry was printed without
 an address, `href="#"`.)
+
+## A record's address
+
+A record is linked by the first readable identifier it **stores**, else by
+its id: `/admin/articles/petit-cours`, `/admin/users/14`.
+
+```yaml
+# config/packages/admin.yaml
+admin:
+    url_identifier:
+        fields: [slug, uuid]                  # the default, in order; []: always the id
+        entities:
+            App\Entity\User: [username]
+```
+
+A field counts only when it is a column of the entity: the address has to be
+looked up again, and the lookup queries columns. An entity whose `getSlug()`
+is computed - made from the title at each call, or read from a translation -
+is linked by its id: the address made of the computed slug answered 404
+(`/admin/scholars/publications/2/edit` redirected to it). To give such an
+entity a readable address, store the slug (`#[Slugify]` on a column).
+
+An address by id keeps working for every record, and a GET by an identifier
+that is not the canonical one is redirected to it.
