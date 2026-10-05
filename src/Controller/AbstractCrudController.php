@@ -24,6 +24,8 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Contracts\Service\Attribute\Required;
+use Symfony\Contracts\Translation\TranslatableInterface;
+use Symfony\Contracts\Translation\TranslatorInterface;
 use Base\Admin\Router\AdminRouteRegistry;
 
 /**
@@ -67,6 +69,14 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         $this->layoutStore = $layoutStore;
         $this->routeRegistry = $routeRegistry;
         $this->pageCustomization = $pageCustomization;
+    }
+
+    protected ?TranslatorInterface $labelTranslator = null;
+
+    #[Required]
+    public function setLabelTranslator(?TranslatorInterface $translator = null): void
+    {
+        $this->labelTranslator = $translator;
     }
 
     /**
@@ -963,11 +973,50 @@ abstract class AbstractCrudController extends AbstractController implements Crud
 
     protected function getCrudConfig(string $pageName, string $actionName): Crud
     {
-        $crud = $this->buildCrudConfig($pageName, $actionName);
+        $crud = $this->translateCrudLabels($this->buildCrudConfig($pageName, $actionName));
 
         $this->adminContext
             ->setCrudControllerFqcn(static::class)
             ->setCrud($crud);
+
+        return $crud;
+    }
+
+    /**
+     * The words of the page's config: a label, a page title or a help given
+     * as a translation key that names its domain ('@agenda.admin.event.plural')
+     * or as a TranslatableInterface is translated here, once, for every
+     * template that prints it - the list's title printed the key itself.
+     * Plain words ('Journaux') are left as they are.
+     */
+    protected function translateCrudLabels(Crud $crud): Crud
+    {
+        $words = function (mixed $label): mixed {
+            if (null === $this->labelTranslator) {
+                return $label;
+            }
+            if ($label instanceof TranslatableInterface) {
+                return $label->trans($this->labelTranslator);
+            }
+            if (\is_string($label) && str_starts_with($label, '@')) {
+                $translated = $this->labelTranslator->trans($label);
+
+                return '' !== $translated ? $translated : $label;
+            }
+
+            return $label;
+        };
+
+        $crud->setEntityLabelInSingular($words($crud->getEntityLabelInSingular()));
+        $crud->setEntityLabelInPlural($words($crud->getEntityLabelInPlural()));
+        foreach ([Crud::PAGE_INDEX, Crud::PAGE_DETAIL, Crud::PAGE_NEW, Crud::PAGE_EDIT] as $page) {
+            if (null !== $title = $crud->getPageTitle($page)) {
+                $crud->setPageTitle($page, $words($title));
+            }
+            if (null !== $help = $crud->getHelp($page)) {
+                $crud->setHelp($page, $words($help));
+            }
+        }
 
         return $crud;
     }
