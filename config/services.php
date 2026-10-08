@@ -86,6 +86,13 @@ return function (ContainerConfigurator $configurator) {
         ->args([service(AdminUrlGenerator::class), service(\Base\Field\FieldValueResolver::class), service(AdminRouteRegistry::class), service(AdminContext::class), service(\Base\Admin\Security\CrudAccessChecker::class), service('router'), service_closure(\Base\Admin\Menu\MenuBuilder::class), service('security.helper')->nullOnInvalid()])
         ->tag('twig.extension');
 
+    // admin_entity_name(): the entity's translated name ("entities" domain),
+    // or its class name in plain words - the CRUD pages' title when
+    // configureCrud() set no label.
+    $services->set(\Base\Admin\Twig\EntityNameTwigExtension::class)
+        ->args([service(\Base\Service\TranslatorInterface::class)->nullOnInvalid()])
+        ->tag('twig.extension');
+
     // The registry: its URL prefix (/admin) - every path under it is an admin page.
     $services->set(\Base\Admin\EventSubscriber\NestHeaderSubscriber::class)
         ->args([service(AdminRouteRegistry::class)])

@@ -4,7 +4,7 @@
    drops the entity + "#id" to the subtitle, the same shape detail uses.
    page.edit_named / page.edit are still used for the browser tab. #}
 {% block page_title %}
-    {%- set _entityLabel = crud.entityLabelInSingular ?? crud.entityFqcn|split('\\')|last -%}
+    {%- set _entityLabel = crud.entityLabelInSingular ?? admin_entity_name(crud.entityFqcn) -%}
     {%- set _record = admin_display(entity)|trim -%}
     {{- _record and _record != _entityLabel
         ? 'page.edit_named'|trans({'%name%': _record}, 'admin')

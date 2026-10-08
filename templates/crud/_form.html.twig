@@ -8,7 +8,7 @@
    the form footer - form="admin-form" targets them at the form by id
    regardless of where they sit in the document. #}
 {% block content_header %}
-{% set _entityLabel = crud.entityLabelInSingular ?? crud.entityFqcn|split('\\')|last %}
+{% set _entityLabel = crud.entityLabelInSingular ?? admin_entity_name(crud.entityFqcn) %}
 {# The same editable heading index/detail use, rather than a plain <h1>:
    the form pages were the only ones without the entity icon or an editable
    title. On NEW there is no record yet, so the heading is just the entity -

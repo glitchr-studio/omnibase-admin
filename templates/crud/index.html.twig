@@ -1,6 +1,6 @@
 {% extends '@Admin/layout.html.twig' %}
 
-{% block page_title %}{{ crud.entityLabelInPlural ?? crud.entityFqcn|split('\\')|last }}{% endblock %}
+{% block page_title %}{{ crud.entityLabelInPlural ?? admin_entity_name(crud.entityFqcn, true) }}{% endblock %}
 
 {% block content_header %}
 {# Same selected-menu-item resolution as page/system.html.twig's own
@@ -34,7 +34,7 @@
         stored: crud_page ?? null,
         fallbackTitle: (_current and _current.labelCustomized)
             ? _current.label|trans({}, 'admin')
-            : (crud.pageTitle('index') ?? crud.entityLabelInPlural ?? crud.entityFqcn|split('\\')|last),
+            : (crud.pageTitle('index') ?? crud.entityLabelInPlural ?? admin_entity_name(crud.entityFqcn, true)),
     } only %}
     {# data-action-row marks this as reorderable in customize mode (see
        layout.html.twig's drag handler); the stored order is applied below.

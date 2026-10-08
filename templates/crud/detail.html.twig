@@ -1,6 +1,6 @@
 {% extends '@Admin/layout.html.twig' %}
 
-{% set _entityLabel = crud.entityLabelInSingular ?? crud.entityFqcn|split('\\')|last %}
+{% set _entityLabel = crud.entityLabelInSingular ?? admin_entity_name(crud.entityFqcn) %}
 {# admin_display() is the entity's own label (Thread::__toString() -> its
    title); it degrades to "ClassName #id" for an entity with no __toString,
    which is why the record shape is only used when it yields something

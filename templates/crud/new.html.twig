@@ -5,4 +5,4 @@
    admin page title. It used to print "Nouveau %entity%", which is wrong
    French before a vowel ("Nouvel Article") and duplicated what the Créer
    button already says. #}
-{% block page_title %}{{ crud.entityLabelInSingular ?? crud.entityFqcn|split('\\')|last }}{% endblock %}
+{% block page_title %}{{ crud.entityLabelInSingular ?? admin_entity_name(crud.entityFqcn) }}{% endblock %}
