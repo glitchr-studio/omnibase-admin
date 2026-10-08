@@ -125,8 +125,7 @@
            box-shadow it reads as an open dropdown panel flashing across
            the top (reported live). The border-bottom alone carries the
            separation for that brief window. #}
-        html.loading .admin-topbar,
-        html.progress-bar-active .admin-topbar { box-shadow: none; }
+        html.loading .admin-topbar { box-shadow: none; }
         .topbar-search { flex: 1; max-width: 420px; display: flex; align-items: center; gap: .5rem; padding: .4rem .8rem; border: 1px solid var(--admin-border);
                          border-radius: 999px; background: var(--admin-surface); color: var(--admin-muted); }
         .topbar-search i { flex: 0 0 auto; }
@@ -3173,7 +3172,7 @@
                sticky topbar. Must come AFTER the transparent.css <link> -
                same specificity, cascade order is what makes this override
                win. #}
-            html.progress-bar-native.ready:not(.first).progress-bar-active body::before {
+            html.progress-bar-native.ready:not(.first).loading body::before {
                 position: absolute;
             }
         </style>

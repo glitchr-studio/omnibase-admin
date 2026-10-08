@@ -1,3 +1,4 @@
+/*! @glitchr/transparentjs 3.0.29 - github.com/glitchr-studio/transparentjs 0e87a61, src/css/index.scss copied as it is (plain CSS). Do not edit: change the library, then copy it again (public/js/README.md). */
 
 img[data-src] { transition:all 0.25s ease !important; }
 img[data-src]:not(.loaded) {
@@ -134,7 +135,14 @@ html.nested { overflow: hidden; }
 	flex-direction: column;
 	background: #fff;
 	border-radius: 10px;
-	overflow: hidden;
+	/* visible, not hidden, so .transparent-nest-chrome can sit just ABOVE
+	   this box's top-right corner instead of inside it - see that rule.
+	   The clipping this used to provide has not been lost, only moved one
+	   level down: .transparent-nest-body already has its own
+	   overflow:hidden and now inherits this radius, and it is the element
+	   that actually wraps the iframe, so the rounded corners still cut the
+	   nested page exactly as before. */
+	overflow: visible;
 	box-shadow: 0 20px 60px rgba(0, 0, 0, .35), 0 2px 8px rgba(0, 0, 0, .2);
 	/* The panel's own entrance/close motion (moved here from the backdrop -
 	   see #transparent-nest above for why): starts very slightly scaled
@@ -202,19 +210,107 @@ html.nested { overflow: hidden; }
    whole class of backdrop-filter recomposite glitch at zero visual cost -
    the glass treatment stays exactly where it was praised, on the spinner
    body below. */
+/* A floating corner cluster, not a title bar. This used to be a full-width
+   40px band across the top of the panel, which cost 40px of the nested
+   page's height and read as a heavy chrome strip above content that already
+   has its own header.
+
+   It is now taken out of flow entirely (position:absolute), so the nested
+   page gets the panel's full height, and parked just OUTSIDE the panel's
+   top-right corner - `bottom:100%` puts it in the backdrop gap ABOVE the
+   window rather than on top of the page inside it. That placement is the
+   whole point: dropped inside the corner these three buttons landed exactly
+   on the nested admin's own header controls (measured live: cluster at
+   x 1284-1376 against the admin's theme/locale/move icons at x 1271-1361)
+   and would have swallowed clicks meant for them.
+
+   It carries its own translucent pill at all times rather than only on
+   hover, because it no longer has a bar behind it: it floats over whatever
+   the backdrop happens to be showing (a blurred page, or - once docked -
+   the live host page, which may be any colour), and a bare icon has no
+   guaranteed contrast there. Hover just deepens it. */
 .transparent-nest-chrome {
-	flex: 0 0 auto;
+	position: absolute;
+	top: 0;              /* fallback anchor for the fullscreen/docked states below */
+	right: 0;
+	left: auto;
+	width: auto;
+	height: auto;
+	z-index: 6;          /* above .transparent-nest-handle (5) so the corner stays clickable */
 	display: flex;
 	align-items: center;
 	justify-content: flex-end;
-	gap: 4px;
-	height: 40px;
-	padding: 0 6px;
-	background: #f6f7f9;
-	border-bottom: 1px solid rgba(0, 0, 0, .08);
+	gap: 2px;
+	padding: 3px;
+	border-radius: 9px;
+	background: rgba(15, 18, 22, .55);
+	-webkit-backdrop-filter: blur(6px);
+	backdrop-filter: blur(6px);
+	box-shadow: 0 2px 8px rgba(0, 0, 0, .25);
+	/* Visible from the moment the panel opens. Everywhere but fullscreen
+	   this pill floats in the backdrop gap ABOVE the panel (see the rule
+	   right below), where it covers nothing of the nested page - there is
+	   nothing to hide it FOR, and chrome you have to discover by hovering
+	   is worse than chrome that is simply there.
+
+	   Fullscreen is the exception, and the only state the corner peek in
+	   transparent.js applies to: no gap is left to float into, so the pill
+	   falls back inside the corner on top of whatever the nested page keeps
+	   there, and it stays hidden until the pointer dwells in that corner.
+	   `pointer-events:none` is the load-bearing half of that hidden state -
+	   an opaque pill parked over the nested page's own controls would
+	   otherwise eat their clicks even while invisible. Shown, it takes them
+	   back. */
+	opacity: 1;
+	pointer-events: auto;
+	transition: opacity .18s ease, background .15s ease, box-shadow .15s ease;
 }
+#transparent-nest.is-full .transparent-nest-chrome {
+	opacity: 0;
+	pointer-events: none;
+}
+#transparent-nest.is-full.is-chrome-peek .transparent-nest-chrome,
+#transparent-nest.is-full .transparent-nest-chrome:focus-within {
+	opacity: 1;
+	pointer-events: auto;
+}
+/* Float above the window in every state that still looks like a window -
+   the pristine centered default AND a panel merely moved/resized away from
+   it. That second case used to be excluded by `:not(.is-docked)`, but
+   .is-docked is set by ANY move (it is what drops the modal backdrop), so
+   dragging the panel an inch dropped the cluster back inside the corner,
+   on top of the nested page's own controls - the exact collision floating
+   it exists to avoid. The states that genuinely have nowhere to float are
+   named explicitly instead: fullscreen (no backdrop gap), an edge dock
+   (repositioned for the grab tab by the [data-dock-edge] rules further
+   down), a container dock (the panel lives inside a host element), and
+   .is-chrome-inside - set from transparent.js when the panel sits too
+   close to the top of the viewport for the cluster to fit above it. */
+#transparent-nest:not(.is-full):not(.is-container-docked):not(.is-chrome-inside):not([data-dock-edge]) .transparent-nest-chrome {
+	top: auto;
+	bottom: 100%;
+	margin-bottom: 6px;
+}
+.transparent-nest-chrome:hover,
+.transparent-nest-chrome:focus-within {
+	background: rgba(15, 18, 22, .82);
+	box-shadow: 0 4px 14px rgba(0, 0, 0, .35);
+}
+/* Fullscreen is the one state with no backdrop gap to float into - the
+   panel IS the viewport - so the cluster falls back inside the corner, on
+   top of whatever the nested page keeps there.
+
+   This used to offset the body by the cluster's height to keep that corner
+   clear, which was the right answer while the cluster was always visible -
+   but it reserved a full-width strip that read as the title bar coming
+   back, just white and empty. The corner peek makes it unnecessary: the
+   pill is click-through and invisible until the pointer dwells in that
+   corner, so it costs the nested page nothing until it is actually wanted. */
+#transparent-nest.is-full .transparent-nest-chrome { top: 3px; right: 3px; }
 @media (prefers-color-scheme: dark) {
-	.transparent-nest-chrome { background: #26292e; border-bottom-color: rgba(255, 255, 255, .08); }
+	.transparent-nest-chrome { background: rgba(0, 0, 0, .6); }
+	.transparent-nest-chrome:hover,
+	.transparent-nest-chrome:focus-within { background: rgba(0, 0, 0, .85); }
 }
 .transparent-nest-btn {
 	appearance: none;
@@ -227,17 +323,16 @@ html.nested { overflow: hidden; }
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	color: #444;
+	/* Light in BOTH schemes now, not just dark: these no longer sit on a
+	   light bar, they sit on the chrome's own translucent dark pill (see
+	   .transparent-nest-chrome), so the old #444 was dark-on-dark. */
+	color: #f2f4f7;
 	font-size: 18px;
 	line-height: 1;
 }
-.transparent-nest-btn:hover { background: rgba(0, 0, 0, .06); }
+.transparent-nest-btn:hover { background: rgba(255, 255, 255, .18); }
 .transparent-nest-close { font-size: 20px; }
 .transparent-nest-share { font-size: 15px; }
-@media (prefers-color-scheme: dark) {
-	.transparent-nest-btn { color: #ddd; }
-	.transparent-nest-btn:hover { background: rgba(255, 255, 255, .08); }
-}
 
 /* Small loading indicator next to the chrome buttons - ONLY while the
    nested page's own transparentJS is mid-navigation INSIDE the iframe
@@ -253,41 +348,14 @@ html.nested { overflow: hidden; }
 	height: 14px;
 	margin-right: 4px;
 	border-radius: 50%;
-	border: 2px solid rgba(0, 0, 0, 0.15);
-	border-top-color: #444;
+	/* Light in both schemes, like .transparent-nest-btn: it sits on the
+	   chrome's dark pill, where the old #444 on a dark ring was invisible. */
+	border: 2px solid rgba(255, 255, 255, 0.25);
+	border-top-color: #f2f4f7;
 	animation: transparent-nest-spin 0.7s linear infinite;
 	align-self: center;
 }
 #transparent-nest.is-busy .transparent-nest-busy { display: inline-block; }
-@media (prefers-color-scheme: dark) {
-	.transparent-nest-busy { border-color: rgba(255, 255, 255, 0.2); border-top-color: #ddd; }
-}
-
-/* Wider alternative to the spinner above (Settings.nest_progress_bar,
-   default true - see transparent.js) - same .is-busy trigger, a full-
-   width bar along the chrome's own bottom edge instead of a small icon.
-   top:40px matches .transparent-nest-chrome's own fixed height (see that
-   rule above) - a sibling of the chrome bar rather than a child of it,
-   so it isn't clipped by anything the chrome's own flex row might do to
-   an internal child's overflow. Same gradient/animation as the admin
-   dashboard's own native top bar (transparent-nest-bar keyframes,
-   already defined below) for visual consistency between the two -
-   deliberately not shown at the same time as that one, see
-   nest_progress_bar's own doc comment for when a consumer turns this
-   off instead. */
-.transparent-nest-progress-bar {
-	display: none;
-	position: absolute;
-	top: 40px; left: 0;
-	height: 3px;
-	width: 100%;
-	z-index: 3;
-	background: linear-gradient(90deg, transparent, #2563eb, transparent);
-	background-size: 50% 100%;
-	background-repeat: no-repeat;
-	pointer-events: none;
-}
-#transparent-nest.is-busy .transparent-nest-progress-bar { display: block; animation: transparent-nest-bar 1s linear infinite; }
 
 /* ── Panel interactions: move / resize / magnetic snap ─────────────────
    The first drag "frees" the panel out of flex centering into explicit
@@ -314,68 +382,6 @@ html.nested { overflow: hidden; }
 #transparent-nest.is-full .transparent-nest-collapse { display: inline-flex; }
 #transparent-nest.is-full .transparent-nest-share,
 #transparent-nest.is-full .transparent-nest-dock-toggle { display: none; }
-
-/* ── Fullscreen: no chrome band ────────────────────────────────────────
-   Windowed, the 40px chrome earns its keep: it is the drag handle and it
-   carries share/dock/close. Fullscreen strips it to two buttons, so a
-   full-width bar was spending an entire 40px strip of a page the user
-   just asked to see as large as possible - and, being flex-in-flow, it
-   also shortened the iframe by exactly that much.
-
-   Take it out of flow and hug the top-right corner instead. The iframe
-   then gets the whole panel, and the controls sit on a soft triangular
-   scrim so they stay findable over whatever the nested page happens to
-   paint underneath. pointer-events are handed back to the buttons alone,
-   so the scrim never swallows a click meant for the content beneath it. */
-#transparent-nest.is-full .transparent-nest-chrome {
-	position: absolute;
-	top: 0;
-	right: 0;
-	left: auto;
-	width: auto;
-	height: auto;
-	padding: 7px 9px 0 0;
-	gap: 6px;
-	background: none;
-	border-bottom: 0;
-	z-index: 4;
-	pointer-events: none;
-}
-#transparent-nest.is-full .transparent-nest-chrome > * { pointer-events: auto; }
-
-/* The corner itself: a right-angled triangle filling the top-right, fading
-   out along its hypotenuse so it reads as a soft corner shadow rather than
-   a pasted-on shape. Sized so both buttons still sit over the opaque end of
-   the gradient rather than off the thin tip. */
-#transparent-nest.is-full .transparent-nest-chrome::before {
-	content: "";
-	position: absolute;
-	top: 0;
-	right: 0;
-	width: 118px;
-	height: 118px;
-	clip-path: polygon(100% 0, 0 0, 100% 100%);
-	background: linear-gradient(225deg, rgba(0, 0, 0, .34) 0%, rgba(0, 0, 0, .16) 55%, rgba(0, 0, 0, 0) 100%);
-	pointer-events: none;
-	z-index: -1;
-}
-
-/* The scrim is dark in both colour schemes (it sits over page content, not
-   over our own surface), so the icons go white in both rather than
-   inheriting the windowed #444/#ddd which would vanish against it. */
-#transparent-nest.is-full .transparent-nest-btn {
-	color: #fff;
-	text-shadow: 0 1px 2px rgba(0, 0, 0, .55);
-}
-#transparent-nest.is-full .transparent-nest-btn:hover {
-	background: rgba(255, 255, 255, .18);
-}
-
-/* The progress bar is a SIBLING of the chrome pinned at top:40px to sit on
-   the band's bottom edge (see its own rule above). With no band in
-   fullscreen that 40px would strand it in mid-air over the content, so
-   bring it back to the very top edge. */
-#transparent-nest.is-full .transparent-nest-progress-bar { top: 0; }
 /* A small "sidebar" pictograph (outline box + filled strip) for the dock
    button - reads as "dock to the side" independent of language, same
    language as e.g. a devtools/editor sidebar toggle icon. */
@@ -395,15 +401,28 @@ html.nested { overflow: hidden; }
 	width: 5px;
 	background: currentColor;
 }
-#transparent-nest.is-docked .transparent-nest-dock-toggle { color: #2563eb; }
-@media (prefers-color-scheme: dark) {
-	#transparent-nest.is-docked .transparent-nest-dock-toggle { color: #6ea8fe; }
-}
+/* Marks the dock toggle as the active state. The lighter blue is used in
+   BOTH schemes on purpose: this button only ever renders on the dark glass
+   pill (fullscreen and edge docks hide it entirely), and #2563eb - correct
+   against a light page - is close to unreadable there. */
+#transparent-nest.is-docked .transparent-nest-dock-toggle { color: #6ea8fe; }
+/* Closed, but kept mounted - see the park/resume block in transparent.js.
+   display:none (rather than removing the node) is the whole trick: pulling
+   an iframe out of the document tears its browsing context down and the
+   nested page would reload from scratch on the next open, losing whatever
+   was being typed into it. Hidden, it just stops being painted. */
+#transparent-nest.is-parked { display: none; }
 #transparent-nest.is-movable .transparent-nest-chrome { cursor: grab; }
 #transparent-nest.is-dragging .transparent-nest-chrome { cursor: grabbing; }
 /* the shield: without it the drag dies the instant the pointer crosses
-   into the iframe (its document eats the events) */
-#transparent-nest.is-dragging iframe { pointer-events: none; }
+   into the iframe (its document eats the events). .is-host-dragging is the
+   same shield armed on behalf of the HOST page - any of its own draggable
+   widgets (Symfony's dev toolbar, floating above this overlay, is the one
+   that surfaced it) would otherwise freeze mid-drag over the panel and
+   never receive its mouseup. See the host-drag-shield block in
+   transparent.js. */
+#transparent-nest.is-dragging iframe,
+#transparent-nest.is-host-dragging iframe { pointer-events: none; }
 #transparent-nest.is-dragging { user-select: none; -webkit-user-select: none; }
 
 /* Invisible resize zones along the panel's edges/corners, INSIDE the
@@ -477,7 +496,22 @@ html.nested { overflow: hidden; }
    close affordance in this collapsed state, by design. */
 #transparent-nest.is-docked[data-dock-edge] .transparent-nest-chrome {
 	position: absolute;
+	/* Exempt from the corner peek above: docked flush against an edge, this
+	   collapses to the grab tab, which is the ONLY control left in that
+	   state - the way back out. Hiding it until a corner hover would strand
+	   the panel with no visible affordance at all. It is also no longer a
+	   pill over the nested page here (background/shadow are dropped just
+	   below), so there is nothing to collide with. */
+	opacity: 1;
+	pointer-events: auto;
 	background: transparent;
+	/* the floating cluster's pill (see .transparent-nest-chrome) has to come
+	   off with its background here too, or the grab tab this state collapses
+	   down to would trail a blurred shadowed box around itself */
+	box-shadow: none;
+	-webkit-backdrop-filter: none;
+	backdrop-filter: none;
+	padding: 0;
 	border: 0;
 	padding: 0;
 }
@@ -507,6 +541,30 @@ html.nested { overflow: hidden; }
 .transparent-nest-grab:hover { background: #eef0f2; }
 #transparent-nest.is-dragging .transparent-nest-grab { cursor: grabbing; }
 #transparent-nest.is-docked[data-dock-edge] .transparent-nest-grab { display: flex; }
+/* ...and in the floating-cluster state it is the only draggable surface
+   left. The chrome's pointerdown handler deliberately bails on anything
+   inside a <button> (`e.target.closest('button')`), so that a click on
+   share/dock/close is never mistaken for a window drag - which was fine
+   while the chrome was a 40px full-width bar with plenty of bare space,
+   but leaves nothing to grab now that it has collapsed to just those three
+   buttons. Same element, re-styled small: a three-dot grip at the
+   cluster's leading edge rather than the big tab the docked edges use. */
+#transparent-nest:not(.is-full):not(.is-container-docked):not([data-dock-edge]) .transparent-nest-grab {
+	display: flex;
+	width: 16px;
+	height: 28px;
+	background: transparent;
+	border: 0;
+	border-radius: 6px;
+}
+#transparent-nest:not(.is-full):not(.is-container-docked):not([data-dock-edge]) .transparent-nest-grab:hover { background: rgba(255, 255, 255, .18); }
+#transparent-nest:not(.is-full):not(.is-container-docked):not([data-dock-edge]) .transparent-nest-grab::before {
+	width: 3px;
+	height: 3px;
+	border-radius: 50%;
+	background: rgba(255, 255, 255, .8);
+	box-shadow: 0 -5px 0 rgba(255, 255, 255, .8), 0 5px 0 rgba(255, 255, 255, .8);
+}
 @media (prefers-color-scheme: dark) {
 	.transparent-nest-grab { background: #26292e; border-color: rgba(255, 255, 255, .08); }
 	.transparent-nest-grab::before { background: rgba(255, 255, 255, .28); }
@@ -672,6 +730,11 @@ html.nested.nest-docked { overflow: visible; }
 	flex: 1 1 auto;
 	min-height: 0; /* required so the iframe's height:100% below actually shrinks inside this flex column */
 	overflow: hidden;
+	/* Took over the panel's corner clipping when that switched to
+	   overflow:visible (see .transparent-nest-panel). `inherit` rather than
+	   a literal 10px so the two can never drift, and so the fullscreen
+	   state - which squares the panel off - squares this off with it. */
+	border-radius: inherit;
 }
 
 /* mount() inserts the iframe (srcdoc set, fetch already resolved) BEFORE
@@ -757,8 +820,6 @@ html.nested.nest-docked { overflow: visible; }
 /* first-open feedback: progress cursor + slim animated top bar on the host */
 html.nest-loading, html.nest-loading body { cursor: progress; }
 html.nest-loading body::before {
-	display: block;
-	visibility: visible;
 	content: '';
 	position: fixed;
 	top: 0; left: 0;
@@ -788,56 +849,17 @@ html.nest-loading body::before {
    alone is deliberately NOT styled (would double up with nest-loading's
    own bar during a fresh nest open, and would fire for the very first
    page load too where `html.first` is also present and nothing should
-   show yet) - gated to fire only once the app is past its first paint.
-
-   Gated on `.progress-bar-active`, NOT `.loading` directly: reported live
-   as imperceptible - this beta environment's own navigations are fast
-   enough that `.loading` came and went inside a single ~15ms polling
-   tick, well under what a human eye registers. `.progress-bar-active` is
-   a separate class transparent.js adds alongside `.loading` but removes
-   on its OWN minimum-duration timer (see MIN_PROGRESS_BAR_MS there) - so
-   the underlying navigation/transition timing is completely untouched,
-   only this bar's own visible window is stretched. Thicker (4px, was
-   3px) and given its own drop-shadow for the same "easy to miss"
-   reason. */
-html.progress-bar-native.ready:not(.first).progress-bar-active body::before {
-	/* An unrelated inline <style> block (the @glitchr/breakpoints device
-	   probe, injected per-page for JS breakpoint detection) sets a bare
-	   `body:before { display:none; visibility:hidden; }` with no class
-	   gate. This rule outranks it on `content`/`background`/etc via
-	   specificity, but never touched `display`/`visibility` itself - so
-	   those two properties still fell through to the probe's rule and
-	   the bar computed correctly yet never painted. Must be re-declared
-	   here explicitly. */
-	display: block;
-	visibility: visible;
+   show yet) - gated to fire only once the app is past its first paint. */
+html.progress-bar-native.ready:not(.first).loading body::before {
 	content: '';
 	position: fixed;
 	top: 0; left: 0;
-	height: 4px;
+	height: 3px;
 	width: 100%;
 	z-index: 100001;
 	background: linear-gradient(90deg, transparent, #2563eb, transparent);
 	background-size: 50% 100%;
 	background-repeat: no-repeat;
-	/* drop-shadow, NOT box-shadow. box-shadow is cast by the element's
-	   BOX, and this element is the full width of the viewport (only its
-	   background paints a moving 50%-wide segment with transparent ends,
-	   via the background-position animation below). So the glow rendered
-	   as a static blue haze along the entire top edge, sitting there for
-	   the bar's whole visible window instead of travelling with it -
-	   reported live, twice. A filter drop-shadow is generated from the
-	   painted alpha channel rather than the box, so it follows the moving
-	   gradient and fades out with it at both ends. Keep the two in sync if
-	   the colour changes; the intent (make an easy-to-miss 4px bar
-	   noticeable) is unchanged. */
-	/* No shadow at all. A drop-shadow with zero offset glows in every
-	   direction, but this bar is flush against top:0 - the upward half is
-	   clipped off-screen, so all that can ever be seen is the downward
-	   half, which reads as a shadow hanging under the bar. Reported three
-	   times. Visibility is already handled by the 4px height and by
-	   MIN_PROGRESS_BAR_MS holding the bar on screen long enough to
-	   register; the glow only ever added the artefact. */
 	animation: transparent-nest-bar 1s linear infinite;
 }
 /* Same gap as the bar above, for the cursor: the nested overlay already
@@ -845,12 +867,10 @@ html.progress-bar-native.ready:not(.first).progress-bar-active body::before {
    a plain in-page navigation (link click, form submit) left the pointer
    looking exactly like it does when nothing is happening - the only
    feedback was the 3px top bar, easy to miss if your eyes are elsewhere. */
-/* No cursor:progress. It turned the pointer into the "busy" cursor on the
-   whole document for every single click - including plain button presses -
-   which reads as the app hanging rather than as feedback (reported live).
-   The 4px top bar and the per-button busy state (dim + spinner, see
-   layout.html.twig) already carry that signal without touching the cursor
-   the user is aiming with. */
+html.progress-bar-native.ready:not(.first).loading,
+html.progress-bar-native.ready:not(.first).loading body {
+	cursor: progress;
+}
 
 /* Opaque, not transparent: the nested page's own transparentJS instance
    does real DOM swaps while navigating internally (menu clicks, edit/save),

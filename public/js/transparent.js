@@ -1,3 +1,4 @@
+/*! @glitchr/transparentjs 3.0.29 - github.com/glitchr-studio/transparentjs 0e87a61, src/js/transparent.js copied as it is (LGPL-3.0-or-later). Do not edit: change the library, then copy it again (public/js/README.md). */
 // Modern browser: use passive event listeners where appropriate for better performance
 jQuery.event.special.touchstart = { setup: function( _, ns, handle ) { this.addEventListener("touchstart", handle, { passive: !ns.includes("noPreventDefault") }); } };
 jQuery.event.special.touchmove  = { setup: function( _, ns, handle ) { this.addEventListener("touchmove", handle, { passive: !ns.includes("noPreventDefault") }); } };
@@ -19,15 +20,22 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
 
     window.replaceHash = function(newHash, triggerHashChange = true, skipIfEmptyIdentifier = true) {
 
+        // The query string stays: rebuilding the address as origin + pathname
+        // + hash silently dropped it, so changing the fragment on
+        // "/list?page=3#item-12" rewrote the address to "/list#item-12" - the
+        // page still showed page 3 while the address claimed page 1, and any
+        // reload or shared link landed on the wrong page.
+        var base = location.origin + location.pathname + location.search;
+
         var oldHash = location.hash;
-        var oldURL = location.origin+location.pathname+location.hash;
+        var oldURL = base+location.hash;
         var oldHashElement = $(oldHash);
 
         if(!newHash) newHash = "";
         if (newHash !== "" && (''+newHash).charAt(0) !== '#')
             newHash = '#' + newHash;
 
-        var newURL = location.origin+location.pathname+newHash;
+        var newURL = base+newHash;
         var newHashElement = $(newHash);
 
         var fallback  = $(newHash).length === 0;
@@ -38,8 +46,8 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
             dispatchEvent(new HashChangeEvent("hashfallback", {oldURL:oldURL, newURL:newURL}));
             newHash = skipIfEmptyIdentifier && !newHash ? "" : (newHashElement.length == 0 ? "" : oldHash);
 
-            oldURL = location.origin+location.pathname+location.hash;
-            newURL = location.origin+location.pathname+newHash;
+            oldURL = base+location.hash;
+            newURL = base+newHash;
         }
 
         if(oldURL == newURL) return false;
@@ -71,6 +79,34 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
         return o;
     };
 
+    /* Scroll test for ONE node, no jQuery wrapper. The jQuery plugins below
+       are the public API and keep working exactly as before, but they cost a
+       $() allocation (two, since isScrollable calls both X and Y) for every
+       element they touch - which is fine per element and ruinous for
+       getScrollableElement, whose whole job is to test every element in the
+       document. Sharing one implementation here rather than open-coding it
+       there keeps the two from drifting apart.
+
+       Same short-circuit as the plugins: the cheap layout comparison decides
+       the answer for nearly every element, so getComputedStyle - by far the
+       expensive half - is only reached for the few that could actually
+       qualify. */
+    function isScrollableNode(node)
+    {
+        if (node === window || node === document) node = document.documentElement;
+        if (!node || node.nodeType !== 1) return false;
+
+        var isDom = node === document.documentElement;
+
+        if (node.scrollWidth > node.clientWidth
+            && (isDom || window.getComputedStyle(node).overflowX.indexOf('scroll') !== -1)) return true;
+
+        if (node.scrollHeight > node.clientHeight
+            && (isDom || window.getComputedStyle(node).overflowY.indexOf('scroll') !== -1)) return true;
+
+        return false;
+    }
+
     $.fn.isScrollable  = function()
     {
         for (let el of $(this).isScrollableX())
@@ -89,12 +125,27 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
             var el = this[i] === window ? document.documentElement : this[i];
             var isDom = el == document.documentElement;
 
-            var hasScrollableContent = el.scrollWidth > el.clientWidth;
+            // Cheap test first, and bail on it. The result is
+            // `hasScrollableContent && (isOverflowScroll || isDom)`, so an
+            // element with nothing to scroll can never qualify however it is
+            // styled - yet getComputedStyle() was being called for every one
+            // of them anyway.
+            //
+            // That matters because of who calls this: getScrollableElement()
+            // runs `$(el).find('*')` over the WHOLE document and tests every
+            // element, immediately after a page swap has inserted a fresh
+            // subtree. At ~1600 elements that was ~3200 getComputedStyle
+            // calls plus the layout flush they force, measured at 136.6ms of
+            // the swap's blocking task - the single most expensive phase in
+            // it, larger than every piece of transparentJS's own work
+            // combined. Almost none of those elements scroll.
+            //
+            // Same short-circuit for isDom: the documentElement qualifies on
+            // that flag alone, so its overflow never needed reading either.
+            if (!(el.scrollWidth > el.clientWidth)) return false;
+            if (isDom) return true;
 
-            var overflowStyle   = window.getComputedStyle(el).overflowX;
-            var isOverflowScroll = overflowStyle.indexOf('scroll') !== -1;
-
-            return hasScrollableContent && (isOverflowScroll || isDom);
+            return window.getComputedStyle(el).overflowX.indexOf('scroll') !== -1;
 
         }.bind(this));
     }
@@ -106,12 +157,12 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
             var el = this[i] === window ? document.documentElement : this[i];
             var isDom = el == document.documentElement;
 
-            var hasScrollableContent = el.scrollHeight > el.clientHeight;
+            // Same short-circuit as isScrollableX above - see that comment
+            // for why this one call site dominated the swap.
+            if (!(el.scrollHeight > el.clientHeight)) return false;
+            if (isDom) return true;
 
-            var overflowStyle   = window.getComputedStyle(el).overflowY;
-            var isOverflowScroll = overflowStyle.indexOf('scroll') !== -1;
-
-            return hasScrollableContent && (isOverflowScroll || isDom);
+            return window.getComputedStyle(el).overflowY.indexOf('scroll') !== -1;
 
         }.bind(this));
     }
@@ -176,6 +227,50 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
         "response_limit": 25,
         "throttle": 1000,
         "rescue_reload": 5000,
+        // ── Prefetch on intent ───────────────────────────────────────────
+        // Fetch a link's HTML when the pointer settles on it, so the server
+        // round-trip is already done (or well underway) by the time it is
+        // clicked. The existing response cache only ever helped Back: it is
+        // keyed by history uuid, so returning to a page you had already
+        // visited cost full price again - measured 2360ms for a first visit
+        // and 2301ms for a second visit to the SAME url, against 877ms for
+        // Back. Server time dominates a navigation, and this is the only
+        // lever that removes it rather than shortening what comes after.
+        //
+        // prefetch_delay is a dwell, not a debounce: sweeping the pointer
+        // across a list of links should not fire a request per link. 65ms is
+        // long enough to mean "aiming at this" and far shorter than the
+        // reaction time between deciding and clicking.
+        //
+        // prefetch_ttl bounds staleness. A prefetched page is HTML rendered
+        // before the click, so it can be out of date by the time it is used;
+        // short is safer, and a miss only costs a normal navigation.
+        //
+        // OPT-IN, link by link: only an anchor carrying rel="prefetch" is
+        // ever fetched ahead. A GET is not free of consequences on the
+        // server (a logout link IS a logout, a page render IS a page view in
+        // the analytics), and every fetch is a full render the visitor may
+        // never look at - so the page author names the few links worth it
+        // (a "next article" button, say) rather than the library guessing.
+        // "prefetch": false switches the whole mechanism off.
+        "prefetch": true,
+        "prefetch_delay": 65,
+        "prefetch_ttl": 30000,
+        "prefetch_max": 15,
+        // Milliseconds to hold `html.exiting` after the response arrives and
+        // before the DOM is swapped, so the outgoing page can animate away.
+        //
+        // 0 (off) by default, which is the behaviour every consumer had
+        // before this existed: the swap happens the moment the response
+        // lands. Turning it on trades that much added latency per navigation
+        // for an exit animation - and it is the ONLY window in which one can
+        // run, because the swap itself is a single blocking task and a
+        // transition started against it never gets a style commit.
+        //
+        // Plain milliseconds, not parseDuration(): that helper returns
+        // seconds for "200ms" but milliseconds for a bare 5000, which is not
+        // a distinction to hang a timing API on.
+        "exit_duration": 0,
         "identifier": "#page",
         "loader": "#loader",
         "smoothscroll_duration": "200ms",
@@ -196,14 +291,6 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
         "nest_move": true,
         "nest_resize": true,
         "nest_snap": true,
-        // Full-width bar across the chrome, replacing the small spinner
-        // (.transparent-nest-busy) - same .is-busy signal (mirrored from
-        // the nested page's own html.loading), just a wider indicator.
-        // Set false when the nested content already shows its OWN loading
-        // feedback (e.g. the admin dashboard's native top progress bar,
-        // see transparent.css) - two bars for the same "navigating inside
-        // the nest" moment would double up.
-        "nest_progress_bar": true,
         // For resize (its own separate flush-to-edge clamp): how close
         // counts as close enough. For dock (see nest_dock below): how far
         // PAST the viewport boundary counts as genuinely "pushed out" -
@@ -235,6 +322,38 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
         // default) disables this - docking then always floats.
         "nest_dock_target": null,
         "nest_swipe": true,
+        // nest_keepalive: closing the overlay PARKS the nested session
+        // (hidden, still mounted) instead of destroying it, and the next
+        // open of that same page resumes it exactly as it was left - a
+        // half-filled form, an editor mid-edit, the scroll position. Only
+        // one session is ever parked; opening a different page discards it.
+        // Set false to go back to tearing the iframe down on every close.
+        "nest_keepalive": true,
+        // nest_remember: the panel's LAYOUT - where the user put it, how big
+        // they made it, whether they docked it and against which edge -
+        // survives the close and comes back on the next open. Unlike
+        // nest_keepalive, which preserves the nested SESSION in memory and
+        // therefore only lasts as long as the host document, this is written
+        // to localStorage: a reload, a new tab, tomorrow morning, all reopen
+        // the panel where it was left.
+        //
+        // Two states are deliberately NOT remembered, because restoring them
+        // would make the next open look broken rather than familiar:
+        //   - fullscreen (is-full), which is not a panel geometry at all but
+        //     a commitment of the address bar to the nested page's own URL;
+        //     silently re-entering it on open would navigate, not restore.
+        //   - tucked-away (is-hidden), where the panel is pushed off-screen
+        //     with only its grab tab showing - reopening into it would look
+        //     exactly like clicking the link did nothing.
+        // Both fall back to the state underneath them (default / docked).
+        //
+        // Below the mobile breakpoint the panel is always fullscreen and none
+        // of this applies, so nothing is read or written there either - a
+        // phone visit can't overwrite what was set up on a desktop.
+        "nest_remember": true,
+        // Storage key for the above. Worth changing only when one origin
+        // hosts several independent nests that should not share a layout.
+        "nest_remember_key": "transparent[nest][layout]",
         // headlock: list of URL substrings or regex patterns to preserve in
         // <head> across page transitions (e.g. third-party widgets that
         // inject <style>/<link> dynamically). Anything matching is treated
@@ -319,6 +438,17 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
         POPSTATE   : "popstate",
         HASHCHANGE : "hashchange",
         CLICK      : "click",
+
+        // Set once the response is in hand but BEFORE the DOM is swapped, and
+        // held for Settings.exit_duration so the outgoing page has a window in
+        // which it can still animate. Off (0) by default - see exit_duration.
+        //
+        // Deliberately its own state rather than reusing `new`: `new` is only
+        // added when isKnownLayout() is false, i.e. the first time a layout is
+        // seen in a session, so CSS keyed on it animates once and then quietly
+        // stops. That is a trap worth naming - it looks correct in testing and
+        // fails on the second visit.
+        EXITING    : "exiting",
 
         PREACTIVE  : "pre-active",
         ACTIVEIN   : "active-in",
@@ -589,6 +719,185 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
         Transparent._liveDomCache.clear();
     };
 
+    // ── Prefetch cache, keyed by URL ────────────────────────────────────
+    // Deliberately separate from the uuid-keyed caches above. Those answer
+    // "what did THIS history entry look like", which is the right question
+    // for Back and the wrong one for "am I about to be asked for this page".
+    // A url key is what lets a prefetch started on hover be claimed by the
+    // click that follows, and what lets a second visit to a page skip the
+    // server entirely.
+    Transparent._prefetchCache = new Map();
+    // href -> { xhr, waiters:[] }. A Set until claimPrefetch() needed a
+    // handle on the request itself, so a click can adopt a prefetch that is
+    // still on the wire instead of racing it with a duplicate GET.
+    Transparent._prefetchInFlight = new Map();
+
+    Transparent.getPrefetched = function(href) {
+
+        var entry = Transparent._prefetchCache.get(href);
+        if (!entry) return null;
+
+        var ttl = parseInt(Settings["prefetch_ttl"], 10) || 0;
+        if (ttl > 0 && Date.now() - entry.ts > ttl) {
+            Transparent._prefetchCache.delete(href);
+            return null;
+        }
+
+        return entry.text;
+    };
+
+    Transparent.setPrefetched = function(href, text) {
+
+        if (!href || !text) return;
+        Transparent._prefetchCache.set(href, { text: text, ts: Date.now() });
+
+        var max = parseInt(Settings["prefetch_max"], 10) || 15;
+        while (Transparent._prefetchCache.size > max) {
+            var oldest = Transparent._prefetchCache.keys().next().value;
+            Transparent._prefetchCache.delete(oldest);
+        }
+    };
+
+    Transparent.clearPrefetched = function() {
+        Transparent._prefetchCache.clear();
+    };
+
+    // GET a page in the background and park its HTML under its url. Never
+    // throws and never reports: a prefetch that fails is simply a click that
+    // pays full price later, which is the behaviour without prefetch at all.
+    Transparent.prefetch = function(href) {
+
+        if (Settings["prefetch"] === false) return;
+        if (!href) return;
+        if (Transparent._prefetchCache.has(href)) return;
+        if (Transparent._prefetchInFlight.has(href)) return;
+        // Two at a time. A slow backend is exactly the case prefetch helps
+        // most and also the one where a hover-storm could pile requests onto
+        // an already-struggling server.
+        if (Transparent._prefetchInFlight.size >= 2) return;
+
+        var request = new XMLHttpRequest();
+        // The entry holds the request and anyone waiting on it, not just the
+        // url - see claimPrefetch() below for why that matters.
+        var entry = { xhr: request, waiters: [] };
+        Transparent._prefetchInFlight.set(href, entry);
+
+        request.open("GET", href, true);
+        // Marks it as a speculative fetch so a backend can tell it apart from
+        // a real navigation (skip write-side effects, analytics, etc.).
+        request.setRequestHeader("X-Purpose", "prefetch");
+        request.setRequestHeader("Purpose", "prefetch");
+
+        request.onreadystatechange = function() {
+
+            if (request.readyState !== 4) return;
+            Transparent._prefetchInFlight.delete(href);
+
+            var text = (request.status >= 200 && request.status < 300) ? request.responseText : null;
+            if (text) Transparent.setPrefetched(href, text);
+
+            // Hand the result to whoever claimed this prefetch mid-flight.
+            // A null text means it failed or was aborted; the waiter then
+            // falls back to a real request of its own, which is exactly the
+            // behaviour it would have had with no prefetch running.
+            var waiters = entry.waiters;
+            entry.waiters = [];
+            for (var i = 0; i < waiters.length; i++) {
+                try { waiters[i](text); } catch (e) {}
+            }
+        };
+
+        try { request.send(); }
+        catch (e) { Transparent._prefetchInFlight.delete(href); }
+    };
+
+    // "I am navigating to href right now - is a prefetch of it already on
+    // the wire?" Returns the in-flight XHR (and calls back with its HTML, or
+    // null if it fails) when there is one, null otherwise.
+    //
+    // Without this, hovering a link and clicking it before the prefetch
+    // lands fired a SECOND, identical GET: getPrefetched() only ever looked
+    // in the finished-responses cache, so an in-flight prefetch was
+    // invisible to the click that caused it. Measured on beta with the
+    // article PREV/NEXT buttons, that is two full renders of the same page
+    // back to back (2070ms + 1924ms) - the user waits for the second one
+    // while the first is still being thrown away, and the server does the
+    // work twice. Any link slower to render than the eye is quick to click
+    // hits this, which is why it looked like "it sends a new request instead
+    // of going the lazy way".
+    Transparent.claimPrefetch = function(href, onSettled) {
+
+        var entry = Transparent._prefetchInFlight.get(href);
+        if (!entry) return null;
+
+        entry.waiters.push(onSettled);
+
+        return entry.xhr;
+    };
+
+    // May this anchor be fetched before it is clicked? Only when its author
+    // said so (rel="prefetch"), and only if the click would be a plain GET
+    // navigation to another page of this site. Conservative on purpose: a
+    // wrong "yes" is at best a wasted render, at worst a side effect the
+    // user never asked for.
+    function isPrefetchable(a) {
+
+        if (!a || !a.getAttribute) return false;
+        if (!/(^|\s)prefetch(\s|$)/.test(a.getAttribute("rel") || "")) return false;
+        if (a.hasAttribute("download")) return false;
+
+        var target = a.getAttribute("target");
+        if (target && target !== "_self") return false;
+
+        var href = a.getAttribute("href");
+        if (!href || href.charAt(0) === "#") return false;
+
+        var url;
+        try { url = new URL(a.href, location.href); } catch (e) { return false; }
+
+        if (url.origin !== location.origin) return false;
+        if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+        // Same page - nothing to fetch.
+        if (url.href.split("#")[0] === location.href.split("#")[0]) return false;
+
+        var exceptions = Settings["exceptions"] || [];
+        if (exceptions.length && matchesPatternList(url.pathname, exceptions)) return false;
+
+        // Nest links open as an overlay through their own path; the main
+        // navigation cache is not what serves them.
+        var nest = Settings["nest"] || [];
+        if (nest.length && matchesPatternList(url.pathname, nest)) return false;
+
+        return true;
+    }
+
+    var prefetchTimer = null;
+
+    function onPrefetchIntent(e) {
+
+        if (Settings["prefetch"] === false) return;
+
+        var a = e.target && e.target.closest ? e.target.closest("a[href]") : null;
+        if (!isPrefetchable(a)) return;
+
+        var href = new URL(a.href, location.href).href;
+
+        clearTimeout(prefetchTimer);
+        prefetchTimer = setTimeout(function() { Transparent.prefetch(href); },
+                                   parseInt(Settings["prefetch_delay"], 10) || 0);
+    }
+
+    document.addEventListener("mouseover", onPrefetchIntent, true);
+    document.addEventListener("mouseout", function() { clearTimeout(prefetchTimer); }, true);
+    // Touch has no hover, but touchstart still lands ~100ms before the click
+    // it becomes - enough to overlap the request with the tap. No dwell here:
+    // a finger already on the link IS the intent.
+    document.addEventListener("touchstart", function(e) {
+        if (Settings["prefetch"] === false) return;
+        var a = e.target && e.target.closest ? e.target.closest("a[href]") : null;
+        if (isPrefetchable(a)) Transparent.prefetch(new URL(a.href, location.href).href);
+    }, { capture: true, passive: true });
+
     Transparent.setResponse = function(uuid, responseText, scrollableXY, exceptionRaised = false)
     {
         // Populate live-DOM cache FIRST while we still have the node.
@@ -758,12 +1067,11 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
     // Drop every cached page. Called after a write goes through, because each
     // snapshot is HTML captured BEFORE it: Back replays one verbatim, with the
     // form's pre-edit field values and a CSRF token the session still accepts,
-    // so saving from a replayed page would write the old record back over the
-    // new one. Reported live - an article edited in the back-office, then the
-    // page behind it still showed the previous version until a refresh. The
-    // whole cache goes rather than one entry because a write is rarely
-    // confined to the page that made it (a list, a count, a sidebar); the
-    // cost of being wrong is one refetch.
+    // so saving from a replayed page writes the old record back over the new
+    // one. Reported live - an article edited, then Back showed the previous
+    // version. The whole cache goes rather than one entry because a write is
+    // rarely confined to the page that made it (a list, a count, a sidebar);
+    // the cost of being wrong is one refetch.
     Transparent.invalidateResponses = function() {
 
         try {
@@ -833,7 +1141,8 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
         window.previousScroll = {top: scrollTop, left: scrollLeft};
 
         if($(Transparent.html).hasClass(Transparent.state.FIRST)) {
-            Transparent.scrollToHash(location.hash, {}, function() {
+            // A reload already went back to where the page was left.
+            Transparent.scrollToHash(reloadRestored ? "" : location.hash, {}, function() {
                 Transparent.activeOut(() => Transparent.html.removeClass(Transparent.state.FIRST));
             });
         }
@@ -860,6 +1169,76 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
         return layout.data("layout");
     }
 
+    /**
+     * Why the browser refuses a form: each invalid control as "name: message".
+     *
+     * "Invalid form submission." on its own said nothing about WHICH field,
+     * and the browser's own bubble is easily missed - it appears at the
+     * control, which may be off screen, and the next scroll dismisses it. The
+     * reasons are the browser's own (validationMessage), so they read in the
+     * visitor's language.
+     */
+    Transparent.formInvalidity = function (form) {
+
+        var reasons = [];
+        var controls = form.querySelectorAll("input, select, textarea");
+
+        for (var i = 0; i < controls.length; i++) {
+
+            var control = controls[i];
+            if (control.willValidate === false || control.checkValidity()) continue;
+
+            reasons.push((control.name || control.id || control.type) + ": " + control.validationMessage);
+        }
+
+        return reasons;
+    }
+
+    /**
+     * Refuse a submission the browser has already refused, and SAY SO.
+     *
+     * Returning null here stops the submission for good: the page is never
+     * sent, and whatever else would have shown the reason does not run. In a
+     * plain form the browser's own interactive validation follows the click
+     * and puts its bubble on the first invalid control, but a form submitted
+     * by script - a jQuery .submit(), a requestSubmit() - never reaches it,
+     * and the visitor is left with a button that does nothing and an error in
+     * a console they will never open. reportValidity() is that same bubble,
+     * asked for explicitly: it names the control, focuses it and brings it on
+     * screen. Guarded, because a control that cannot be focused (hidden, in a
+     * closed disclosure) makes the browser refuse to show anything.
+     */
+    Transparent.refuseInvalidForm = function (form, el) {
+
+        // __main__ reads it: a refusal is not "nothing to do here", and the
+        // default action has to be stopped - see there.
+        Transparent.formRefused = true;
+
+        console.error("Invalid form submission.", Transparent.formInvalidity(form), el);
+        form.classList.add('was-validated');
+
+        // On the CONTROL, not on the form. A form carrying `novalidate` -
+        // which is what the Bootstrap "custom feedback" pattern does to every
+        // form on the page, base-bundle included - answers form.reportValidity()
+        // with nothing at all on WebKit, so the visitor was left with a button
+        // that did nothing. A control reports its own validity whatever its
+        // form says, and brings itself on screen while it is at it.
+        var controls = form.querySelectorAll("input, select, textarea");
+        for (var i = 0; i < controls.length; i++) {
+
+            if (controls[i].willValidate === false || controls[i].checkValidity()) continue;
+
+            // Guarded: a control that cannot be focused (hidden, inside a
+            // closed disclosure) makes the browser refuse to show anything.
+            try { controls[i].reportValidity(); } catch (e) {}
+            return null;
+        }
+
+        try { form.reportValidity(); } catch (e) {}
+
+        return null;
+    }
+
     Transparent.findNearestForm = function (el) {
 
         switch (el.tagName) {
@@ -868,24 +1247,19 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                 return (form.length ? form[0] : undefined);
             case "INPUT":
             case "BUTTON":
-                // The HTML `form` attribute wins, and is checked FIRST: a submit
-                // control is allowed to live outside the form it submits, and the
-                // admin's action bar does exactly that (it is hoisted into the
-                // topbar). Walking up the ancestors finds nothing there, so the
-                // Save button reported "No form found upstream" and never
-                // submitted - the attribute names the form explicitly.
-                var owned = el.getAttribute && el.getAttribute("form");
-                if (owned) {
-                    var byId = document.getElementById(owned);
-                    if (byId && byId.tagName === "FORM") return byId;
-                }
+                // A control bound to its form by the form ATTRIBUTE (HTML5:
+                // form="admin-form") belongs to that form wherever it sits -
+                // a back office hoists its "Enregistrer" and "Supprimer" out of
+                // the form into its top bar. el.form is the browser's answer.
+                if (el.form) return el.form;
 
                 var form = $(el).closest("form");
                 if (form.length) return form[0];
 
+                // A button without a name (most are) used to throw here.
                 var formName = ($(el).attr("name") || "").split("[")[0];
                 if (!formName) return undefined;
-                form = $("form[name="+formName+"]");
+                form = $("form[name='"+formName+"']");
                 return (form.length ? form[0] : undefined);
         }
 
@@ -915,9 +1289,9 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
        literal string "null". `new URL(path, "null")` THROWS ("Invalid
        URL"), so every link and every form submission resolved here died
        with a TypeError the moment it ran inside the overlay. Reported
-       live: saving the settings form from the nested admin did nothing at
-       all. __main__'s same-origin guard was already fixed this way; this
-       is the same fix for the URLs findLink() builds. */
+       live: saving a form from the nested site did nothing at all.
+       __main__'s same-origin guard was already fixed this way; this is the
+       same fix for the URLs findLink() builds. */
     Transparent.findLink = function (el) {
 
         if (el.type == Transparent.state.HASHCHANGE) {
@@ -954,11 +1328,18 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
 
             if(el.target && el.target.tagName == "FORM") {
 
+                // A form without an action is sent to its own document's
+                // address, query included - as the browser itself would.
+                // Not location.pathname: inside a nest iframe that is
+                // "srcdoc", and `+ href` added the missing attribute's null,
+                // so such a form went to /srcdocnull (to /loginnull on a
+                // plain page sent with Enter). currentPathname() and
+                // currentSearch() read document.baseURI, the nested page's
+                // real address (see their comment).
                 var href = el.target.getAttribute("action");
-                if(!href) href = location.pathname + href;
+                if(!href) href = currentPathname() + currentSearch();
 
-
-                if (href.startsWith("#")) href = location.pathname + href;
+                if (href.startsWith("#")) href = currentPathname() + currentSearch() + href;
                 if (href.endsWith  ("#")) href = href.slice(0, -1);
 
                 var method = el.target.getAttribute("method") || "GET";
@@ -970,11 +1351,8 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                     return null;
                 }
 
-                if(!$(el).hasClass("skip-validation") && !form.checkValidity()) {
-                    console.error("Invalid form submission.", el);
-                    form.classList.add('was-validated');
-                    return null;
-                }
+                if(!$(el).hasClass("skip-validation") && !form.checkValidity())
+                    return Transparent.refuseInvalidForm(form, el);
 
                 var pat  = /^https?:\/\//i;
                 if (pat.test(href)) return [method, new URL(href), form];
@@ -1002,38 +1380,20 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
 
             case "INPUT":
             case "BUTTON":
-                // el.formAction is the browser's own resolution, and for a
-                // form with no action attribute inside a `srcdoc` iframe -
-                // how Transparent.nest mounts the website-in-website overlay
-                // - it is the opaque string "about:srcdoc". Split on "/" that
-                // yields "about:srcdoc", which matches no domain, so the
-                // same-domain test below rejected it and the submit was
-                // dropped: findLink() returned null and __main__ then
-                // preventDefault()ed the click. Reported live - saving from
-                // the nested admin produced no request at all.
-                //
-                // Resolved explicitly instead: the form's own action when it
-                // has one, else the document's real URL (which is what a
-                // form with no action posts to). currentOrigin()/
-                // currentPathname() are the srcdoc-safe readings of those.
-                var formEl = Transparent.findNearestForm(el);
-                var actionAttr = el.getAttribute("formaction")
-                    || (formEl ? formEl.getAttribute("action") : null)
-                    || "";
+                // Where the form goes: the button's own formaction, else the
+                // form's action, else the page. Not el.formAction - by the HTML
+                // spec that property falls back to the DOCUMENT's address, not
+                // the form's, so every form whose action is not the page it
+                // sits on was sent to that page instead: a forum search posted
+                // to the forum index, a vote to the page listing the votes.
+                var owner = el.form || $(el).closest("form")[0];
+                var actionAttribute = el.getAttribute("formaction") || (owner ? owner.getAttribute("action") : null);
+                var formAction = actionAttribute ? new URL(actionAttribute, el.baseURI).href : el.formAction;
 
-                var resolvedAction;
-                try {
-                    resolvedAction = actionAttr
-                        ? new URL(actionAttr, currentOrigin() + currentPathname()).href
-                        : currentOrigin() + currentPathname() + currentSearch();
-                } catch (err) {
-                    return null;
-                }
+                var domainBaseURI = el.baseURI.split('/').slice(0, 3).join('/');
+                var domainFormAction = formAction.split('/').slice(0, 3).join('/');
 
-                var domainBaseURI = currentOrigin();
-                var domainFormAction = resolvedAction.split('/').slice(0, 3).join('/');
-
-                var pathname = resolvedAction.replace(domainFormAction, "");
+                var pathname = formAction.replace(domainFormAction, "");
                 if(!pathname) return null;
 
                 if (domainBaseURI == domainFormAction && el.getAttribute("type") == "submit") {
@@ -1044,43 +1404,15 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                         return null;
                     }
 
-                    if(!$(el).hasClass("skip-validation") && !form.checkValidity()) {
-                        form.classList.add('was-validated');
+                    if(!$(el).hasClass("skip-validation") && !form.checkValidity())
+                        return Transparent.refuseInvalidForm(form, el);
 
-                        // Tell the USER, not only the console. Returning null
-                        // here sends the click straight into __main__'s
-                        // preventDefault(), so a submit blocked by validation
-                        // was indistinguishable from a dead button: nothing
-                        // moved, nothing was said. Reported live on
-                        // /admin/settings, where one empty required file
-                        // input made "Enregistrer" do nothing at all.
-                        //
-                        // The form carries novalidate (the needs-validation
-                        // pattern), which suppresses the browser's own bubble
-                        // on submit - but calling reportValidity() on the
-                        // FIELD still shows it. Scroll first: on a long
-                        // settings form the offending field is usually off
-                        // screen, and a bubble nobody can see is no better
-                        // than silence.
-                        var invalid = Array.prototype.find.call(form.elements, function (field) {
-                            return field.willValidate && !field.checkValidity();
-                        });
-
-                        if (invalid) {
-                            if (invalid.scrollIntoView) invalid.scrollIntoView({block: 'center', behavior: 'smooth'});
-                            if (invalid.reportValidity) invalid.reportValidity();
-                            else if (form.reportValidity) form.reportValidity();
-                        }
-
-                        console.error("Invalid form submission.", invalid || el);
-                        return null;
-                    }
-
-                    // The form's own method (as upstream transparentjs has it): a
-                    // hardcoded POST sent a <form method="get"> submitted by its
-                    // button out as a POST, which lost its query and hit a
-                    // GET-only route (405/404) - a filter bar's "Filtrer" button.
-                    // A form that names no method keeps POST, as it always had.
+                    // The form's own method. This was a hardcoded POST, so a
+                    // <form method="get"> submitted by its button - or by Enter,
+                    // which the browser turns into a click on that button - went
+                    // out as a POST and lost its query: every search box came
+                    // back empty. A form that names no method keeps POST, as it
+                    // always had here.
                     var method = (el.getAttribute("formmethod") || form.getAttribute("method") || "POST").toUpperCase();
 
                     var pat  = /^https?:\/\//i;
@@ -1267,17 +1599,6 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
     }
     var activeInTime = 0;
     var activeInRemainingTime = 0;
-    // Top progress bar's own minimum visible window (see the
-    // .progress-bar-active CSS in transparent.css) - independent of the
-    // real transition timing above: on a fast environment the actual
-    // .loading state can come and go faster than a human eye registers
-    // (reported live: imperceptible). progressBarStartedAt is stamped the
-    // instant .loading goes on; removal of .progress-bar-active is
-    // deferred to top it up to MIN_PROGRESS_BAR_MS if the real transition
-    // finished sooner, WITHOUT touching when .loading itself (or anything
-    // else in the state machine) actually gets removed.
-    var MIN_PROGRESS_BAR_MS = 400;
-    var progressBarStartedAt = 0;
     Transparent.activeIn = function(activeCallback = function() {}) {
 
         if(!Transparent.html.hasClass(Transparent.state.PREACTIVE)) {
@@ -1342,17 +1663,6 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
 
                     Object.values(Transparent.state).forEach(e => Transparent.html.removeClass(e));
                     Transparent.html.addClass(Transparent.state.ROOT + " " + Transparent.state.READY);
-                    // 'progress-bar-active' isn't one of Transparent.state's
-                    // own values, so the forEach above never touches it -
-                    // removed here on its own timer instead, topped up to
-                    // MIN_PROGRESS_BAR_MS if the real transition (everything
-                    // above) finished faster. Real state-machine timing is
-                    // completely unaffected either way.
-                    (function() {
-                        var elapsed = Date.now() - progressBarStartedAt;
-                        var remaining = Math.max(0, MIN_PROGRESS_BAR_MS - elapsed);
-                        setTimeout(function() { Transparent.html.removeClass('progress-bar-active'); }, remaining);
-                    })();
                 }
                 
                 Transparent.html.addClass(Transparent.state.POSTACTIVE);
@@ -1495,6 +1805,18 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
             pending[i](function() { if (--remaining === 0) fire(); });
     };
 
+    /*
+     * Only the scripts a browser would run: no type, a JavaScript MIME type,
+     * or a module. A <script> also carries data - application/json,
+     * application/ld+json, a text/template - and eval'd as code that data
+     * threw a SyntaxError out of the page swap: the new page stayed half in,
+     * its transition classes on and its load hooks never called.
+     */
+    var SCRIPT_TYPES = /^(?:|module|(?:text|application)\/(?:x-)?(?:java|ecma)script(?:1\.[0-5])?|text\/(?:jscript|livescript))$/i;
+    function isExecutableScript(el) {
+        return SCRIPT_TYPES.test((el.getAttribute('type') || '').split(';')[0].trim());
+    }
+
     Transparent.evalScript = function(el)
     {
         function scriptCloneEl(el){
@@ -1507,12 +1829,33 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                 script.setAttribute( (attr = attrs[i]).name, attr.value );
             }
 
-            eval($(script).text());
+            // One broken inline script is that script's failure, not the
+            // swap's: reported, and the page goes on loading.
+            try { eval($(script).text()); }
+            catch (e) { console.error('Transparent: a page script failed', e); }
             return script;
         }
 
-        if (el.tagName === 'SCRIPT' ) el.parentNode.replaceChild( scriptCloneEl(el) , el );
-        else {
+        if (el.tagName === 'SCRIPT' ) {
+            if (isExecutableScript(el)) el.parentNode.replaceChild( scriptCloneEl(el) , el );
+        }
+        else if (typeof el.querySelectorAll === 'function') {
+
+            // One native query instead of recursing the entire node tree.
+            // This walked childNodes and called itself for every node - text
+            // and comment nodes included - which after a page swap meant 618
+            // recursive calls costing 33.5ms to locate FOUR <script> tags.
+            //
+            // querySelectorAll returns the same elements in the same document
+            // order, and as a STATIC list, so replacing each script as we go
+            // cannot disturb the iteration the way a live childNodes walk
+            // would. Non-Element nodes keep the old path below rather than
+            // throwing on the missing method.
+            var scripts = el.querySelectorAll('script');
+            for (var s = 0; s < scripts.length; s++)
+                Transparent.evalScript( scripts[s] );
+
+        } else {
 
             var i = -1, children = el.childNodes;
             var N = children.length;
@@ -1528,6 +1871,10 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
     {
         console.error("Rescue mode.. called");
         rescueMode = true;
+        // Whatever was being submitted got no usable answer: its draft must
+        // survive the reload below, and the form must be usable again.
+        if (Transparent.formMemory) Transparent.formMemory.abandon();
+        releaseInFlightForm();
 
         var head = $(dom).find("head").html();
         var body = $(dom).find("body").html();
@@ -1814,7 +2161,25 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
         });
     }
 
-    Transparent.onLoad = function(uuid, dom, callback = null, scrollTo = false) {
+    Transparent.onLoad = function(uuid, dom, callback = null, scrollTo = false, keepScroll = false) {
+
+        // Where the reader is, read BEFORE the swap takes the page apart.
+        //
+        // A swap that does not scroll - a form's answer, see the scrollTo
+        // argument - must leave the reader where they were, and leaving the
+        // scroll alone is not enough to do that: between the moment the old
+        // page is removed and the moment the new one is laid out the document
+        // is briefly shorter than the scroll position, and the browser CLAMPS
+        // the scroll to what is left. On a page whose content is most of its
+        // height that means the very top, and nothing ever puts it back: a
+        // form sent from halfway down came back with the page at its top and
+        // its error messages off screen. Reported on Chapaland, whose header
+        // is a full screen of sky - so "the form was refused" read as "the
+        // page jumped to the sky". Put back after the swap, below.
+        var keptScroll = {
+            top:  window.scrollY || window.pageYOffset || 0,
+            left: window.scrollX || window.pageXOffset || 0
+        };
 
         window.previousHash     = window.location.hash;
         window.previousLocation = window.location.toString();
@@ -1958,6 +2323,34 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
 
             Transparent.addLayout();
 
+            // Deferred a frame ON PURPOSE. Everything above has just inserted
+            // a freshly parsed page and removed the old one, leaving style and
+            // layout dirty for the whole document. getScrollableElement() then
+            // reads scrollWidth/scrollHeight off every element, and the first
+            // of those reads forces the browser to compute all of it
+            // synchronously, inside this task - measured at 136.6ms before the
+            // short-circuit in isScrollableX/Y, and still ~80ms after it,
+            // because the flush itself is the cost, not the per-element work.
+            //
+            // rAF *then setTimeout*, not rAF alone. requestAnimationFrame
+            // callbacks run BEFORE the frame's style and layout pass, so a
+            // layout-forcing read inside one still forces layout synchronously
+            // - it just moves the cost into the rAF task instead of removing
+            // it. Measured exactly that: 88.5ms inside rAF, barely better than
+            // doing it inline. (The wavejs fix in this same stack hit the
+            // identical trap; worth remembering that "defer it to rAF" is not
+            // the same as "let the browser lay out first".)
+            //
+            // The setTimeout inside the frame callback runs after the browser
+            // has done style, layout and paint, so the reads land on CLEAN
+            // layout and cost close to nothing.
+            //
+            // Nothing visible shifts: Transparent.scrollTo already defers its
+            // own work with setTimeout, so only the MEASUREMENT was ever
+            // synchronous, and the page is still hidden (.active-out) across
+            // these frames.
+            requestAnimationFrame(function() { setTimeout(function() {
+
             if(scrollTo) {
 
                 // Go back to top of the page..
@@ -1984,7 +2377,19 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                         else Transparent.scrollTo({top:0, left:0, duration:0}, el);
                     }
                 }
+
+            } else if (keepScroll && keptScroll.top && !location.hash && (window.scrollY || window.pageYOffset || 0) !== keptScroll.top) {
+
+                // The swap lost the reader's place - see keptScroll above.
+                // Only when it was actually lost, so a page that scrolled
+                // itself as it came in (an anchor, a script of its own) is
+                // left to it; and only for a page that came back to its own
+                // address, since a POST that lands somewhere else is a page
+                // the reader has not seen, and starts where its own top is.
+                window.scrollTo(keptScroll.left, keptScroll.top);
             }
+
+            }, 0); }); /* end rAF + setTimeout - see the comment above it */
 
             // Held until every external script this swap brought in has run
             // (see adoptNode) - the same order a real page load gives them:
@@ -2118,7 +2523,34 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
 
     Transparent.getScrollableElement = function(el = document.documentElement)
     {
-        return $(el).find('*').add(el).filter(function() { return $(this).isScrollable(); });
+        // Was: $(el).find('*').add(el).filter(fn) with the filter calling
+        // $(this).isScrollable() - which wraps EVERY element in jQuery twice
+        // (isScrollable calls isScrollableX and isScrollableY, each doing its
+        // own $(this).map()). Across a whole document that is ~3200 jQuery
+        // allocations to answer a question that is two property reads for
+        // almost every element. Measured at 88.5ms on this site's ~1600
+        // elements even after the reads themselves were short-circuited, and
+        // this runs on every page swap.
+        //
+        // Plain loop over the same nodes, same predicate (isScrollableNode,
+        // shared with the plugins above), wrapped in jQuery once at the end so
+        // callers still get a jQuery set.
+        //
+        // Order is preserved deliberately: .add() returned document order,
+        // which put the root ancestor first, and getScrollableElementXY zips
+        // its saved positions against this list BY INDEX - reordering here
+        // would restore each container's scroll position onto a different
+        // container.
+        var root = (el && el.nodeType === 1) ? el : ($(el)[0] || document.documentElement);
+
+        var out = [];
+        if (isScrollableNode(root)) out.push(root);
+
+        var all = root.querySelectorAll('*');
+        for (var i = 0; i < all.length; i++)
+            if (isScrollableNode(all[i])) out.push(all[i]);
+
+        return $(out);
     };
 
     Transparent.getScrollableElementXY = function() {
@@ -2141,6 +2573,19 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
     // more recent click already requested.
     var currentNavUuid = null;
     var formSubmission = false;
+
+    // The form whose submission is currently on the wire, if any. A navigation
+    // aborts whatever navigation preceded it (see __main__), so a second press
+    // during a slow POST -> redirect -> GET cycle cancels the page the first
+    // press was loading and sends the whole form again - which files the same
+    // record twice. One submission per form at a time; released as soon as any
+    // answer arrives, so a failed one can be retried.
+    var inFlightForm = null;
+    function releaseInFlightForm() {
+        if (!inFlightForm) return;
+        try { $(inFlightForm).find(":submit").removeAttr("disabled"); } catch (e) {}
+        inFlightForm = null;
+    }
 
     // ── User-typed form dirty tracking ──────────────────────────────────────
     //
@@ -2195,8 +2640,18 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
     // Restored fields get `data-restored-from-draft=""` for optional
     // project-level toast / styling.
     //
-    // Clear: on form submit + on TTL expiry (7 days) + manually via
-    // `Transparent.formMemory.clear(form)`.
+    // Clear: only once the SERVER HAS ANSWERED the submission and the answer
+    // has been looked at (settle(), on the load that follows a submit) - never
+    // at submit time. Accepted (the form is back on screen, or the user was
+    // sent elsewhere than a sign-in page) → gone. Bounced to a sign-in page -
+    // recognised by its password field, no path is assumed - (the session had
+    // died under the form; prod 2026-09-11 lost two comment replies exactly
+    // that way) → kept as `lost`, filled back in the next time that form is on
+    // screen. No answer at all (network error, rescue) → stays a plain draft.
+    // Plus TTL expiry (7 days) and `Transparent.formMemory.clear(form)`.
+    //
+    // Same-named forms (Symfony renders every instance of a type under one
+    // name, e.g. a reply form per comment) are told apart by their `action`.
     //
     // Opt-out:
     //   - `<form data-no-persist>` — entire form skipped
@@ -2239,12 +2694,58 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
         function shouldSkipForm(form) {
             if (!form) return true;
             if (form.hasAttribute && form.hasAttribute('data-no-persist')) return true;
-            if (!form.name && !form.id) return true; // need identity for key
+            // getAttribute, not form.name/form.id: a field called "name" or "id"
+            // shadows the property - see the note in __main__'s form block.
+            if (!formIdentity(form)) return true; // need identity for key
             return false;
         }
 
+        /** A form's own name or id, from its attributes - see shouldSkipForm. */
+        function formIdentity(form) {
+            return (form.getAttribute && (form.getAttribute('name') || form.getAttribute('id'))) || '';
+        }
+
         function getKey(form) {
-            return KEY_PREFIX + location.pathname + ':' + (form.name || form.id);
+            return KEY_PREFIX + location.pathname + ':' + formIdentity(form) + actionSuffix(form);
+        }
+
+        // Whatever the form's action adds to the page's own URL - a fragment
+        // (`#<comment-uuid>`), a query, another path. Empty for a form that
+        // posts to its own page, so keys written before this existed still match.
+        function actionSuffix(form) {
+            var action = form.getAttribute ? form.getAttribute('action') : null;
+            if (!action) return '';
+            var u;
+            try { u = new URL(action, location.href); } catch (e) { return ''; }
+            var suffix = (u.pathname !== location.pathname ? u.pathname : '') + u.search + u.hash;
+            return suffix ? '@' + suffix : '';
+        }
+
+        // This tab's submission awaiting its verdict. sessionStorage, not
+        // localStorage: another tab must neither settle nor discard it.
+        var PENDING_KEY = KEY_PREFIX + 'pending';
+        function readPending() {
+            try { return JSON.parse(sessionStorage.getItem(PENDING_KEY)); } catch (e) { return null; }
+        }
+        function writePending(value) {
+            try {
+                if (value) sessionStorage.setItem(PENDING_KEY, JSON.stringify(value));
+                else sessionStorage.removeItem(PENDING_KEY);
+            } catch (e) {}
+        }
+
+        // A page asking for a password is a sign-in page, whatever its URL.
+        function isLoginPage() {
+            return !!document.querySelector('form input[type="password"]');
+        }
+
+        function keysOnPage() {
+            var keys = {};
+            var forms = document.querySelectorAll('form');
+            for (var i = 0; i < forms.length; i++) {
+                if (!shouldSkipForm(forms[i])) keys[getKey(forms[i])] = true;
+            }
+            return keys;
         }
 
         function readLS(key) {
@@ -2355,7 +2856,60 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                     field.setAttribute('data-restored-from-draft', '');
                 }
             });
+
+            // A `lost` draft is back where it belongs: from here it is an
+            // ordinary draft again, and its next submit gets its own verdict.
+            if (entry.s) {
+                delete entry.s;
+                writeLS(key, JSON.stringify(entry));
+            }
         };
+
+        // Submit is not a verdict: flush the debounced save so the draft is
+        // exactly what went out, and note that THIS tab owes a verdict.
+        api.markSent = function(form) {
+            if (!api.enabled) return;
+            if (shouldSkipForm(form)) return;
+            var timer = saveTimers.get(form);
+            if (timer) { clearTimeout(timer); saveTimers.delete(form); }
+            api.save(form);
+            writePending({ key: getKey(form), t: Date.now() });
+        };
+
+        // The verdict, read off the page that followed the submission. Runs
+        // before any restore so a draft never fills the form it was just
+        // accepted from.
+        api.settle = function() {
+            var pending = readPending();
+            if (!pending) return;
+            writePending(null);
+
+            var raw = readLS(pending.key);
+            if (!raw) return;
+
+            // The form is on screen again: accepted (redirect-after-post), or
+            // re-rendered by the server with its own values. Either way the
+            // server has the text.
+            if (keysOnPage()[pending.key]) { removeLS(pending.key); return; }
+
+            // Bounced to a sign-in page: the session had died under the form.
+            // Keep the text for when the form is back.
+            if (isLoginPage()) {
+                var entry;
+                try { entry = JSON.parse(raw); } catch (e) { removeLS(pending.key); return; }
+                entry.s = 'lost';
+                entry.t = Date.now();
+                writeLS(pending.key, JSON.stringify(entry));
+                return;
+            }
+
+            // Accepted and sent somewhere else (a thank-you page).
+            removeLS(pending.key);
+        };
+
+        // No answer came (network error, rescue reload): nothing to judge,
+        // the draft stays a draft and comes back with the page.
+        api.abandon = function() { writePending(null); };
 
         api.clear = function(form) {
             if (!form) return;
@@ -2364,6 +2918,7 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
         };
 
         api.restoreAll = function() {
+            api.settle();
             var forms = document.querySelectorAll('form');
             for (var i = 0; i < forms.length; i++) api.restore(forms[i]);
         };
@@ -2419,11 +2974,12 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
             debouncedSave(e.target.form);
         }, true);
 
-        // Successful submit clears the draft. We listen in capture so we
-        // run before any user-side submit handler that might cancel.
+        // A submit only ARMS the verdict (see settle()); the draft itself
+        // outlives the request. Capture phase, so it runs before any
+        // user-side submit handler that might cancel.
         document.addEventListener('submit', function(e) {
             if (e.target && e.target.tagName === 'FORM') {
-                api.clear(e.target);
+                api.markSent(e.target);
             }
         }, true);
 
@@ -2498,6 +3054,27 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
     function currentPathname() { return new URL(document.baseURI).pathname; }
     function currentSearch() { return new URL(document.baseURI).search; }
 
+    // From inside a nest iframe: hand a navigation whose target is outside
+    // the nest's scope to the host (nest.leave) and report whether it was
+    // taken. The host's own Settings.nest decides the scope; the iframe's
+    // copy is only the fallback for a host that cannot be reached.
+    function leaveNest(url) {
+
+        if (location.origin !== 'null') return false;
+
+        try {
+            var host = parent.Transparent && parent.Transparent.nest;
+            if (host && host.leave && host.isOpen()) {
+                if (host.inScope(url.href)) return false;
+                return host.leave(url.href);
+            }
+        } catch (err) {}
+
+        if (!Settings.nest || !Settings.nest.length || matchesPatternList(url.pathname, Settings.nest)) return false;
+        try { window.top.location.href = url.href; } catch (err) { return false; }
+        return true;
+    }
+
     // Shared by Settings.exceptions (__main__) and Settings.nest
     // (Transparent.nest) - both are lists of RegExp objects or wildcard
     // strings ('*' matches any sequence, everything else literal), tested
@@ -2538,41 +3115,49 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
         // underneath must not be swapped
         if (Transparent.nest && Transparent.nest.owns(e)) return;
 
+        // ...and one it has already dealt with itself. Which of the two
+        // popstate handlers runs first differs between engines (see the nest
+        // listener), so the nest marks the events it handles, and replays
+        // the ones that also need a page swap through a copy of its own.
+        if (e.type == Transparent.state.POPSTATE && e.transparentNestHandled) return;
+
         // Determine link
+        Transparent.formRefused = false;
         const link = Transparent.findLink(e);
         if (link == null) {
 
-            // findLink() returning null means "this click is not a
-            // navigation" - but the branch below then called
-            // preventDefault() on it anyway, which suppressed the DEFAULT
-            // ACTION of every non-link interactive element on the page.
-            // Two confirmed casualties in the admin: the create-button
-            // <details>/<summary> dropdown on inheritance-tree entities
-            // (Comment, Thread...) never opened, and datagrid row
-            // checkboxes never ticked - both reported live as "click does
-            // nothing". Anything whose default action IS its behaviour has
-            // to be left alone here; for those elements transparentJS has
-            // nothing to do in the first place, since there is no link to
-            // follow. Buttons are deliberately NOT in this list: a submit
-            // button's default is a form submission, which findLink() does
-            // recognise and route through the swap pipeline, so exempting
-            // them would double-fire real navigations.
-            // `button` IS in the list above, despite the note further up
-            // about double-firing. That concern only applies when findLink()
-            // RECOGNISES the button - and in that case this branch is never
-            // reached, because link would not be null. Reaching here means the
-            // opposite: transparentJS has decided it will not handle this
-            // click, so preventDefault() suppresses the browser's own default
-            // without substituting anything for it. For a submit button that
-            // default IS the form submission, so suppressing it left the
-            // button completely dead - no request, and (where a form relies on
-            // one) not even the submit event a confirmation handler needs.
+            // A form the browser refused is not "not a navigation": it is one
+            // this code has just stopped, and the default action must go with
+            // it. Left to run, the click went on to submit the form; the form
+            // carries `novalidate` on any Bootstrap-flavoured page, so the
+            // browser raised `submit` all the same, and every submit listener
+            // in turn - the host's, this module's own, the base bundle's -
+            // refused it again and showed the reason again. The bubble was
+            // drawn, cleared and redrawn several times over: it blinked.
+            if (Transparent.formRefused) {
+                e.preventDefault();
+                return;
+            }
+
+            // findLink() returning null means "this click is not a navigation".
+            // preventDefault()ing it anyway suppressed the DEFAULT ACTION of
+            // every non-link interactive element on the page - and for anything
+            // whose default action IS its behaviour, that is the behaviour gone.
             //
-            // Confirmed live in the admin datagrid: findLink() gates on
-            // el.getAttribute("type") == "submit", but a <button> inside a
-            // form submits by default and those buttons are rendered without
-            // the attribute, so findLink() returned null and the row delete
-            // button did nothing at all when clicked.
+            // Buttons are the sharpest case: a <button> inside a form submits by
+            // default, but findLink() only recognises one when it carries an
+            // explicit type="submit" ATTRIBUTE. Markup that relies on the HTML
+            // default (very common) is therefore unrecognised here, and the
+            // click was swallowed - no request, no submit event, no error. This
+            // was confirmed live in a consuming admin, where every datagrid row
+            // delete button was dead, along with the confirmation dialog that
+            // listens for the submit event those buttons never fired.
+            //
+            // The others in the list have the same problem: <summary>/<details>
+            // never toggled, checkboxes and radios never ticked, <select> never
+            // opened. For all of these transparentJS has nothing to do in the
+            // first place - there is no link to follow - so the default must be
+            // left alone.
             const t = e.target;
             if (t && t.closest && t.closest('summary, details, input, select, textarea, option, label, [contenteditable], button')) return;
 
@@ -2580,7 +3165,20 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
             return;
         }
 
-        dispatchEvent(new CustomEvent('transparent:link', {link:link}));
+        // What findLink() made of the interaction, for the page to read:
+        // where it is going, and what sent it - a link, a button, or the FORM
+        // itself for a submission. The payload was passed as a plain `link`
+        // option, which CustomEvent ignores, so every listener got an event
+        // with a null `detail` and nothing to go on; a page that wants to know
+        // a form was sent (to keep the reader at it when the server sends it
+        // back refused) had no way to tell. Dispatched here, before history is
+        // touched, so `location` is still the address the reader came from.
+        dispatchEvent(new CustomEvent('transparent:link', {detail: {method: link[0], url: link[1], target: link[2]}}));
+
+        // The address this navigation starts from, read before history is
+        // touched: a POST that comes back to it is a form the server refused,
+        // and the reader keeps their place in it - see onLoad's keptScroll.
+        const fromHref = location.href;
 
         const uuid   = uuidv4();
         const type   = link[0];
@@ -2612,81 +3210,88 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
 
         if (form) {
 
-            data = new FormData();
-            var formAmbiguity = $("form[name='"+form.name+"']").length > 1;
-            
-            var formInput = undefined; // In case of form ambiguity (two form with same name, restrict the data to the target form, if not extends it to each element with standard name)
-            // An UNNAMED form matches neither clause below: form.name is "",
-            // so `form[name='']` selects nothing and `[name^='[']` selects
-            // nothing either - formInput came out empty and the request was
-            // sent with NO FIELDS AT ALL. Every plain <form method="post">
-            // added to the admin without a name attribute therefore lost its
-            // CSRF token, was refused, and bounced through the login page
-            // back to its own action URL as a GET - which reads as "the
-            // button does nothing" plus a 404 (found live on the trash page's
-            // restore/destroy buttons). Same failure mode as the hoisted
-            // submit buttons below, different trigger.
-            if(!form.name) formInput = $(form).find(":input");
-            else if(formAmbiguity) formInput = $(form).find(":input, [name^='"+form.name+"\[']");
-            else formInput = $("form[name='"+form.name+"'] :input, [name^='"+form.name+"\[']");
+            // Already sending this one. Left to run, the navigation started
+            // below would abort the in-flight one and post the form a second
+            // time (production, 2026-09-12: one reply filed three times while
+            // the author waited on a slow render).
+            if (inFlightForm === form) {
+                e.preventDefault();
+                return;
+            }
 
-            // Both clauses above require actual DOM nesting inside <form> -
-            // but the admin's own save/save-and-continue/delete buttons are
-            // deliberately hoisted OUT of the form into the topbar, linked
-            // back only via the HTML5 `form="admin-form"` attribute (see
-            // _form.html.twig's own comment on this). Neither selector
-            // clause can see them there, so `submit_action` was NEVER
-            // appended for ANY of them regardless of which one was clicked -
-            // the server's redirectAfterSubmit() always fell back to its
-            // default (plain save, back to the index), even when "Enregistrer
-            // et continuer" was the one pressed (reported live). Elements
-            // explicitly bound via the `form` attribute are real form
-            // participants per the HTML5 spec even when they live elsewhere
-            // in the document, so this adds them back in regardless of
-            // position - .add() dedupes, so anything already matched above
-            // (a field genuinely inside the form that ALSO carries a
-            // redundant form="..." attribute) isn't counted twice.
+            data = new FormData();
+
+            // The name ATTRIBUTE, never form.name. A form's named controls are
+            // exposed as properties of the form element itself, so one field
+            // called "name" - a group's name, a member's name, a file's name -
+            // IS form.name: an HTMLInputElement where a string was expected.
+            // Interpolated into the selectors below it became
+            // "form[name='[object HTMLInputElement]']", which matches nothing,
+            // so formInput came out empty and the request went out with NO
+            // FIELDS AT ALL - the same silent failure as the unnamed form
+            // described below, and reported the same way: the server sees an
+            // empty POST, refuses the CSRF token that is not there, and
+            // re-renders the page it was sent from, so the button reads as
+            // doing nothing at all (Chapaland, founding a group: <input
+            // name="name">). "id", "action", "method", "submit" and "length"
+            // are the same trap.
+            var formName = form.getAttribute("name") || "";
+
+            var formAmbiguity = formName !== "" && $("form[name='"+formName+"']").length > 1;
+
+            var formInput = undefined; // In case of form ambiguity (two form with same name, restrict the data to the target form, if not extends it to each element with standard name)
+            // An UNNAMED form matches neither clause below: its name is "",
+            // so `form[name='']` selects nothing and `[name^='[']` selects
+            // nothing either - formInput came out empty and the request went
+            // out with NO FIELDS AT ALL. Every plain <form method="post">
+            // without a name attribute therefore lost its CSRF token, was
+            // refused, and bounced through the login page back to its own
+            // action URL as a GET - which reads as "the button does nothing"
+            // plus a 404. Found on an admin page whose restore/destroy buttons
+            // were each their own small unnamed form.
+            if(!formName) formInput = $(form).find(":input");
+            else if(formAmbiguity) formInput = $(form).find(":input, [name^='"+formName+"\[']");
+            else formInput = $("form[name='"+formName+"'] :input, [name^='"+formName+"\[']");
+
+            // The controls bound to the form by the form ATTRIBUTE (HTML5:
+            // form="admin-form") are part of it wherever they sit in the
+            // document - a back office's save buttons hoisted out of the form
+            // into its top bar. Neither selector above reaches them, so the
+            // button pressed never told the server which one it was ("save
+            // and continue" came back as a plain save). .add() keeps each once.
             if (form.id) formInput = formInput.add($("[form='"+form.id+"']"));
 
             formInput.each(function() {
 
-                if(this.tagName == "BUTTON") {
+                // Only what a browser would send (the HTML form data set). Every
+                // control went in whatever its state: both radios of a POUR /
+                // CONTRE choice were posted, and PHP kept the last - on
+                // Chapaland every vote POUR was filed CONTRE, every wedding OUI
+                // answered "non". A box or a radio goes only when ticked, a
+                // control without a name or disabled not at all, and of the
+                // buttons only the one that was pressed.
+                if (!this.name || this.disabled) return;
 
-                    // Was `this == e.target`: a button's own icon/label markup
-                    // (e.g. <button><i class="..."></i> Enregistrer et
-                    // continuer</button>) puts a nested <i> in the way, and a
-                    // click landing on THAT sets e.target to the icon, not the
-                    // button - the exact-equality check then silently dropped
-                    // submit_action, so the server fell back to its default
-                    // (plain "save", back to the index) even though the right
-                    // button was clicked (reported live: "save and continue"
-                    // landing on the index). contains() still resolves to
-                    // exactly one button, since buttons are siblings here, not
-                    // nested in each other.
-                    if(this.contains(e.target)) data.append(this.name, this.value);
+                if(this.tagName == "BUTTON" || this.type == "submit" || this.type == "image") {
+
+                    // The button pressed: the event's own target, or what holds it
+                    // (a click lands on the button's icon or label as often as on
+                    // the button), or the submitter a submit event names.
+                    if(this == e.target || (e.target && this.contains && this.contains(e.target)) || this == e.submitter) data.append(this.name, this.value);
+
+                } else if(this.type == "checkbox" || this.type == "radio") {
+
+                    if(this.checked) data.append(this.name, this.value);
 
                 } else if(this.type == "file") {
 
                     for(var i = 0; i < this.files.length; i++)
                         data.append(this.name, this.files[i]);
 
-                } else if(this.type == "select-multiple") {
+                } else if(this.tagName == "SELECT" && this.multiple) {
 
-                    // `this.value` on a multi-select is the FIRST selected
-                    // option only - and "" when nothing is selected. That
-                    // submitted followers as [""], which the server then tried
-                    // to hydrate into a User ("Expected value of type User,
-                    // got string"), and silently dropped every selection past
-                    // the first on populated multi-selects. Serialize like a
-                    // native submit: one entry per selected option, none when
-                    // empty.
-                    for(var i = 0; i < this.selectedOptions.length; i++)
-                        data.append(this.name, this.selectedOptions[i].value);
-
-                } else if((this.type == "checkbox" || this.type == "radio") && !this.checked) {
-
-                    // Native submits omit unchecked boxes; appending their
-                    // value regardless made every switch read as ON.
+                    for(var j = 0; j < this.options.length; j++)
+                        if(this.options[j].selected) data.append(this.name, this.options[j].value);
 
                 } else data.append(this.name, this.value);
             });
@@ -2695,16 +3300,20 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
             formSubmission = true; // mark as form submission
             formTrigger = e.target;
 
-            // A GET carries its fields in the address, not in a body (as
-            // upstream transparentjs has it): the request goes out with
-            // processData: false, which leaves `data` untouched, and a GET has
-            // no body - so a GET form's fields were silently dropped. Put in
-            // the query instead, exactly as a browser would (the form's data
-            // replaces the action's own query). A file cannot travel in an
+            // A GET carries its fields in the address, not in a body. The
+            // request below goes out with processData: false, which leaves
+            // `data` untouched - and a GET has no body - so a GET form's
+            // fields were silently dropped. Put in the query instead, exactly
+            // as a browser would (the form's data replaces the action's own
+            // query), the result is also a real address: reload, back button
+            // and sharing all keep the search. A file cannot travel in an
             // address and is left out, as a browser leaves it out of a GET.
             if (String(type).toUpperCase() === "GET" && data instanceof FormData) {
                 var query = new URLSearchParams();
                 data.forEach(function (value, name) {
+                    // A control without a name - the submit button usually -
+                    // is not a field: a browser leaves it out, and kept it
+                    // put a stray "=" on the end of every search address.
                     if (name && typeof value === "string") query.append(name, value);
                 });
                 url.search = query.toString();
@@ -2713,8 +3322,8 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
             if ($(e.target).hasClass(Transparent.state.RELOAD)) return;
             if ($(form).hasClass(Transparent.state.RELOAD)) return;
 
-            if(e.type == "submit") // NB: This doesn't work if a button is generated afterward.. 
-                $(form).find(':submit').attr('disabled', 'disabled');
+            // The buttons are disabled further down, once the request is
+            // actually being dispatched - see the comment there.
         }
 
         // Specific page exception
@@ -2730,25 +3339,17 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
         if (url.origin != currentOrigin()) return;
 
         // Inside a nest iframe (Transparent.nest's overlay), a link whose
-        // target falls OUTSIDE the nest's own configured scope
-        // (Settings.nest, e.g. "/admin*") isn't a page the nest should ever
-        // render itself - it's the user leaving the nested app back toward
-        // the host site. Close the overlay and let the HOST page navigate
-        // there for real, instead of AJAX-swapping the iframe's own content
-        // to something it was never scoped for (previously: a link back to
-        // "/" rendered the public homepage INSIDE the admin overlay).
-        if (location.origin === 'null' && Settings.nest && Settings.nest.length && !matchesPatternList(url.pathname, Settings.nest)) {
+        // target falls OUTSIDE the nest's scope (Settings.nest, e.g.
+        // "/admin*") is the user leaving the nested app for the host site.
+        // The overlay closes and the HOST navigates there, as an ordinary
+        // page of its own, while the overlay's history entry is kept: Back
+        // brings the overlay back exactly as it was left (nest.leave).
+        // Rendering that page inside the iframe instead is what showed the
+        // main website looping inside the overlay. A POST goes out from
+        // here as usual - its answer is checked the same way in
+        // handleResponse, since leaving would re-send it as a GET.
+        if (location.origin === 'null' && String(type).toUpperCase() !== "POST" && leaveNest(url)) {
             e.preventDefault();
-            try {
-                if (parent.Transparent && parent.Transparent.nest) {
-                    parent.Transparent.nest.close(false);
-                    parent.window.location.href = url.href;
-                } else {
-                    window.top.location.href = url.href;
-                }
-            } catch (err) {
-                window.top.location.href = url.href;
-            }
             return;
         }
 
@@ -2793,8 +3394,6 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
         $(Transparent.html).stop();
 
         Transparent.html.addClass(Transparent.state.LOADING);
-        Transparent.html.addClass('progress-bar-active');
-        progressBarStartedAt = Date.now();
         Transparent.activeIn();
 
         function isJsonResponse(str) {
@@ -2815,7 +3414,10 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
             if (uuid !== currentNavUuid) return;
             if (currentXhr === xhr) currentXhr = null;
 
-            // That answered a write, so everything cached predates it.
+            // An answer arrived - whatever it says, this form is free again.
+            releaseInFlightForm();
+
+            // ...and if it answered a write, everything cached predates it.
             if (String(method).toUpperCase() === "POST" && status < 400) {
                 Transparent.invalidateResponses();
             }
@@ -2915,6 +3517,19 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                 return Transparent.rescue(dom);
             }
 
+            // A nested navigation that ended up outside the nest's scope
+            // (a redirect after saving, typically) leaves the overlay rather
+            // than showing the host site inside it - see leaveNest().
+            if (xhr && location.origin === 'null') {
+                var landedOutside = false;
+                try { landedOutside = leaveNest(new URL(responseURL)); } catch (err) {}
+                if (landedOutside) {
+                    Transparent.html.removeClass(Transparent.state.LOADING);
+                    Transparent.activeOut();
+                    return;
+                }
+            }
+
             // From here the page is valid..
             // so the new page is added to history..
             //
@@ -2965,6 +3580,11 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                             var base = document.querySelector('head > base');
                             if (base) base.setAttribute('href', responseURL);
 
+                            // A POST answer is not replayed: Back to it fetches the page.
+                            if (String(method).toUpperCase() !== "POST")
+                                nestRecord({ uuid: uuid, status: status, method: method, data: {}, href: responseURL });
+                            else nestCurrent = null;
+
                             // The host owns the overlay's history and URL:
                             // it records which page the overlay now shows
                             // (what share/Back/resume all key on) and only
@@ -2977,7 +3597,7 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                             // page and tracks every navigation into the
                             // address bar.
                             if (parent.Transparent.nest.notifyNavigated) {
-                                parent.Transparent.nest.notifyNavigated(responseURL, dom.title);
+                                parent.Transparent.nest.notifyNavigated(responseURL, dom.title, { method: method, status: status });
                             } else {
                                 var nestContainer = parent.Transparent.nest.getContainer && parent.Transparent.nest.getContainer();
                                 var isFullPage = nestContainer && nestContainer.classList.contains('is-full');
@@ -3031,35 +3651,104 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
             if($(dom).find("html").hasClass(Transparent.state.RELOAD) || $(dom).find("html").hasClass(Transparent.state.DISABLE))
                 return window.location.reload();
 
-            return Transparent.onLoad(uuid, dom, function() {
+            var swap = function() {
 
-                Transparent.activeOut(function() {
+                return Transparent.onLoad(uuid, dom, function() {
 
-                    Transparent.html
-                        .removeClass(switchLayout)
-                        .removeClass(Transparent.state.SUBMIT)
-                        .removeClass(Transparent.state.POPSTATE)
-                        .removeClass(Transparent.state.NEW);
-                });
+                    Transparent.activeOut(function() {
 
-            }, type != "POST");
+                        Transparent.html
+                            .removeClass(switchLayout)
+                            .removeClass(Transparent.state.SUBMIT)
+                            .removeClass(Transparent.state.POPSTATE)
+                            .removeClass(Transparent.state.EXITING)
+                            .removeClass(Transparent.state.NEW);
+                    });
+
+                }, type != "POST", type == "POST" && location.href === fromHref);
+            };
+
+            // Give the outgoing page a window to animate away in, if the host
+            // asked for one. This is the only place such a window can exist:
+            // before this point we are waiting on the server with no idea when
+            // the response lands, and after it the swap is one long blocking
+            // task in which a newly-started transition never gets a style
+            // commit. Measured: a transition begun against the swap had ~1ms
+            // of free time in a 412ms window.
+            //
+            // `exiting` is dropped in the activeOut callback above, not here,
+            // so it hands over to `active-out` without a frame in between
+            // where neither is set - that gap would flash the swapped-in page
+            // before its own entrance.
+            var exitMs = parseInt(Settings["exit_duration"], 10) || 0;
+            if (exitMs > 0) {
+
+                Transparent.html.addClass(Transparent.state.EXITING);
+
+                // Force the style change to be committed NOW. Adding a class
+                // only schedules a recalc, and the browser is free to defer it
+                // - which it does, because this moment is busy: measured 70ms
+                // of a 120ms window elapsing before the transition produced
+                // any movement at all, leaving ~50ms of visible slide that
+                // was then cut off at 75% of its travel. Reported, fairly, as
+                // the menu not sliding out.
+                //
+                // Reading a layout property flushes pending style and starts
+                // the transition in this frame, so the window that follows is
+                // animation time rather than mostly waiting. It costs one
+                // forced layout on a document that is about to be replaced
+                // anyway.
+                void Transparent.html[0].offsetHeight;
+
+                dispatchEvent(new Event('transparent:' + Transparent.state.EXITING));
+
+                setTimeout(swap, exitMs);
+                return;
+            }
+
+            return swap();
         }
 
-        if(history.state && !Transparent.hasResponse(history.state.uuid))
-            Transparent.setResponse(history.state.uuid, Transparent.html[0], Transparent.getScrollableElementXY());
+        var shownEntry = currentEntry();
+        if(shownEntry && shownEntry.uuid && !Transparent.hasResponse(shownEntry.uuid))
+            Transparent.setResponse(shownEntry.uuid, Transparent.html[0], Transparent.getScrollableElementXY());
 
         // This append on user click (e.g. when user push a link)
         // It is null when dev is pushing or replacing state
         var addNewState = !e.state;
         if (addNewState) {
 
-            if(history.state)
-                Transparent.setResponse(history.state.uuid, Transparent.html[0], Transparent.getScrollableElementXY());
+            if(shownEntry && shownEntry.uuid)
+                Transparent.setResponse(shownEntry.uuid, Transparent.html[0], Transparent.getScrollableElementXY());
 
             $(Transparent.html).prop("user-scroll", false); // make sure to avoid page jump during transition (cancelled in activeIn callback)
 
-            // Submit ajax request..
-            if(form) form.dispatchEvent(new SubmitEvent("submit", { submitter: formTrigger }));
+            // Let every submit listener see this submission (validation,
+            // formMemory's markSent, the host's own handlers) - but only SEE
+            // it. The request itself is ours and goes out below.
+            //
+            // Firefox, unlike Chromium, carries out the form submission for a
+            // SYNTHETIC submit event when nobody cancels it. So every form
+            // sent through here was sent twice from Firefox: our XHR, and 5ms
+            // later the browser's own native POST. Reproduced headless on
+            // Firefox 140 (a bare page, no library, one dispatchEvent - it
+            // posts); seen in production as two identical comments filed in
+            // the same second, and two POST /login a few minutes earlier in
+            // the same visit. Only Firefox visitors, only forms, which is why
+            // it looked occasional.
+            //
+            // So the event is cancelable, and cancelled by a listener added
+            // on the form right before dispatch: it runs after every handler
+            // already bound there, and the event does not bubble, so nothing
+            // at all runs after it - no other listener can tell the
+            // difference. Chromium never had a default action to cancel.
+            if (form) {
+                var submitEvent = new SubmitEvent("submit", { submitter: formTrigger, cancelable: true });
+                var noNativeSubmit = function (ev) { if (ev === submitEvent) ev.preventDefault(); };
+                form.addEventListener("submit", noNativeSubmit);
+                try { form.dispatchEvent(submitEvent); }
+                finally { form.removeEventListener("submit", noNativeSubmit); }
+            }
 
             // A navigation already in flight is now stale - the user's
             // most recent click always wins. Abort it (best-effort; a
@@ -3080,6 +3769,111 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
             // guard passed it through as if it were still current -
             // confirmed live: the aborted request's error response was
             // reaching Transparent.rescue() instead of being discarded.
+            // Already fetched on hover (or on an earlier visit)? Feed it
+            // through the same path popstate uses - park the HTML under this
+            // navigation's uuid and call handleResponse with no xhr - so the
+            // click costs a swap and nothing else. GET only: a POST is a
+            // write and must never be answered from a cache.
+            if (type !== "POST") {
+
+                var prefetched = Transparent.getPrefetched(url.href);
+                if (prefetched) {
+
+                    currentNavUuid = uuid;
+                    Transparent.setResponseText(uuid, prefetched);
+
+                    // Passing a stand-in rather than null for `xhr`, and the
+                    // reason is load-bearing: handleResponse gates
+                    // history.pushState on `if (xhr)`. That is right for the
+                    // popstate path it was written for - the browser has
+                    // already moved history, so pushing again would corrupt
+                    // it - but this is a FORWARD navigation that still has to
+                    // push. With null the swap ran and the URL never changed,
+                    // so the click appeared to do nothing at all.
+                    //
+                    // responseURL is the only property read off it (twice),
+                    // so a one-field stand-in is the whole contract.
+                    return handleResponse(uuid, 200, type, data, { responseURL: url.href });
+                }
+
+                // Not finished, but already ON THE WIRE - the usual case for
+                // a link the user hovered and clicked straight away. Adopt
+                // that request instead of opening a second identical one:
+                // waiting on it costs whatever is left of it, racing it cost
+                // a whole new render (see claimPrefetch's own comment).
+                var claimedXhr = Transparent.claimPrefetch(url.href, function(text) {
+
+                    // A newer click has happened since; this response is no
+                    // longer what the user is waiting for. handleResponse
+                    // would discard it on the same uuid check anyway - this
+                    // just avoids the work.
+                    if (currentNavUuid !== uuid) return;
+
+                    // Failed or aborted: pay full price with a real request,
+                    // which is exactly where this click would have been with
+                    // no prefetch running at all. Issued here rather than by
+                    // re-entering __main__ - history has already been pushed
+                    // for this navigation, and __main__ takes the original
+                    // event, not a url.
+                    if (!text) {
+
+                        var retryXhr = new XMLHttpRequest();
+                        currentXhr = retryXhr;
+
+                        return jQuery.ajax({
+                            url: url.href,
+                            type: type,
+                            data: data,
+                            contentType: false,
+                            processData: false,
+                            headers: Settings["headers"] || {},
+                            xhr: function () { return retryXhr; },
+                            success: function (html, status, request) { return handleResponse(uuid, request.status, type, data, retryXhr, request); },
+                            error:   function (request, ajaxOptions, thrownError) { return handleResponse(uuid, request.status, type, data, retryXhr, request); }
+                        });
+                    }
+
+                    Transparent.setResponseText(uuid, text);
+                    handleResponse(uuid, 200, type, data, { responseURL: url.href });
+                });
+
+                if (claimedXhr) {
+
+                    var supersededXhr = currentXhr;
+
+                    // Same ordering rule as the plain-request path below:
+                    // claim THIS navigation first, then abort the previous
+                    // one, because an abort can fire its error callback
+                    // synchronously and that callback compares against
+                    // currentNavUuid as it stands at that moment.
+                    currentXhr = claimedXhr;
+                    currentNavUuid = uuid;
+
+                    if (supersededXhr && supersededXhr !== claimedXhr) {
+                        try { supersededXhr.abort(); } catch (err) {}
+                    }
+
+                    return claimedXhr;
+                }
+            }
+
+            // Claimed and disabled HERE, not where the submission was first
+            // recognised. Everything between the two is a guard that can still
+            // decline this navigation (an excepted path, a foreign origin, a
+            // RELOAD-classed form), and disabling a submit button before
+            // knowing whether a request will actually go out leaves the form
+            // both unsubmitted and unusable - a browser will not submit
+            // through a disabled button either, so the press is simply lost.
+            // Measured on /login: the button went grey and nothing was sent.
+            //
+            // Disabled on every submission, not only the ones arriving as a
+            // "submit" event: a click on a type="submit" button is what
+            // findLink() handles, and that path was the one left unguarded.
+            if (form) {
+                inFlightForm = form;
+                $(form).find(':submit').attr('disabled', 'disabled');
+            }
+
             var previousXhr = currentXhr;
 
             var xhr = new XMLHttpRequest();
@@ -3108,8 +3902,12 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
         // there's no actual staleness race here, but handleResponse's
         // uuid check would still spuriously discard this if
         // currentNavUuid weren't also updated for this path.
-        currentNavUuid = history.state.uuid;
-        return handleResponse(history.state.uuid, history.state.status, history.state.method, history.state.data);
+        //
+        // e.state, not history.state: for a real popstate they are the same
+        // object, but the nest module replays a HOST entry while the
+        // current entry is its own (see nest.reopen).
+        currentNavUuid = e.state.uuid;
+        return handleResponse(e.state.uuid, e.state.status, e.state.method, e.state.data);
     }
 
     // Update history if not refreshing page or different page (avoid double pushState)
@@ -3125,11 +3923,146 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
     // inside the admin overlay; every click there fell through to a real
     // full-page reload of the iframe instead of an SPA swap.
     try {
+        // Query string included, for the same reason as replaceHash above:
+        // this runs on every page open, and without location.search it
+        // rewrote "/list?page=3" to "/list" straight away - losing the page
+        // the reader was on, and making every later "is this the same page?"
+        // comparison fail, so in-page anchors did full navigations.
+        var here = location.origin + location.pathname + location.search + location.hash;
         var href = history.state ? history.state.href : null;
-        if (href != location.origin + location.pathname + location.hash)
-            history.replaceState({uuid: uuidv4(), status: history.state ? history.state.status : 200, data:{}, method: history.state ? history.state.method : "GET", href: location.origin + location.pathname + location.hash}, '', location.origin + location.pathname + location.hash);
+        if (href != here)
+            history.replaceState({uuid: uuidv4(), status: history.state ? history.state.status : 200, data:{}, method: history.state ? history.state.method : "GET", href: here}, '', here);
     } catch (e) {
         if (Settings.debug) console.error('Transparent: initial replaceState failed (likely a srcdoc iframe) - continuing without it', e);
+    }
+
+    // The entry this document was loaded as. currentNavUuid only exists once
+    // a navigation has happened; the nest compares against whichever page the
+    // host is actually showing (see nest.reopen).
+    var initialUuid = history.state && history.state.uuid ? history.state.uuid : null;
+
+    // ── History of a nest iframe ─────────────────────────────────────────
+    // A srcdoc iframe has no history of its own (pushState throws there), so
+    // the entry it is showing and the pages it has shown are kept here: the
+    // outgoing page is cached under its entry like on the host, and the host
+    // replays one on Back/Forward (nest.replayInFrame) as an ordinary cached
+    // swap. Without it every history step inside the overlay downloaded the
+    // page again and reloaded the whole iframe, scripts and styles included.
+    var nestCurrent = null;
+    var nestEntries = {};
+
+    function nestKey(href) {
+        try { return new URL(href, document.baseURI).href; } catch (e) { return href; }
+    }
+
+    function nestRecord(state) {
+        nestCurrent = state;
+        nestEntries[nestKey(state.href)] = state;
+    }
+
+    // The entry the document is showing: history.state on the host, the
+    // recorded one inside a nest iframe.
+    function currentEntry() {
+        return location.origin === 'null' ? nestCurrent : history.state;
+    }
+
+    if (location.origin === 'null') {
+        nestRecord({ uuid: uuidv4(), status: 200, method: "GET", data: {}, href: document.baseURI });
+    }
+
+    // Whether this nest iframe can show href again from its cache.
+    Transparent.nestCanReplay = function(href) {
+        var state = nestEntries[nestKey(href)];
+        if (!state) return false;
+        if (nestCurrent && nestKey(nestCurrent.href) === nestKey(href)) return true;
+        return Transparent.hasResponse(state.uuid);
+    };
+
+    // Show href again from the cache, as a Back/Forward step. Called by the
+    // host; returns false when there is nothing cached to show.
+    Transparent.nestReplay = function(href) {
+
+        if (!isReady || !Transparent.nestCanReplay(href)) return false;
+
+        var state = nestEntries[nestKey(href)];
+        if (nestCurrent === state) return true;
+
+        // Kept as it is now, not as it was first cached: Forward comes back to it.
+        if (nestCurrent && nestCurrent.uuid)
+            Transparent.setResponse(nestCurrent.uuid, Transparent.html[0], Transparent.getScrollableElementXY());
+
+        var base = document.querySelector('head > base');
+        if (base) base.setAttribute('href', state.href);
+        nestCurrent = state;
+
+        addEventListener('transparent:load', function() {
+            try { parent.document.title = document.title; } catch (e) {}
+        }, { once: true });
+
+        __main__({ type: Transparent.state.POPSTATE, state: state, preventDefault: function() {} });
+        return true;
+    };
+
+    // ── Reload keeps the scroll position ─────────────────────────────────
+    // The browser's own restoration cannot be relied on: it restores against
+    // a document that is still growing (deferred bundles, images), and any
+    // page that sets history.scrollRestoration = "manual" turns it off for
+    // every later reload of that entry. So the position is saved when the
+    // page goes, and put back on a reload of the same address - at once,
+    // again when the DOM is parsed and again once everything has loaded, and
+    // no more after the visitor scrolls, clicks or types themselves.
+    //
+    // Stored in sessionStorage["transparent[reload]"] as {href, top, left}:
+    // a page script that runs before this bundle (to avoid painting the top
+    // of the page first) may read it too. Transparent.getReloadPosition()
+    // returns it when this load is such a reload, null otherwise.
+    var RELOAD_KEY = 'transparent[reload]';
+    var reloadRestored = false;
+
+    Transparent.getReloadPosition = function() {
+        try {
+            var entry = performance.getEntriesByType('navigation')[0];
+            if (!entry || entry.type !== 'reload') return null;
+            var saved = JSON.parse(sessionStorage.getItem(RELOAD_KEY) || 'null');
+            if (!saved || saved.href !== location.href) return null;
+            return { top: +saved.top || 0, left: +saved.left || 0 };
+        } catch (e) {
+            return null;
+        }
+    };
+
+    if (location.origin !== 'null') { // not inside a nest iframe: the host owns the scroll
+
+        window.addEventListener('pagehide', function() {
+            try {
+                sessionStorage.setItem(RELOAD_KEY, JSON.stringify({ href: location.href, top: window.scrollY, left: window.scrollX }));
+            } catch (e) {}
+        });
+
+        (function() {
+            var position = Transparent.getReloadPosition();
+            if (!position) return;
+
+            reloadRestored = true;
+
+            var USER_EVENTS = ['wheel', 'touchstart', 'keydown', 'mousedown'];
+            var stopped = false;
+            var stop = function() {
+                stopped = true;
+                USER_EVENTS.forEach(function(type) { window.removeEventListener(type, stop, true); });
+            };
+            var apply = function() { if (!stopped) window.scrollTo(position.left, position.top); };
+
+            USER_EVENTS.forEach(function(type) { window.addEventListener(type, stop, { capture: true, passive: true }); });
+
+            apply();
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply, { once: true });
+            if (document.readyState !== 'complete') {
+                window.addEventListener('load', function() { apply(); setTimeout(function() { apply(); stop(); }, 0); }, { once: true });
+            } else {
+                setTimeout(function() { apply(); stop(); }, 0);
+            }
+        })();
     }
 
     if($("html").hasClass(Transparent.state.DISABLE))
@@ -3186,7 +4119,30 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
 
         document.addEventListener('click', __main__, false);
 
-        $("form").on("submit", __main__);
+        // Delegated from the document, not bound to the forms that exist now.
+        // `$("form").on(...)` reached only the forms of the first page loaded:
+        // every page swapped in afterwards brought forms nothing listened to,
+        // so a submission that is not a click on a submit button - Enter in a
+        // form with no button (a search box), a script's requestSubmit() -
+        // went to the browser, and the browser posted it the old way: a full
+        // page load, no transition, the app started over. A click on a button
+        // never showed it, because the click listener above is on the document.
+        //
+        // Delegation also means it runs after the handlers bound on the form
+        // itself, so their verdict is respected: base-bundle's form.js cancels
+        // a disabled form and stops an invalid one, and neither must turn into
+        // a navigation here. The submit event this module dispatches itself
+        // (see the Firefox note in __main__) does not bubble, so it never
+        // comes back through here.
+        //
+        // Called with the document as `this`, like the click listener:
+        // __main__ gives up unless `this` contains Settings.identifier, and a
+        // form never does - which is why the old per-form binding had in fact
+        // never sent anything, even on the first page.
+        $(document).on("submit", "form", function (e) {
+            if (e.isDefaultPrevented()) return;
+            return __main__.call(document, e);
+        });
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -3224,16 +4180,130 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
         var hostTitle = null;      // host document title backup
         var hostOverflow = null;   // body overflow backup
         var closing = false;       // reentrance guard (closeNest vs popstate)
+        // The one closed-but-still-mounted session, if any - see closeShell
+        // and resume() at the bottom of this module.
+        var parked = null;
+
+        // The overlay's own classes on <html> must survive a swap of the
+        // host page underneath it (nest.reopen replays one while it opens).
+        [HTML_CLASS, 'nest-docked', 'nest-loading'].forEach(function(name) { Persist.add(name); });
+
+        // Every nest history entry remembers the HOST entry under the
+        // overlay ({uuid, href, ...}). Once the overlay has been left for
+        // another page (api.leave), Back onto a nest entry has to put that
+        // page back under the overlay, not just re-show the overlay over
+        // whatever the host is showing now.
+        function hostStateNow() {
+            var state = history.state;
+            if (state && state.nest) return state.nest.host || null;
+            return state && state.uuid ? state : null;
+        }
+
+        function nestState(href, container) {
+            return { nest: { href: href, host: container && container._hostState ? container._hostState : null } };
+        }
+
+        function shownHostUuid() {
+            return currentNavUuid || initialUuid;
+        }
+
+        // A host entry replayed as though Back/Forward had landed on it. A
+        // copy of the event, not the event: __main__ skips the real one once
+        // the nest has marked it.
+        function replayHost(state) {
+            __main__({ type: Transparent.state.POPSTATE, state: state, preventDefault: function() {} });
+        }
+
+        // Back/Forward onto a nest entry with no overlay showing: put the host
+        // page it was over back if another one is showing, then bring the
+        // overlay back - the parked session when it is still that page,
+        // otherwise a fresh open.
+        function reopen(state) {
+            var host = state.host;
+            if (host && host.uuid && host.uuid !== shownHostUuid()) replayHost(host);
+
+            // The parked session, when it is on that page or can go back to it
+            // from its own cache - resume() alone would also accept the page it
+            // was OPENED with while showing another one.
+            var container = parked;
+            if (container && (sameTarget(state.href, container._currentHref) || canReplayInFrame(container, state.href))) {
+                resume(container._currentHref);
+                if (!sameTarget(state.href, container._currentHref)) replayInFrame(container, state.href);
+                return;
+            }
+
+            fetchNested(state.href, function() { window.location.href = state.href; });
+        }
+
+        function innerTransparent(container) {
+            try {
+                var frame = container.querySelector('.transparent-nest-body iframe');
+                return frame && frame.contentWindow ? frame.contentWindow.Transparent || null : null;
+            } catch (e) { return null; }
+        }
+
+        function canReplayInFrame(container, href) {
+            var inner = innerTransparent(container);
+            try { return !!(inner && inner.nestCanReplay && inner.nestCanReplay(href)); } catch (e) { return false; }
+        }
+
+        // A Back/Forward step inside the overlay, served by the nested page's
+        // own transparent from its cache instead of a new fetch and mount.
+        function replayInFrame(container, href) {
+            var inner = innerTransparent(container);
+            try { if (!inner || !inner.nestReplay || !inner.nestReplay(href)) return false; }
+            catch (e) { return false; }
+            container._currentHref = href;
+            return true;
+        }
+
+        // ── Remembered panel layout (Settings.nest_remember) ─────────────
+        // localStorage, not the sessionStorage the response cache uses: the
+        // point is to outlive the tab. Every access is wrapped - a private
+        // window, blocked site data or a full quota all throw or hand back
+        // null, and none of that is a reason for the overlay not to open.
+        // Shape is versioned so a future change to what gets stored
+        // discards old entries instead of half-applying them.
+        var LAYOUT_VERSION = 1;
+
+        function readLayout() {
+
+            if (Settings["nest_remember"] === false) return null;
+            try {
+                var raw = localStorage.getItem(Settings["nest_remember_key"]);
+                if (!raw) return null;
+                var state = JSON.parse(raw);
+                return (state && state.v === LAYOUT_VERSION) ? state : null;
+            } catch (e) { return null; }
+        }
+
+        function writeLayout(state) {
+
+            if (Settings["nest_remember"] === false) return;
+            try {
+                if (state == null) localStorage.removeItem(Settings["nest_remember_key"]);
+                else localStorage.setItem(Settings["nest_remember_key"], JSON.stringify(state));
+            } catch (e) { if (Settings.debug) console.error('Transparent.nest: layout not stored', e); }
+        }
 
         api.isOpen = function() {
             var el = document.getElementById(CONTAINER_ID);
             // a container mid-close-fade doesn't count as "open" - a fast
-            // re-open must be treated as fresh, not folded into the dying one
-            return el != null && !el.classList.contains('is-closing');
+            // re-open must be treated as fresh, not folded into the dying
+            // one - and neither does a parked one: it IS closed, it just
+            // still exists (hidden) so its nested page keeps its state.
+            return el != null
+                && !el.classList.contains('is-closing')
+                && !el.classList.contains('is-parked');
         };
 
+        // Deliberately blind to a parked container, so that everything
+        // reaching for "the overlay" (esc, retry, mount, close) treats a
+        // parked session as gone. resume() below is the only way back to
+        // it, through the `parked` reference.
         api.getContainer = function() {
-            return document.getElementById(CONTAINER_ID);
+            var el = document.getElementById(CONTAINER_ID);
+            return el != null && !el.classList.contains('is-parked') ? el : null;
         };
 
         // __main__ consults this before acting: popstate traffic related to
@@ -3254,16 +4324,21 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
         // the host's history. The address bar follows only while the panel
         // is full-page; floating, it is "just a panel" over the host page
         // and the host's own URL stays.
-        api.notifyNavigated = function(href, title) {
+        api.notifyNavigated = function(href, title, info) {
 
             var container = api.getContainer();
             if (container == null) return false;
 
             container._currentHref = href;
+            // A form was sent from this session and accepted: the page it
+            // was opened with has done its job (see resume).
+            // (told by the nested page, or heard as a submit event in the frame)
+            if (info && String(info.method).toUpperCase() === 'POST' && info.status < 400) container._submitted = true;
+            if (container._pendingSubmit) { container._submitted = true; container._pendingSubmit = false; }
             if (title) document.title = title;
 
             var full = container.classList.contains('is-full');
-            try { history.pushState({ nest: { href: href } }, '', full ? href : location.href); }
+            try { history.pushState(nestState(href, container), '', full ? href : location.href); }
             catch (e) { if (Settings.debug) console.error('Transparent.nest: pushState failed', e); }
 
             dispatchEvent(new CustomEvent('transparent:nest:navigated', { detail: { href: href, committed: full } }));
@@ -3294,9 +4369,13 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
 
             // a fast re-open racing an in-flight close animation wins:
             // drop the dying node rather than leaving two #transparent-nest
-            // elements in the document at once
+            // elements in the document at once. A PARKED session is dropped
+            // here too - reaching this point means the caller asked for a
+            // page that session isn't on (resume() already declined it), and
+            // only one nested document is ever kept alive.
             var stale = document.getElementById(CONTAINER_ID);
             if (stale) stale.remove();
+            if (parked) parked = null;
 
             var container = document.createElement('div');
             container.id = CONTAINER_ID;
@@ -3304,6 +4383,11 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
             // the response URL) so share/esc/backdrop event details and the
             // share navigation always have something meaningful to use
             container._currentHref = href;
+            // the page this session was opened WITH, kept alongside the one
+            // it has since navigated to - resume() accepts either
+            container._openHref = href;
+            // the host entry this overlay sits over - see hostStateNow()
+            container._hostState = hostStateNow();
 
             // Standard modal convention: clicking the dimmed backdrop
             // (outside the panel) closes the nest. `e.target !== container`
@@ -3341,31 +4425,13 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
             busySpinner.setAttribute('aria-hidden', 'true');
             chromeBar.appendChild(busySpinner);
 
-            // Wider alternative to the spinner above - a full-width bar
-            // along the chrome's own bottom edge, same .is-busy trigger.
-            // Settings-gated (nest_progress_bar) rather than always both:
-            // a consumer nesting content that already shows its own
-            // loading feedback (see the setting's own comment) turns this
-            // OFF entirely instead of stacking a second indicator on top
-            // of the first. A plain sibling of the chrome bar (not nested
-            // inside it) so its full-width CSS positions against the
-            // PANEL, not the chrome's own narrower content box - same
-            // reasoning as .item-resize-handle in the admin dashboard's
-            // own CSS for why an absolutely-positioned child anchors to
-            // its immediate parent's box, not a distant ancestor's.
-            if (Settings["nest_progress_bar"] !== false) {
-                var progressBar = document.createElement('div');
-                progressBar.className = 'transparent-nest-progress-bar';
-                progressBar.setAttribute('aria-hidden', 'true');
-                panel.appendChild(progressBar);
-            }
-
             // resets the panel to its pristine centered default geometry -
             // shared by the dock/restore/share state switches so freed
             // (moved/resized) inline px never leaks between modes
             function resetGeometry() {
                 panel.classList.remove('is-free');
                 panel.style.left = panel.style.top = panel.style.width = panel.style.height = '';
+                updateChromePlacement();
             }
 
             // Re-parents the WHOLE panel (chrome + body, so close/dock-
@@ -3440,6 +4506,7 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                 container.classList.add('is-docked');
                 Transparent.html.addClass('nest-docked');
                 document.body.style.overflow = hostOverflow || '';
+                updateChromePlacement();
                 dispatchEvent(new CustomEvent('transparent:nest:dock', { detail: { href: container._currentHref, edge: null } }));
             }
 
@@ -3454,6 +4521,7 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                 delete container.dataset.dockEdge;
                 Transparent.html.removeClass('nest-docked');
                 document.body.style.overflow = 'hidden';
+                updateChromePlacement();
             }
 
             function restoreDefault() {
@@ -3520,8 +4588,8 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                 // pushed yet), push one now instead - replacing there
                 // would destroy the HOST's own entry.
                 try {
-                    if (history.state && history.state.nest) history.replaceState({ nest: { href: target } }, '', target);
-                    else history.pushState({ nest: { href: target } }, '', target);
+                    if (history.state && history.state.nest) history.replaceState(nestState(target, container), '', target);
+                    else history.pushState(nestState(target, container), '', target);
                 } catch (err) {}
             });
             chromeBar.appendChild(shareBtn);
@@ -3541,7 +4609,7 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
             collapseBtn.addEventListener('click', function(e) {
                 e.preventDefault();
                 if (preShareHref) {
-                    try { history.replaceState({ nest: { href: container._currentHref } }, '', preShareHref); } catch (err) {}
+                    try { history.replaceState(nestState(container._currentHref, container), '', preShareHref); } catch (err) {}
                     preShareHref = null;
                 }
                 restoreDefault();
@@ -3596,6 +4664,168 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
             });
             chromeBar.appendChild(closeBtn);
 
+            // ── Chrome placement ─────────────────────────────────────────
+            // The cluster floats in the backdrop gap ABOVE the panel (see
+            // index.scss) - which only works while there IS a gap. A panel
+            // dragged flush against the top of the viewport would push its
+            // own chrome off-screen, so below that much room it falls back
+            // inside the panel's corner. Recomputed on every move/resize/
+            // dock and, cheaply, from the pointer tracking below.
+            var CHROME_ROOM = 46;   // cluster height (34) + its 6px gap + slack
+
+            function applyChromeRoom(r) {
+
+                var inside = r.top < CHROME_ROOM;
+                if (inside === container.classList.contains('is-chrome-inside')) return;
+                container.classList.toggle('is-chrome-inside', inside);
+            }
+
+            function updateChromePlacement() { applyChromeRoom(panel.getBoundingClientRect()); }
+            container._updateChromePlacement = updateChromePlacement;
+
+            // ── Corner peek ──────────────────────────────────────────────
+            // IN FULLSCREEN ONLY, the cluster is hidden (and click-through)
+            // until the pointer dwells in the panel's top-right corner.
+            // That is the one state where it has no backdrop gap to float
+            // in and sits inside the corner instead, on top of whatever the
+            // nested page keeps there - in the consuming admin, that page's
+            // own controls - where a permanently visible pill both hides
+            // them and eats their clicks. Every other state floats it clear
+            // of the page and simply leaves it visible (see index.scss), so
+            // everything below is a no-op there.
+            //
+            // The trigger is deliberately small: a corner, not the whole
+            // top-right quadrant. A generous zone made the pill appear while
+            // the pointer was merely on its way to one of the NESTED page's
+            // own top-right controls, and the pill then covered the very
+            // button being reached for. The cluster's own (always
+            // measurable, even at opacity 0) rect is unioned in below, so
+            // shrinking this box can never strand the pointer outside the
+            // zone while it is on the pill itself.
+            var PEEK_W = 104, PEEK_ABOVE = 60, PEEK_BELOW = 36, PEEK_PAD = 10;
+            // PEEK_SHOW_MS is a dwell, not a debounce: "keep the mouse in
+            // the corner". Passing through on the way somewhere else must
+            // not flash the pill, so it is long enough to sit out a normal
+            // traverse. PEEK_HIDE_MS is the opposite - leaving must be
+            // forgiving, or the pill vanishes in the gap between the corner
+            // zone and the button the user is reaching for inside it.
+            // PEEK_YIELD_MS is that same exit taken in a hurry: the pointer
+            // has landed on a control the pill is covering, and every ms it
+            // stays up is a ms that control cannot be clicked.
+            var PEEK_SHOW_MS = 340, PEEK_HIDE_MS = 340, PEEK_YIELD_MS = 90;
+            var peekShowTimer = null, peekHideTimer = null, peekHideDelay = 0;
+
+            // Anything the pointer could be aiming AT rather than merely
+            // passing over. Matched against the element under the pointer -
+            // in the host document and, forwarded from the mount below, in
+            // the nested one.
+            var PEEK_CONTROL_SEL = 'a[href],button,input,select,textarea,summary,label,'
+                + '[role="button"],[role="link"],[role="tab"],[contenteditable=""],[contenteditable="true"]';
+
+            function isControl(target) {
+
+                if (!target || target.nodeType !== 1 || !target.closest) return false;
+                var hit = target.closest(PEEK_CONTROL_SEL);
+                // the cluster's own buttons are not a conflict with itself
+                return !!hit && !chromeBar.contains(hit);
+            }
+            container._peekIsControl = isControl;
+
+            function clearPeek() {
+
+                if (peekShowTimer) { clearTimeout(peekShowTimer); peekShowTimer = null; }
+                if (peekHideTimer) { clearTimeout(peekHideTimer); peekHideTimer = null; }
+                container.classList.remove('is-chrome-peek');
+            }
+
+            function setPeek(on, urgent) {
+
+                if (on) {
+                    if (peekHideTimer) { clearTimeout(peekHideTimer); peekHideTimer = null; }
+                    if (container.classList.contains('is-chrome-peek') || peekShowTimer) return;
+                    peekShowTimer = setTimeout(function() {
+                        peekShowTimer = null;
+                        container.classList.add('is-chrome-peek');
+                    }, PEEK_SHOW_MS);
+                    return;
+                }
+
+                if (peekShowTimer) { clearTimeout(peekShowTimer); peekShowTimer = null; }
+                if (!container.classList.contains('is-chrome-peek')) return;
+                // A pending leave already counting down is left alone -
+                // restarting it on every mousemove would turn the delay into
+                // a debounce and it would never fire. Switching from the
+                // forgiving leave to the urgent yield (or back) IS a
+                // restart: the shorter deadline has to win.
+                var delay = urgent ? PEEK_YIELD_MS : PEEK_HIDE_MS;
+                if (peekHideTimer) {
+                    if (peekHideDelay === delay) return;
+                    clearTimeout(peekHideTimer);
+                }
+                peekHideDelay = delay;
+                peekHideTimer = setTimeout(function() {
+                    peekHideTimer = null;
+                    container.classList.remove('is-chrome-peek');
+                }, delay);
+            }
+
+            // Host-viewport coordinates. The zone hugs the panel's top-right
+            // corner and deliberately reaches ABOVE the panel as well: in the
+            // default windowed state the cluster floats in the backdrop gap
+            // up there, outside the panel box entirely, so a zone clipped to
+            // the panel would never cover the pill the user is aiming at.
+            // The cluster's own rect is unioned in for the same reason - it
+            // grows and moves with the state (fullscreen, docked, error) and
+            // must stay hoverable whatever the fixed box above covers.
+            function peekFromPoint(x, y, overControl) {
+
+                // a parked session still has these listeners attached, and
+                // measures as a zero rect while hidden - nothing here means
+                // anything until it is resumed
+                if (container.classList.contains('is-parked')) return;
+
+                var r = panel.getBoundingClientRect();
+                // free ride: this is the one callback that already runs on
+                // every pointer move, so the placement stays right even
+                // after a viewport change nothing else hooked
+                applyChromeRoom(r);
+
+                // Outside fullscreen the cluster is simply always visible -
+                // nothing to peek at, and a stale .is-chrome-peek left on
+                // here would make the next fullscreen start out showing it.
+                if (!container.classList.contains('is-full')) { clearPeek(); return; }
+
+                // A control under the pointer OWNS that pointer, wherever it
+                // is. The pill is opaque and, once shown, click-eating: put
+                // it over a button somebody is already hovering and it both
+                // hides the target and swallows the click meant for it. So
+                // this is a veto, not a longer dwell - an earlier version
+                // merely stretched the wait to a second and the pill still
+                // turned up on top of the control being used. Keyboard users
+                // are unaffected (:focus-within shows it) and Escape still
+                // closes the nest outright, so no state is unreachable.
+                if (overControl) { setPeek(false, true); return; }
+
+                var inCorner = x >= r.right - PEEK_W && x <= r.right + PEEK_PAD
+                            && y >= r.top - PEEK_ABOVE && y <= r.top + PEEK_BELOW;
+
+                if (!inCorner) {
+                    var c = chromeBar.getBoundingClientRect();
+                    inCorner = x >= c.left - PEEK_PAD && x <= c.right + PEEK_PAD
+                            && y >= c.top - PEEK_PAD && y <= c.bottom + PEEK_PAD;
+                }
+
+                setPeek(inCorner);
+            }
+            container._peekFromPoint = peekFromPoint;
+
+            document.addEventListener('mousemove', function(e) {
+                peekFromPoint(e.clientX, e.clientY, isControl(e.target));
+            });
+            // Pointer gone from the host document entirely - drop it rather
+            // than leaving the pill stranded on screen.
+            document.addEventListener('mouseleave', function() { setPeek(false); });
+
             var body = document.createElement('div');
             body.className = 'transparent-nest-body';
             panel.appendChild(body);
@@ -3609,6 +4839,49 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
             error.innerHTML = '<div class="transparent-nest-error-icon">&#9888;</div>'
                 + '<div class="transparent-nest-error-message">Something went wrong loading this content.</div>';
             body.appendChild(error);
+
+            // ── Host drag shield ─────────────────────────────────────────
+            // The iframe swallows every mouse event over the pixels it
+            // covers, so a drag implemented the usual way - listeners on the
+            // HOST document, no pointer capture - dies the moment the
+            // pointer crosses the panel: no more mousemove, and no mouseup
+            // either, which typically leaves whatever was being dragged
+            // stuck to the pointer afterwards. Reported live against
+            // Symfony's dev toolbar, which is draggable and sits above the
+            // overlay (z-index 9999999): dragging it froze the instant it
+            // reached the panel and never let go.
+            //
+            // The panel's OWN drags already solve this by making the frame
+            // inert while .is-dragging (see index.scss). A host-page widget
+            // cannot reach for that class, so arm the same shield on its
+            // behalf: a pointerdown landing on the host document makes the
+            // frame inert until the button comes back up. It costs the
+            // nested page nothing - the pointer is by definition NOT over
+            // the iframe at the moment a host pointerdown happens (one
+            // inside it never crosses the boundary at all, so it can never
+            // arm this), and press/release/click still works normally.
+            function shieldOff() {
+
+                if (container.classList.contains('is-host-dragging')) {
+                    container.classList.remove('is-host-dragging');
+                }
+            }
+
+            document.addEventListener('pointerdown', function(e) {
+                if (e.button !== 0) return;
+                if (container.classList.contains('is-parked')) return;
+                container.classList.add('is-host-dragging');
+            }, true);
+            // Captured on window so a release the page swallows still lifts
+            // the shield, plus the ways a drag can end without a pointerup
+            // reaching us at all (cancelled, released outside the window and
+            // noticed only on the next buttonless move, tabbed away).
+            window.addEventListener('pointerup', shieldOff, true);
+            window.addEventListener('pointercancel', shieldOff, true);
+            window.addEventListener('blur', shieldOff);
+            document.addEventListener('pointermove', function(e) {
+                if (e.buttons === 0) shieldOff();
+            }, true);
 
             // ── Panel interactions: move (drag the chrome bar), resize
             // (drag edges/corners), magnetic snap against viewport
@@ -3699,7 +4972,127 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                     panel.style.width = '';
                 }
                 panel.style.left = panel.style.top = '';
+                updateChromePlacement();
                 dispatchEvent(new CustomEvent('transparent:nest:dock', { detail: { href: container._currentHref, edge: edge } }));
+            }
+
+            // ── Remembered layout: capture / apply ───────────────────────
+            // Exposed on the container (same pattern as _teardownDock and
+            // _updateChromePlacement) because closeShell lives outside this
+            // closure and has no other way to reach the panel - and must
+            // read it BEFORE it undoes a container-dock.
+            //
+            // Nothing is stored on the mobile breakpoint: the panel is
+            // always fullscreen there, so a snapshot would only record "no
+            // geometry" and wipe whatever the desktop left behind.
+            container._captureLayout = function() {
+
+                if (Settings["nest_remember"] === false || isMobile()) return;
+                // A shell torn down before anything mounted (an ineligible
+                // target - see fetchNested's ineligible()) is a shell the
+                // user never saw, let alone arranged. It closes through the
+                // same closeShell, and must not be allowed to write over a
+                // layout they set up for real.
+                if (!container._mounted) return;
+                // Fullscreen has no position or size of its own to
+                // remember - share() cleared both on the way in. Leaving
+                // the previous entry alone (rather than recording "no
+                // geometry", which reads as the centered default) is what
+                // makes going full page a temporary excursion: dock it
+                // left, expand, close, and the next open is docked left
+                // again, not back at square one.
+                if (container.classList.contains('is-full')) return;
+
+                var docked = container.classList.contains('is-docked');
+                var free = panel.classList.contains('is-free');
+
+                // Nothing was ever moved, resized or docked - the panel is
+                // still the pristine centered default. Clear the entry
+                // rather than storing that: "I put it back in the middle"
+                // should stick just as much as "I put it on the left".
+                if (!docked && !free) return writeLayout(null);
+
+                writeLayout({
+                    v: LAYOUT_VERSION,
+                    docked: docked,
+                    containerDocked: container.classList.contains('is-container-docked'),
+                    edge: container.dataset.dockEdge || null,
+                    // Read off the inline styles rather than the rect: while
+                    // docked, the span dimension is deliberately CSS-driven
+                    // (100vh/100vw) and an empty string here is what keeps
+                    // it responsive on the way back in. A rect would freeze
+                    // today's viewport into it.
+                    left: panel.style.left,
+                    top: panel.style.top,
+                    width: panel.style.width,
+                    height: panel.style.height
+                });
+            };
+
+            // Puts a stored layout back on a FRESH shell. (A parked session
+            // resumed by resume() needs none of this - that container never
+            // left the document and still carries its own classes and inline
+            // px.) Called once, from openShell's tail, before the first
+            // paint, so the panel appears where it belongs instead of
+            // visibly jumping there from the centered default.
+            function applyLayout() {
+
+                var state = readLayout();
+                if (state == null || isMobile()) return;
+                if (Settings["nest_dock"] === false && state.docked) return; // docking forbidden since it was stored
+
+                // Re-parenting into a host element replaces geometry
+                // entirely, so it is tried first and nothing else applies.
+                // Falls through when nest_dock_target is gone or unset.
+                if (state.containerDocked && containerDock()) return;
+
+                var vw = window.innerWidth, vh = window.innerHeight;
+                var num = function(v) { var n = parseFloat(v); return isFinite(n) ? n : null; };
+                var w = num(state.width), h = num(state.height);
+                var l = num(state.left), t = num(state.top);
+
+                if (w != null || h != null || l != null || t != null) {
+                    panel.classList.add('is-free');
+                    // Clamped against TODAY's viewport, which may be another
+                    // monitor or a resized window: a panel stored 1200 wide
+                    // at x=1320 has to come back usable on a 900px screen,
+                    // not as a corner poking in from off-stage.
+                    //
+                    // Size first, down to the viewport - which is what then
+                    // makes full containment free: with w <= vw the range
+                    // [0, vw - w] is never empty, so the panel always lands
+                    // wholly on screen. Deliberately stricter than a drag,
+                    // which is free to push a panel off the edge (that IS
+                    // the dock gesture); a reopen is not a gesture and has
+                    // to land somewhere the user can work.
+                    if (w != null) w = Math.min(Math.max(w, MIN_W), vw);
+                    if (h != null) h = Math.min(Math.max(h, MIN_H), vh);
+                    if (l != null) l = Math.min(Math.max(l, 0), Math.max(0, vw - (w != null ? w : MIN_W)));
+                    if (t != null) t = Math.min(Math.max(t, 0), Math.max(0, vh - (h != null ? h : MIN_H)));
+
+                    panel.style.left = l != null ? l + 'px' : '';
+                    panel.style.top = t != null ? t + 'px' : '';
+                    panel.style.width = w != null ? w + 'px' : '';
+                    panel.style.height = h != null ? h + 'px' : '';
+                }
+
+                if (state.edge) {
+                    applyDock(state.edge);
+                    // applyDock re-derives the dock DEPTH through a clamp
+                    // sized for a panel arriving from the centered default
+                    // (<=480/360). That is right for a fresh dock and wrong
+                    // here: a sidebar the user deliberately widened past it
+                    // would come back narrower than they left it every time.
+                    // The stored depth wins, bounded only by the viewport.
+                    if (state.edge === 'left' || state.edge === 'right') {
+                        if (w != null) panel.style.width = Math.min(w, vw) + 'px';
+                    } else if (h != null) {
+                        panel.style.height = Math.min(h, vh) + 'px';
+                    }
+                    updateChromePlacement();
+                } else if (state.docked) {
+                    enterPassthrough();
+                }
             }
 
             if (Settings["nest_move"] !== false) {
@@ -3715,12 +5108,6 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                 // last pointerdown ourselves sidesteps that entirely.
                 var lastDownAt = 0, lastDownX = 0, lastDownY = 0;
                 var DBLCLICK_MS = 400, DBLCLICK_PX = 10;
-                // How far a drag has to pull a DOCKED panel away from its
-                // edge, as a fraction of the remaining distance to the
-                // opposite edge, before release commits to full page
-                // instead of springing back to the normal clamped dock
-                // depth - see the pointerdown handler's peel-drag branch.
-                var PEEL_COMMIT_RATIO = 0.45;
                 // A plain click's hide/show toggle can't fire immediately on
                 // pointerup - it has to wait out the double-click window
                 // first, since the SAME click is also candidate #1 of a
@@ -3730,6 +5117,7 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                 var pendingClickTimer = null;
                 chromeBar.addEventListener('pointerdown', function(e) {
                     if (e.button !== 0) return;
+                    if (container.classList.contains('is-full')) return; // fullscreen (shared) isn't draggable
                     if (isMobile()) return; // always-fullscreen breakpoint - swipe handles dismissal instead
                     if (e.target.closest && e.target.closest('button')) return;
 
@@ -3741,57 +5129,34 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                     if (isDoubleClick) {
                         lastDownAt = 0; // consumed - a third rapid click starts fresh, isn't a triple-trigger
                         if (pendingClickTimer) { clearTimeout(pendingClickTimer); pendingClickTimer = null; }
-                        // Three-way toggle, not always "restore": docked -
-                        // pick it up and recenter (unchanged, original
-                        // behavior); already fullscreen - collapse back to
-                        // default (reuses collapseBtn's own handler, same
-                        // "exit full page" as clicking its small arrow);
-                        // otherwise (free-floating default position
-                        // already) - go fullscreen instead of a no-op
-                        // restore, matching a double-click-title-bar-to-
-                        // maximize gesture. Checked BEFORE the is-full
-                        // drag-disable bailout below, since fullscreen must
-                        // still be reachable by double-click even though
-                        // fullscreen itself isn't draggable.
-                        if (container.classList.contains('is-docked')) {
-                            restoreDefault();
-                        } else if (container.classList.contains('is-full')) {
-                            collapseBtn.click();
-                        } else {
-                            shareBtn.click();
-                        }
+                        restoreDefault();
                         return;
                     }
 
-                    if (container.classList.contains('is-full')) return; // fullscreen (shared) isn't draggable
-
                     var sx = e.clientX, sy = e.clientY;
                     var sl, st, started = false;
-                    // Set only when a drag STARTS from a docked grab tab -
-                    // the edge it was picked up from, kept while the panel
-                    // is being pulled progressively away from that edge
-                    // ("peeled" open) rather than undocked outright. null
-                    // for every other kind of drag (free-floating move).
-                    var peelEdge = null, peelStartDepth = 0;
                     container.classList.add('is-dragging');
                     try { chromeBar.setPointerCapture(e.pointerId); } catch (err) {}
 
-                    // Picking a docked panel up no longer undocks it
-                    // outright - it stays docked (CSS keeps the span
-                    // dimension at 100vw/100vh and the panel pinned to its
-                    // edge) while onMove grows the DEPTH dimension live as
-                    // the pointer pulls away, like a pull-up sheet. onUp
-                    // then decides, based on how far it got pulled, whether
-                    // that commits to full page or springs back to the
-                    // normal clamped dock depth (see the peelEdge branches
-                    // in onMove/onUp below). A plain (non-docked) drag is
-                    // unaffected - still goes through toFree()/
-                    // enterPassthrough() exactly as before.
+                    // Picking a docked panel up needs its own snapshot, NOT
+                    // plain toFree(): a docked panel's SPAN dimension is
+                    // deliberately oversized (100vh for left/right,
+                    // 100vw for top/bottom) as part of what docking means -
+                    // carrying that straight into a free-floating box would
+                    // hand the drag a panel whose height/width already
+                    // reaches (or exceeds, given the move itself shifts
+                    // top/left too) the opposite viewport edge, so the
+                    // edge-proximity check at release would false-positive
+                    // "still touching" almost immediately, regardless of
+                    // where it's actually dropped. Undocking gives the span
+                    // dimension a normal, moderate size instead - only the
+                    // depth (the dimension that was actually meaningful
+                    // while docked) carries over.
                     var beginDrag = function() {
                         started = true;
                         var wasDocked = container.classList.contains('is-docked');
                         if (wasDocked) {
-                            peelEdge = container.dataset.dockEdge;
+                            var edgeAtPickup = container.dataset.dockEdge;
                             // drop is-hidden BEFORE measuring - its
                             // transform pushes the panel fully off-screen,
                             // so a rect taken while it's still applied would
@@ -3799,23 +5164,28 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                             // coordinates
                             container.classList.remove('is-hidden');
                             var rect = panel.getBoundingClientRect();
-                            peelStartDepth = (peelEdge === 'left' || peelEdge === 'right') ? rect.width : rect.height;
-                            // is-docked's own CSS IS the passthrough state
-                            // already (transparent, pointer-events:none) -
-                            // no clearDock()/enterPassthrough() needed here;
-                            // that only happens once onUp actually commits
-                            // to full page or a genuine free position.
+                            clearDock();
+                            panel.classList.add('is-free');
+                            if (edgeAtPickup === 'left' || edgeAtPickup === 'right') {
+                                panel.style.width = rect.width + 'px';
+                                panel.style.height = Math.round(window.innerHeight * 0.7) + 'px';
+                            } else {
+                                panel.style.height = rect.height + 'px';
+                                panel.style.width = Math.round(window.innerWidth * 0.7) + 'px';
+                            }
+                            panel.style.left = rect.left + 'px';
+                            panel.style.top = rect.top + 'px';
                         } else {
                             toFree();
-                            // "if it's not in its default position we
-                            // should go into docking mode" - a genuine drag
-                            // starting drops the modal backdrop immediately,
-                            // not just once it happens to land pushed
-                            // against an edge
-                            enterPassthrough();
-                            sl = parseFloat(panel.style.left);
-                            st = parseFloat(panel.style.top);
                         }
+                        // "if it's not in its default position we should go
+                        // into docking mode" - a genuine drag starting (or
+                        // resuming from a prior dock) drops the modal
+                        // backdrop immediately, not just once it happens to
+                        // land pushed against an edge
+                        enterPassthrough();
+                        sl = parseFloat(panel.style.left);
+                        st = parseFloat(panel.style.top);
                     };
 
                     var onMove = function(ev) {
@@ -3842,53 +5212,15 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                             if (pendingClickTimer) { clearTimeout(pendingClickTimer); pendingClickTimer = null; }
                             beginDrag();
                         }
-                        if (peelEdge) {
-                            // Distance pulled AWAY from the edge it's
-                            // docked to, in the direction that grows the
-                            // panel (not raw pointer delta - "up" grows a
-                            // bottom dock but shrinks a top dock). Clamped
-                            // so it never shrinks below the normal docked
-                            // depth (that's what the resize handle is for)
-                            // nor grows past the opposite viewport edge.
-                            var pulled;
-                            if (peelEdge === 'top') pulled = ev.clientY - sy;
-                            else if (peelEdge === 'bottom') pulled = sy - ev.clientY;
-                            else if (peelEdge === 'left') pulled = ev.clientX - sx;
-                            else pulled = sx - ev.clientX;
-                            var maxDepth = (peelEdge === 'left' || peelEdge === 'right') ? window.innerWidth : window.innerHeight;
-                            var depth = Math.min(Math.max(peelStartDepth + pulled, peelStartDepth), maxDepth);
-                            if (peelEdge === 'left' || peelEdge === 'right') panel.style.width = depth + 'px';
-                            else panel.style.height = depth + 'px';
-                            return;
-                        }
                         panel.style.left = (sl + ev.clientX - sx) + 'px';
                         panel.style.top = (st + ev.clientY - sy) + 'px';
+                        updateChromePlacement();
                     };
                     var onUp = function() {
                         chromeBar.removeEventListener('pointermove', onMove);
                         chromeBar.removeEventListener('pointerup', onUp);
                         chromeBar.removeEventListener('pointercancel', onUp);
                         container.classList.remove('is-dragging');
-                        if (peelEdge) {
-                            var maxDepth = (peelEdge === 'left' || peelEdge === 'right') ? window.innerWidth : window.innerHeight;
-                            var depth = (peelEdge === 'left' || peelEdge === 'right') ? panel.getBoundingClientRect().width : panel.getBoundingClientRect().height;
-                            var committed = (depth - peelStartDepth) >= (maxDepth - peelStartDepth) * PEEL_COMMIT_RATIO;
-                            var edge = peelEdge;
-                            peelEdge = null;
-                            if (committed) {
-                                // same "expand to full page" path as the
-                                // button and the double-click gesture -
-                                // clears dock state and commits the URL
-                                shareBtn.click();
-                            } else {
-                                // didn't pull far enough - spring back to
-                                // the normal clamped dock depth (re-derives
-                                // it from the current, partially-pulled
-                                // rect, same clamp applyDock always uses)
-                                applyDock(edge);
-                            }
-                            return;
-                        }
                         if (started) {
                             var edge = pushedOutEdge(panel.getBoundingClientRect());
                             // Pushed past an edge -> full edge-fit dock.
@@ -3964,6 +5296,7 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                         panel.style.top = top + 'px';
                         panel.style.width = w + 'px';
                         panel.style.height = h + 'px';
+                        updateChromePlacement();
                     };
                     var onUp = function() {
                         handle.removeEventListener('pointermove', onMove);
@@ -4036,6 +5369,14 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
             document.body.style.overflow = 'hidden';
             document.body.appendChild(container);
             Transparent.html.addClass(HTML_CLASS);
+
+            // Where the user left it last time, put back before the
+            // synchronous style flush below commits the first frame - so
+            // the panel is simply THERE, never centered-then-jumping. Has
+            // to run after the append (its helpers measure the panel) and
+            // after hostOverflow is captured (docking hands the host page
+            // its scrollbar back through it).
+            applyLayout();
 
             // Force a SYNCHRONOUS style flush (reading a layout-dependent
             // property forces the browser to commit the base opacity:0
@@ -4117,6 +5458,16 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                 frame = document.createElement('iframe');
                 frame.setAttribute('title', title || 'nested');
                 body.appendChild(frame);
+                frame.addEventListener('load', function() {
+                    guardFrameLocation(container, frame);
+                    // Heard from the host itself: the nested page may run an
+                    // older transparent that does not say a form was sent
+                    // (see notifyNavigated). Capture, so a submission the
+                    // nested page takes over and cancels is heard too.
+                    try {
+                        frame.contentDocument.addEventListener('submit', function() { container._pendingSubmit = true; }, true);
+                    } catch (e) {}
+                });
             }
 
             // Reveal only once the iframe has actually finished loading -
@@ -4134,6 +5485,9 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                 if (revealed) return;
                 revealed = true;
                 container._pendingReveal = null;
+                // there is now a real nested document worth keeping alive
+                // across a close (see canPark)
+                container._mounted = true;
                 // backs the `href` on esc/close-adjacent events without
                 // inventing separate per-event tracking
                 container._currentHref = href;
@@ -4216,6 +5570,30 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                     // assumption turns out not to hold in some engine
                     try { doc.addEventListener('keydown', handleEscKeydown, true); } catch (e) {}
 
+                    // The iframe swallows the host's mousemove for every
+                    // pixel it covers - which, now that the chrome bar no
+                    // longer reserves a strip, is the whole panel. Without
+                    // this the corner peek could only ever trigger from the
+                    // backdrop around the panel, i.e. never at all in
+                    // fullscreen or when docked. Coordinates are relative to
+                    // the iframe's own viewport, so shift them into host
+                    // space by its rect. Re-attached per mount() like the
+                    // keydown above: srcdoc replaces the whole Document.
+                    try {
+                        doc.addEventListener('mousemove', function(e) {
+                            if (!container._peekFromPoint) return;
+                            var fr = frame.getBoundingClientRect();
+                            // Whether the pointer sits on one of the NESTED
+                            // page's own controls travels with the point:
+                            // the host cannot see through the iframe to ask,
+                            // and it is exactly the case the peek has to
+                            // stay out of the way for.
+                            var onControl = container._peekIsControl
+                                && container._peekIsControl(e.target);
+                            container._peekFromPoint(e.clientX + fr.left, e.clientY + fr.top, onControl);
+                        }, true);
+                    } catch (e) {}
+
                     // Mirror the nested page's own transparentJS loading
                     // state (its html.loading class, set for every in-iframe
                     // SPA navigation) onto the container as .is-busy - this
@@ -4262,6 +5640,42 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
             // Same-origin srcdoc means contentDocument is synchronously
             // available immediately, before 'load' even fires.
             try { frame.contentDocument.addEventListener('keydown', handleEscKeydown, true); } catch (e) {}
+        }
+
+        // The overlay only ever shows documents it mounted itself (srcdoc). A
+        // real navigation inside the iframe - anything the nested page's
+        // transparent did not handle - loads a document of its own there, with
+        // a real origin, and without the guards a nested page relies on. A page
+        // outside the nest's scope leaves the overlay for the host (api.leave);
+        // one inside it is mounted again, like any nested page.
+        function guardFrameLocation(container, frame) {
+
+            var href;
+            try { href = frame.contentWindow.location.href; } catch (e) { return; }
+
+            if (api.getContainer() !== container) return;
+
+            if (!href || href === 'about:srcdoc' || href === 'about:blank') {
+                // A mounted document: hide it the moment it starts unloading,
+                // so a real navigation never shows its page inside the panel.
+                try {
+                    frame.contentWindow.addEventListener('pagehide', function() {
+                        if (closing || api.getContainer() !== container) return;
+                        container.classList.remove('is-entering');
+                        container.classList.add('is-loading');
+                    });
+                } catch (e) {}
+                return;
+            }
+
+            if (api.inScope(href)) {
+                fetchNested(href, function() { window.location.href = href; });
+                return;
+            }
+
+            // Nothing worth parking: the iframe holds the host's page now.
+            container._mounted = false;
+            if (!api.leave(href)) window.location.href = href;
         }
 
         // Called by the nested page itself - `parent.Transparent.notifyNestReady()`
@@ -4362,8 +5776,20 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                 // history.state guard covers share-during-loading, which
                 // already pushed the nest entry itself - pushing a second
                 // one here would strand an extra Back press.
+                //
+                // Guarded like notifyNavigated's own pushState: the overlay is
+                // already mounted by now, and a history entry it could not
+                // write is no reason to tear it down. Unguarded, the throw
+                // reached fetchRaw's catch, which reads any exception as
+                // "not nestable" - closing a working overlay and navigating
+                // the whole page away instead. Browsers do refuse this call:
+                // Firefox when the document URL carries user:password@
+                // (seen driving beta through basic auth that way), WebKit and
+                // Gecko past their pushState rate limits. The cost of the
+                // guard is only that Back will not close this one overlay.
                 if (fresh && !(history.state && history.state.nest)) {
-                    history.pushState({ nest: { href: url } }, '', location.href);
+                    try { history.pushState(nestState(url, container), '', location.href); }
+                    catch (e) { if (Settings.debug) console.error('Transparent.nest: history entry not written', e); }
                 }
                 done();
             };
@@ -4441,9 +5867,78 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
             api.navigate(href);
         }
 
+        // Same target, whether or not either side is absolute: the click
+        // that reopens a nest is usually a bare "/admin" while the parked
+        // session records the response URL it actually landed on.
+        function sameTarget(a, b) {
+
+            if (!a || !b) return false;
+            try { return new URL(a, location.href).href === new URL(b, location.href).href; }
+            catch (e) { return a === b; }
+        }
+
+        // Bring the parked session back instead of fetching the page again.
+        // Accepted for the page it was opened with AS WELL AS the one it has
+        // navigated to since: the common flow is opening /admin, walking
+        // into some edit form inside the overlay, closing it, and then
+        // clicking that same /admin link again - meaning "give me back what
+        // I had", not "load the dashboard fresh". A link to any OTHER page
+        // is a deliberate request for that page and falls through to a
+        // normal open, which discards the parked session (see openShell).
+        //
+        // The page it was opened with stops counting once a form has been
+        // sent from the session: opening "new article", saving it (the
+        // overlay moves on to that article's edit form), closing, then
+        // asking for "new article" again means a blank form, not the
+        // article just saved - which is what coming back gave. The page
+        // the session is ON still brings it back.
+        function resume(href) {
+
+            if (!parked) return false;
+            var opened = !parked._submitted && sameTarget(href, parked._openHref);
+            if (!sameTarget(href, parked._currentHref) && !opened) return false;
+
+            var container = parked;
+            parked = null;
+            container.classList.remove('is-parked', 'is-closing');
+            container._hostState = hostStateNow();
+
+            hostTitle = document.title;
+            hostOverflow = document.body.style.overflow;
+            Transparent.html.addClass(HTML_CLASS);
+            // restore the host-page concessions this session was closed in,
+            // not the pristine modal ones: a docked panel left the host
+            // scrollable and interactive, and still does
+            if (container.classList.contains('is-docked')) Transparent.html.addClass('nest-docked');
+            else document.body.style.overflow = 'hidden';
+
+            // the nest history entry was popped by the close - put an
+            // equivalent one back so Back still closes the overlay
+            if (!(history.state && history.state.nest)) {
+                try { history.pushState(nestState(container._currentHref, container), '', location.href); } catch (e) {}
+            }
+
+            untuck(container);
+            if (container._updateChromePlacement) container._updateChromePlacement();
+            dispatchEvent(new CustomEvent('transparent:nest:resume', { detail: { href: container._currentHref } }));
+            return true;
+        }
+
+        // Asking for a page is asking to SEE it. A panel tucked away against
+        // its edge (is-hidden) kept loading the page off-screen: from the
+        // reader's side the click did nothing.
+        function untuck(container) {
+
+            if (!container || !container.classList.contains('is-hidden')) return;
+            container.classList.remove('is-hidden');
+            if (container._updateChromePlacement) container._updateChromePlacement();
+            dispatchEvent(new CustomEvent('transparent:nest:show', { detail: { href: container._currentHref, edge: container.dataset.dockEdge } }));
+        }
+
         api.open = function(href) {
 
-            if (api.isOpen()) return api.navigate(href);
+            if (api.isOpen()) { untuck(api.getContainer()); return api.navigate(href); }
+            if (resume(href)) return;
 
             fetchNested(href, function() { window.location.href = href; });
         };
@@ -4462,8 +5957,27 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
         // `#transparent-nest { transition: opacity .3s }` rule) and only
         // then removing it keeps the visual change fully inside the overlay.
         var CLOSE_TRANSITION_MS = 300; // keep in sync with index.scss's #transparent-nest transition-duration
+
+        // Whether this session is worth parking rather than destroying.
+        // A shell that never mounted anything (an ineligible target torn
+        // down mid-open) has nothing to preserve, and an error panel would
+        // come back as an error.
+        function canPark(container) {
+
+            if (Settings['nest_keepalive'] === false) return false;
+            if (!container._mounted) return false;
+            if (container.classList.contains('is-error')) return false;
+            return true;
+        }
+
         function closeShell(container) {
             var href = container._currentHref;
+            var park = canPark(container);
+            // Remember where the user left the panel - FIRST, while the
+            // layout is still intact: the teardown below undoes a
+            // container-dock, and is-closing/is-parked are about to change
+            // what the classes say.
+            if (container._captureLayout) container._captureLayout();
             // if the panel was re-parented into a host container
             // (nest_dock_target), pull it back under this shell FIRST - it
             // lives outside `container` while docked that way, so removing
@@ -4473,8 +5987,19 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
             container.classList.add('is-closing');
             dispatchEvent(new CustomEvent('transparent:nest:fade-out-start', { detail: { href: href } }));
             setTimeout(function() {
-                if (container.parentNode) container.remove();
-                dispatchEvent(new CustomEvent('transparent:nest:fade-out-end', { detail: { href: href } }));
+                // Parked, not destroyed: the node STAYS in the document and
+                // is merely hidden (index.scss, .is-parked). Removing it
+                // instead would tear the iframe's browsing context down -
+                // that is what made every close start the nested page over
+                // from scratch, losing anything half-typed in it - and
+                // re-inserting the same element reloads it just the same,
+                // so "detach and put it back" is not an option.
+                if (park) {
+                    parked = container;
+                    container.classList.add('is-parked');
+                    container.classList.remove('is-closing');
+                } else if (container.parentNode) container.remove();
+                dispatchEvent(new CustomEvent('transparent:nest:fade-out-end', { detail: { href: href, parked: park } }));
             }, CLOSE_TRANSITION_MS);
         }
 
@@ -4544,25 +6069,113 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
             dispatchEvent(new CustomEvent('transparent:nest:close'));
         };
 
+        // Whether a URL belongs in the overlay (Settings.nest).
+        api.inScope = function(href) {
+            try { return matchesPatternList(new URL(href, location.href).pathname, Settings.nest); }
+            catch (e) { return false; }
+        };
+
+        // Leave the overlay for a page outside its scope - called from INSIDE
+        // the nested iframe (leaveNest). The overlay closes without popping
+        // its history entry and is parked, and the host navigates to the page
+        // like any link of its own, pushing a new entry after the overlay's.
+        // Back then lands on that entry again and brings the overlay back over
+        // the page it was opened on (reopen); Forward closes it again and goes
+        // back to the page it was left for (the popstate listener below).
+        api.leave = function(href) {
+
+            var container = api.getContainer();
+            if (container == null) return false;
+
+            var target;
+            try { target = new URL(href, location.href); } catch (e) { return false; }
+
+            // Leaving for the very page under the overlay is simply closing it.
+            var host = container._hostState;
+            var hostHref = host && host.href ? host.href : location.href;
+            try {
+                var under = new URL(hostHref, location.href);
+                if (target.origin + target.pathname + target.search === under.origin + under.pathname + under.search) {
+                    api.close();
+                    return true;
+                }
+            } catch (e) {}
+
+            api.close(false);
+
+            // The page under the overlay is going away through a navigation
+            // __main__ does not see it leave (history.state is the overlay's
+            // entry, which has no uuid), so keep it here for Back to replay.
+            if (host && host.uuid) {
+                try { Transparent.setResponse(host.uuid, Transparent.html[0], Transparent.getScrollableElementXY()); } catch (e) {}
+            }
+
+            dispatchEvent(new CustomEvent('transparent:nest:leave', { detail: { href: target.href } }));
+
+            // Through a real link of the host document: every rule a click
+            // follows applies (exceptions, a different layout, a full load
+            // as the fallback when transparent is off).
+            var anchor = document.createElement('a');
+            anchor.href = target.href;
+            anchor.hidden = true;
+            document.body.appendChild(anchor);
+            try { anchor.click(); } finally { anchor.remove(); }
+
+            return true;
+        };
+
         // host-side half of the ESC handler - see handleEscKeydown's own
         // comment for why the iframe-side half is attached separately,
         // inside mount(), on every single mount rather than once here
         document.addEventListener('keydown', handleEscKeydown, true);
 
+        // Closing is not the only way to leave: reloading the host page, or
+        // navigating off it, with the overlay still open would otherwise
+        // throw away a layout the user had just set up. pagehide (not
+        // unload) because it is the one that still fires on mobile Safari
+        // and on a bfcache freeze.
+        window.addEventListener('pagehide', function() {
+            var container = api.getContainer();
+            if (container && container._captureLayout) container._captureLayout();
+        });
+
+        // The one answer to "would a click on this link open the overlay?" -
+        // the URL to open it with, or null. Shared by the click handler and
+        // the hover prefetch below so the two cannot disagree again.
+        //
+        // They did: the prefetch asked only "is it same-origin and in scope?",
+        // not "does it have target=_blank?", so hovering the admin pencil of
+        // a comment (an <a target="_blank">) fetched the edit page for an
+        // overlay that the click was never going to open - the click leaves
+        // it to the browser, which opens a new tab and fetches the page
+        // again. Two renders of the same admin page at once, in one session;
+        // production, 2026-09-21, and that is what cost the delete button on
+        // that page its CSRF token (a 403): the session kept the token one
+        // render minted, the tab showed the other's. Reproduced in real
+        // Firefox on beta with a real pointer, hover then click: the edit
+        // page requested twice.
+        function nestUrlFor(anchor) {
+
+            if (anchor == null || anchor.target == '_blank') return null;
+
+            var url;
+            try { url = new URL(anchor.href, currentOrigin()); } catch (_) { return null; }
+            if (url.origin != currentOrigin()) return null;
+            if (!matchesPatternList(url.pathname, Settings.nest)) return null;
+
+            return url;
+        }
+
         // hover prefetch: by the time the click lands the page is usually
-        // already in the cache, so the overlay opens instantly
+        // already in the cache, so the overlay opens instantly - for links
+        // the click will actually open in the overlay, and only those
         document.addEventListener('mouseover', function(e) {
 
             if (Settings.disable || !e.target.closest) return;
             if (location.origin === 'null') return; // inside a nest iframe - see the click handler's nest-within-nest guard
 
-            var anchor = e.target.closest('a[href]');
-            if (anchor == null) return;
-
-            try {
-                var url = new URL(anchor.href, location.origin);
-                if (url.origin == location.origin && matchesPatternList(url.pathname, Settings.nest)) api.prefetch(url.href);
-            } catch (_) {}
+            var url = nestUrlFor(e.target.closest('a[href]'));
+            if (url) api.prefetch(url.href);
         }, true);
 
         // capture phase: runs before __main__'s bubble-phase handler and
@@ -4581,17 +6194,12 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
             // see currentOrigin()). A nested document must never open a
             // second overlay level, regardless of how a consumer configures
             // Settings.nest inside it.
-            if (location.origin === 'null') return;
+            if (location.origin === 'null') { leaveFromFrame(e); return; }
             if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
             if (e.defaultPrevented) return;
 
-            var anchor = e.target.closest ? e.target.closest('a[href]') : null;
-            if (anchor == null || anchor.target == '_blank') return;
-
-            var url;
-            try { url = new URL(anchor.href, currentOrigin()); } catch (_) { return; }
-            if (url.origin != currentOrigin()) return;
-            if (!matchesPatternList(url.pathname, Settings.nest)) return;
+            var url = nestUrlFor(e.target.closest ? e.target.closest('a[href]') : null);
+            if (!url) return;
 
             e.preventDefault();
             e.stopImmediatePropagation();
@@ -4601,6 +6209,35 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                 window.location.href = url.href;
             }
         }, true);
+
+        // Inside a nest iframe: a click on a link that leaves the nest's scope
+        // leaves the overlay, whatever the nested page's own transparent would
+        // have done with it - an excepted path, a .reload link, transparent
+        // disabled on that page. Each of those used to fall through to a real
+        // navigation of the iframe, which showed the host site inside the
+        // overlay. A new tab, a download or an explicit target stays the
+        // browser's; the frame's load guard (guardFrameLocation) catches
+        // whatever still gets through, a native form submission for one.
+        function leaveFromFrame(e) {
+
+            if (e.defaultPrevented || e.button) return;
+            if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+
+            var anchor = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+            if (anchor == null || anchor.hasAttribute('download')) return;
+
+            var target = (anchor.getAttribute('target') || '').toLowerCase();
+            if (target && target !== '_self') return;
+
+            var url;
+            try { url = new URL(anchor.getAttribute('href'), document.baseURI); } catch (_) { return; }
+            if (url.origin !== currentOrigin()) return;
+
+            if (leaveNest(url)) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+            }
+        }
 
         // Back closes the overlay; __main__ defers to api.owns() for every
         // popstate the overlay is involved in
@@ -4622,11 +6259,16 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
             // `closing===true` during their synchronous handling, regardless
             // of relative order; only after the event has fully finished
             // dispatching does the flag actually clear.
-            if (closing) { setTimeout(function() { closing = false; }, 0); return; }
+            if (closing) { e.transparentNestHandled = true; setTimeout(function() { closing = false; }, 0); return; }
 
             if (api.isOpen()) {
+                e.transparentNestHandled = true;
                 if (!(e.state && e.state.nest)) {
                     api.close(false);                  // back onto the host entry
+                    // Forward onto the page the overlay was left for
+                    // (api.leave), or any host entry other than the page the
+                    // overlay sits over: swap the host to it as well.
+                    if (e.state && e.state.uuid && e.state.uuid !== shownHostUuid()) replayHost(e.state);
                     return;
                 }
                 // Back/Forward landed on a DIFFERENT internal nest page
@@ -4641,16 +6283,18 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                 // is already this exact entry).
                 var container = api.getContainer();
                 var target = e.state.nest.href;
-                if (container && container._currentHref !== target) {
+                if (container && !sameTarget(container._currentHref, target) && !replayInFrame(container, target)) {
                     fetchNested(target, function () { window.location.href = target; });
                 }
                 return;
             }
 
             if (e.state && e.state.nest) {
-                // forward into a nested entry with no overlay mounted
-                // (e.g. after a reload): fall back to a real navigation
-                window.location.href = e.state.nest.href;
+                // Back/Forward onto an overlay entry with no overlay showing:
+                // it was left for another page (api.leave), or the page was
+                // reloaded since. Bring it back over the page it was on.
+                e.transparentNestHandled = true;
+                reopen(e.state.nest);
             }
         }, true);
 
