@@ -1076,9 +1076,16 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                         return null;
                     }
 
+                    // The form's own method (as upstream transparentjs has it): a
+                    // hardcoded POST sent a <form method="get"> submitted by its
+                    // button out as a POST, which lost its query and hit a
+                    // GET-only route (405/404) - a filter bar's "Filtrer" button.
+                    // A form that names no method keeps POST, as it always had.
+                    var method = (el.getAttribute("formmethod") || form.getAttribute("method") || "POST").toUpperCase();
+
                     var pat  = /^https?:\/\//i;
-                    if (pat.test(href)) return ["POST", new URL(pathname), form];
-                    return ["POST", new URL(pathname, currentOrigin()), form];
+                    if (pat.test(href)) return [method, new URL(pathname), form];
+                    return [method, new URL(pathname, currentOrigin()), form];
                 }
         }
 
@@ -2687,6 +2694,22 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
             // Force page reload
             formSubmission = true; // mark as form submission
             formTrigger = e.target;
+
+            // A GET carries its fields in the address, not in a body (as
+            // upstream transparentjs has it): the request goes out with
+            // processData: false, which leaves `data` untouched, and a GET has
+            // no body - so a GET form's fields were silently dropped. Put in
+            // the query instead, exactly as a browser would (the form's data
+            // replaces the action's own query). A file cannot travel in an
+            // address and is left out, as a browser leaves it out of a GET.
+            if (String(type).toUpperCase() === "GET" && data instanceof FormData) {
+                var query = new URLSearchParams();
+                data.forEach(function (value, name) {
+                    if (name && typeof value === "string") query.append(name, value);
+                });
+                url.search = query.toString();
+                data = undefined;
+            }
             if ($(e.target).hasClass(Transparent.state.RELOAD)) return;
             if ($(form).hasClass(Transparent.state.RELOAD)) return;
 
