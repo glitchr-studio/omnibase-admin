@@ -14,7 +14,7 @@ the package is not on npm, sites install it from the repository):
     cp <transparent-repo>/src/css/index.scss     public/css/transparent.css
     # jquery.min.js: cp node_modules/jquery/dist/jquery.min.js public/js/jquery.min.js
 
-Currently vendored at transparentjs 3.0.29 (glitchr-studio/transparentjs 0e87a61) / jquery 3.7.1.
+Currently vendored at transparentjs 3.0.30 (glitchr-studio/transparentjs a43d91a) / jquery 3.7.1.
 Both files carry the version and the commit on their first line, and are the library's own,
 unedited: a fix the back office needs goes into transparentjs first (a new version), then is
 copied here - the copy had drifted some 2 500 lines from the library through fixes made only here.
