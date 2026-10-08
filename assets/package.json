@@ -2,7 +2,7 @@
   "name": "@omnibase/admin",
   "version": "1.0.0",
   "description": "Admin shell assets for omnibase/admin",
-  "license": "LGPL-3.0-or-later",
+  "license": "MIT",
   "author": "Marco Meyer <marco.meyer@glitchr.io>",
   "repository": {
     "url": "ssh://git@gitlab.glitchr.dev:public-repository/symfony/bundle/base/extension/admin.git",

@@ -10,7 +10,7 @@
         "dashboard"
     ],
     "homepage": "https://github.com/glitchr-studio/omnibase-admin",
-    "license": "LGPL-3.0-or-later",
+    "license": "MIT",
     "authors": [
         {
             "name": "Marco Meyer",

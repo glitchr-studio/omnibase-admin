@@ -42,4 +42,4 @@ make tests
 
 ## License
 
-LGPL-3.0-or-later: the text of the license is in [LICENSE](LICENSE), and the GNU GPL v3 it supplements in [COPYING](COPYING). See [SECURITY.md](SECURITY.md) for the vulnerability disclosure policy.
+MIT: the text of the license is in [LICENSE](LICENSE). MIT since 2026-10-09; earlier versions remain published under LGPL-3.0-or-later. See [SECURITY.md](SECURITY.md) for the vulnerability disclosure policy.
