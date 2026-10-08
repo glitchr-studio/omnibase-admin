@@ -51,17 +51,25 @@
        handler/captureLevel()/LayoutArranger already handle a matched
        code-defined item's label generically now, block-type or not. #}
     <h2 class="widget-group-title" data-analytics-title>{{ widget.label|trans({}, 'admin') }}</h2>
+    {# A link that leaves the back office (a page of the site itself: a
+       forum board, a public page) says so with a trailing arrow - inside the
+       site's website-in-website panel it closes the panel and the site
+       navigates there, which read as a bug when nothing announced it. The
+       target the item names, if any, is honoured as the sidebar does. #}
+    {% set _adminRoot = path('admin') %}
     <ul data-sortable="dashboard-items-{{ widget.key }}">
         {% for item in widget.subItems %}
             {% if item.linkUrl %}
+            {% set _leaves = not (item.linkUrl starts with _adminRoot) %}
             <li>
-                <a href="{{ item.linkUrl }}">
+                <a href="{{ item.linkUrl }}"{% if item.linkTarget %} target="{{ item.linkTarget }}"{% endif %}{% if _leaves %} data-leaves-admin title="{{ item.label|trans({}, 'admin') }} - {{ 'menu.leaves_admin'|trans({}, 'admin') }}"{% endif %}>
                     {%- if item.crudActionName == 'new' -%}
                         <i class="fa-solid fa-circle-plus"></i>
                     {%- elseif item.icon -%}
                         <i class="{{ item.icon }}"></i>
                     {%- endif -%}
                     {{ item.label|trans({}, 'admin') }}
+                    {%- if _leaves %} <i class="fa-solid fa-arrow-up-right-from-square" style="width: auto; font-size: .7em; opacity: .55" aria-hidden="true"></i>{% endif -%}
                 </a>
             </li>
             {% endif %}

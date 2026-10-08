@@ -182,6 +182,7 @@ menu:
     settings: Mes paramètres
     signed_in_as: Connecté en tant que
     logout: Déconnexion
+    leaves_admin: ouvre la page sur le site (quitte l'administration)
     dashboard: Tableau de bord
 
 flash:

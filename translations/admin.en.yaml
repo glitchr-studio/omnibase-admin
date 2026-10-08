@@ -182,6 +182,7 @@ menu:
     settings: My settings
     signed_in_as: Signed in as
     logout: Sign out
+    leaves_admin: opens the page on the site (leaves the back office)
     dashboard: Dashboard
 
 flash:

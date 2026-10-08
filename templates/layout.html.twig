@@ -208,7 +208,10 @@
         .admin-active-dot { width: .5rem; height: .5rem; border-radius: 50%; background: var(--admin-muted); flex-shrink: 0; }
         .admin-active-dot.is-online { background: var(--admin-success); }
         * { box-sizing: border-box; }
-        body { margin: 0; font: 15px/1.5 system-ui, -apple-system, sans-serif; background: var(--admin-bg); color: var(--admin-text); }
+        {# The back office reads small and dense: its own root size (it is its own document, in the site's frame), so
+           every rem-sized title, button and badge comes down with the text. #}
+        html { font-size: 14px; }
+        body { margin: 0; font: 13.5px/1.5 system-ui, -apple-system, sans-serif; background: var(--admin-bg); color: var(--admin-text); }
         .admin-shell { display: flex; min-height: 100vh; }
         {# Without this, .admin-shell's flex layout stretches .admin-aside to
            match .admin-main's full content height, so on any page taller
@@ -3240,7 +3243,13 @@
                 if (!page || !page.contains(form)) return;
 
                 e.preventDefault();
-                const url = new URL(form.getAttribute('action') || location.pathname, location.origin);
+                // document.baseURI, not location.origin: inside the site's
+                // website-in-website panel (a srcdoc iframe) the origin is
+                // the opaque "null" - an invalid base, so `new URL` threw
+                // and the search/filter went nowhere. The nest injects a
+                // <base href> with the page's real URL; on a plain page
+                // baseURI is that URL anyway.
+                const url = new URL(form.getAttribute('action') || '', document.baseURI);
                 url.search = new URLSearchParams(new FormData(form)).toString();
 
                 if (window.Transparent) {
@@ -4126,7 +4135,36 @@
 <script>
     (function () {
         var dialog = document.getElementById('admin-confirm');
-        var pendingForm = null, pendingSubmitter = null;
+        var pendingForm = null, pendingSubmitter = null, pendingByClick = false;
+
+        // The question has to be asked at the CLICK, not only at the submit:
+        // transparentJS sends the form of a type="submit" button from its
+        // own click listener, before the browser's submit event this dialog
+        // listens to - the dialog came up over a request already sent, and
+        // "Annuler" cancelled nothing (a member taken off the staff, a row
+        // deleted). Captured here, the click is held (transparentJS skips a
+        // prevented event) and replayed once the answer is yes, so whoever
+        // handles it then - transparentJS or the browser - sends it as usual.
+        document.addEventListener('click', function (e) {
+            var button = e.target instanceof Element ? e.target.closest('button, input[type=submit], input[type=image]') : null;
+            if (!button || !button.form || (button.type || '').toLowerCase() !== 'submit' && (button.type || '').toLowerCase() !== 'image') return;
+            var form = button.form;
+            var message = (button.dataset && button.dataset.confirm) || form.dataset.confirm;
+            if (!message) return;
+            if (form.dataset.confirmed === '1') {
+                // The replay. The submit event the browser may fire from it
+                // (no transparentJS on this form) is let through below too.
+                setTimeout(function () { delete form.dataset.confirmed; }, 0);
+                return;
+            }
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            pendingForm = form;
+            pendingSubmitter = button;
+            pendingByClick = true;
+            document.getElementById('admin-confirm-message').textContent = message;
+            dialog.showModal();
+        }, true);
 
         document.addEventListener('submit', function (e) {
             var form = e.target;
@@ -4143,6 +4181,7 @@
             e.stopImmediatePropagation();
             pendingForm = form;
             pendingSubmitter = submitter;
+            pendingByClick = false;
             document.getElementById('admin-confirm-message').textContent = message;
             dialog.showModal();
         }, true);
@@ -4157,9 +4196,11 @@
                     if (check) { check.checked = true; check.dispatchEvent(new Event('change', { bubbles: true })); }
                 }
                 pendingForm.dataset.confirmed = '1';
-                pendingForm.requestSubmit(pendingSubmitter);
+                if (pendingByClick && pendingSubmitter && pendingSubmitter.isConnected) pendingSubmitter.click();
+                else pendingForm.requestSubmit(pendingSubmitter);
             }
             pendingForm = pendingSubmitter = null;
+            pendingByClick = false;
         });
     })();
 </script>

@@ -67,9 +67,12 @@
                         {% for item in pane.subItems %}
                             {% if item.linkUrl %}
                                 <li>
-                                    <a href="{{ item.linkUrl }}">
+                                    {# Leaving the back office says so - see _group.html.twig. #}
+                                    {% set _leaves = not (item.linkUrl starts with path('admin')) %}
+                                    <a href="{{ item.linkUrl }}"{% if _leaves %} data-leaves-admin title="{{ item.label|trans({}, 'admin') }} - {{ 'menu.leaves_admin'|trans({}, 'admin') }}"{% endif %}>
                                         {%- if item.icon -%}<i class="{{ item.icon }}"></i>{%- endif -%}
                                         {{ item.label|trans({}, 'admin') }}
+                                        {%- if _leaves %} <i class="fa-solid fa-arrow-up-right-from-square" style="width: auto; font-size: .7em; opacity: .55" aria-hidden="true"></i>{% endif -%}
                                     </a>
                                 </li>
                             {% endif %}
