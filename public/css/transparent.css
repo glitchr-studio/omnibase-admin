@@ -1,4 +1,4 @@
-/*! @glitchr/transparentjs 3.0.30 - github.com/glitchr-studio/transparentjs a43d91a, src/css/index.scss copied as it is (plain CSS). Do not edit: change the library, then copy it again (public/js/README.md). */
+/*! @glitchr/transparentjs 3.0.31 - github.com/glitchr-studio/transparentjs 3a26e56, src/css/index.scss copied as it is (plain CSS). Do not edit: change the library, then copy it again (public/js/README.md). */
 
 img[data-src] { transition:all 0.25s ease !important; }
 img[data-src]:not(.loaded) {

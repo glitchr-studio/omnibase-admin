@@ -1,4 +1,4 @@
-/*! @glitchr/transparentjs 3.0.30 - github.com/glitchr-studio/transparentjs a43d91a, src/js/transparent.js copied as it is (LGPL-3.0-or-later). Do not edit: change the library, then copy it again (public/js/README.md). */
+/*! @glitchr/transparentjs 3.0.31 - github.com/glitchr-studio/transparentjs 3a26e56, src/js/transparent.js copied as it is (MIT). Do not edit: change the library, then copy it again (public/js/README.md). */
 // Modern browser: use passive event listeners where appropriate for better performance
 jQuery.event.special.touchstart = { setup: function( _, ns, handle ) { this.addEventListener("touchstart", handle, { passive: !ns.includes("noPreventDefault") }); } };
 jQuery.event.special.touchmove  = { setup: function( _, ns, handle ) { this.addEventListener("touchmove", handle, { passive: !ns.includes("noPreventDefault") }); } };
@@ -214,7 +214,7 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
     };
 
     var Transparent = window.Transparent = {};
-    Transparent.version = '3.0.0';
+    Transparent.version = '3.0.31';
     
     var Settings = Transparent.settings = {
         "headers": {},
@@ -1709,11 +1709,11 @@ jQuery.event.special.mousewheel = { setup: function( _, ns, handle ) { this.addE
                 if(dom === undefined)
                     console.alert("Response missing..");
 
+                // A canvas without an id is kept only where the new page has the same place for it;
+                // otherwise the new page draws its own. Never `return false`: in $.each that ends the
+                // loop, and every canvas after this one - with an id or not - was redrawn (3.0.31).
                 var parent = Transparent.findElementFromParents(dom, $(this).parents(), 3);
-                if (parent === undefined) {
-                    console.error("Unexpected canvas without ID found..", this)
-                    return false;
-                }
+                if (parent === undefined) return;
 
                 parent.append(this);
             }
